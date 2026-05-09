@@ -34,8 +34,6 @@ fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<Sessio
     let mut entrypoint = String::new();
     let mut user_messages: Vec<String> = Vec::new();
 
-    let project_name = project_name_from_dir(project_dir_name);
-
     for line in &lines {
         if let Ok(entry) = serde_json::from_str::<JsonlEntry>(line) {
             match entry.entry_type.as_deref() {
@@ -133,10 +131,17 @@ fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<Sessio
         };
     }
 
+    let inferred_project_path = project_name_from_dir(project_dir_name);
+    let project_path = if cwd.is_empty() {
+        inferred_project_path
+    } else {
+        cwd.clone()
+    };
+
     Some(SessionInfo {
         session_id,
-        project_path: project_dir_name.to_string(),
-        project_name,
+        project_path: project_path.clone(),
+        project_name: project_path,
         full_path: file_path.to_string_lossy().to_string(),
         title,
         first_prompt,
@@ -196,19 +201,24 @@ pub fn scan_sessions() -> Vec<SessionInfo> {
                 let key = fp.to_string_lossy().to_string();
                 seen_keys.push(key.clone());
 
-                let mtime = fs::metadata(&fp)
-                    .ok()
-                    .and_then(|m| m.modified().ok());
+                let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
 
                 let cached = cache.get(&key);
-                let use_cache = cached.is_some() && mtime.is_some()
+                let use_cache = cached.is_some()
+                    && mtime.is_some()
                     && cached.unwrap().modified == mtime.unwrap();
 
                 if use_cache {
                     sessions.push(cached.unwrap().session.clone());
                 } else if let Some(session) = parse_session_file(&fp, &dir_name) {
                     if let Some(mt) = mtime {
-                        cache.insert(key.clone(), CacheEntry { session: session.clone(), modified: mt });
+                        cache.insert(
+                            key.clone(),
+                            CacheEntry {
+                                session: session.clone(),
+                                modified: mt,
+                            },
+                        );
                     }
                     sessions.push(session);
                 }

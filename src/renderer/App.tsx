@@ -10,6 +10,12 @@ import { ToastContainer } from './components/Toast'
 
 type Theme = 'light' | 'dark' | 'system'
 
+function projectDisplayName(projectPath: string | null): string {
+  if (!projectPath) return 'All Projects'
+  const segments = projectPath.split('/').filter(Boolean)
+  return segments.at(-1) || projectPath
+}
+
 export default function App() {
   const store = useStore()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -18,6 +24,7 @@ export default function App() {
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
   const searchRef = useRef<HTMLInputElement>(null)
   const selectedSessionIdRef = useRef(store.selectedSessionId)
   selectedSessionIdRef.current = store.selectedSessionId
@@ -34,9 +41,17 @@ export default function App() {
     try { await store.loadData() } finally { setSyncing(false) }
   }, [store.loadData])
 
+  const toggleProjectMenu = useCallback(() => {
+    const rect = projectBtnRef.current?.getBoundingClientRect()
+    if (rect) {
+      setProjectMenuPosition({ top: rect.bottom + 5, left: rect.left })
+    }
+    setProjectMenuOpen(v => !v)
+  }, [])
+
   useEffect(() => {
     if (!projectMenuOpen && !settingsMenuOpen) return
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent) => {
       const target = e.target as Node
       if (projectMenuOpen && projectBtnRef.current && !projectBtnRef.current.contains(target)
         && projectMenuRef.current && !projectMenuRef.current.contains(target)) {
@@ -46,8 +61,8 @@ export default function App() {
         setSettingsMenuOpen(false)
       }
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('pointerdown', handler, true)
+    return () => document.removeEventListener('pointerdown', handler, true)
   }, [projectMenuOpen, settingsMenuOpen])
 
   useEffect(() => {
@@ -107,6 +122,9 @@ export default function App() {
     document.addEventListener('mouseup', onUp)
   }, [sidebarWidth])
 
+  const currentProjectName = projectDisplayName(store.selectedProject)
+  const currentProjectTitle = store.selectedProject || 'All Projects'
+
   if (store.loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface">
@@ -122,10 +140,10 @@ export default function App() {
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Unified title bar */}
       <header className="h-[38px] flex items-center border-b border-edge/70 flex-shrink-0 relative" data-tauri-drag-region>
-        <div className="w-[78px] flex-shrink-0" />
+        <div className="w-[72px] flex-shrink-0" />
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="p-1.5 rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
+          className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
           title="Toggle sidebar (⌘B)"
           aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
           aria-expanded={!sidebarCollapsed}
@@ -134,17 +152,19 @@ export default function App() {
         </button>
         <button
           ref={projectBtnRef}
-          onClick={() => setProjectMenuOpen(v => !v)}
-          className={`p-1.5 rounded-md transition-colors ${store.selectedProject ? 'text-blue-400 hover:bg-blue-500/10' : 'text-content-3 hover:bg-surface-3 hover:text-content-2'}`}
-          title="Filter by project"
+          onClick={toggleProjectMenu}
+          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-md px-1.5 transition-colors ${store.selectedProject ? 'text-blue-400 hover:bg-blue-500/10' : 'text-content-3 hover:bg-surface-3 hover:text-content-2'}`}
+          title={currentProjectTitle}
+          aria-label={`Filter by project: ${currentProjectTitle}`}
         >
           <FolderOpen className="w-4 h-4" />
+          <span className="max-w-[190px] truncate text-xs font-medium" title={currentProjectTitle}>{currentProjectName}</span>
         </button>
         {projectMenuOpen && createPortal(
           <div
             ref={projectMenuRef}
             className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[200px] max-h-[320px] overflow-y-auto"
-            style={{ top: 38, left: 78 }}
+            style={projectMenuPosition}
           >
             <button
               onClick={() => { store.setSelectedProject(null); setProjectMenuOpen(false) }}
