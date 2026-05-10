@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
-import type { SessionInfo, GTDMetadata } from '../../shared/types'
+import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
 import { formatDate, relativeProjectName, GTD_STATUS_CONFIG } from '../lib/utils'
 import { MessageSquare, GitBranch, Star, FileText, Search } from 'lucide-react'
 
@@ -12,9 +12,10 @@ interface SessionListProps {
   selectSession: (session: SessionInfo) => void
   getGTD: (sessionId: string) => GTDMetadata
   hasFilters: boolean
+  contentResults: Map<string, ContentSearchResult>
 }
 
-export function SessionList({ filteredSessions, selectedSessionId, selectSession, getGTD, hasFilters }: SessionListProps) {
+export function SessionList({ filteredSessions, selectedSessionId, selectSession, getGTD, hasFilters, contentResults }: SessionListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(0)
@@ -93,6 +94,11 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
                       <div className="text-[11px] text-content-4 mt-0.5 truncate">
                         {relativeProjectName(session.projectName)}
                       </div>
+                      {contentResults.has(session.sessionId) && (
+                        <div className="text-[10px] text-content-3 mt-0.5 truncate italic">
+                          {contentResults.get(session.sessionId)!.snippet}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-1">
                         <span className="text-[10px] text-content-4 flex items-center gap-0.5">
                           <MessageSquare className="w-2.5 h-2.5" />{session.messageCount}

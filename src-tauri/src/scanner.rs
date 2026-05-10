@@ -5,7 +5,7 @@ use std::sync::Mutex;
 use std::time::SystemTime;
 
 use crate::helpers::{extract_text, project_name_from_dir, projects_dir};
-use crate::models::{JsonlEntry, SessionInfo};
+use crate::models::{ContentSearchResult, JsonlEntry, SessionInfo};
 
 struct CacheEntry {
     session: SessionInfo,
@@ -231,4 +231,136 @@ pub fn scan_sessions() -> Vec<SessionInfo> {
 
     sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
     sessions
+}
+
+fn count_occurrences(haystack: &str, needle: &str) -> usize {
+    haystack.to_lowercase().matches(needle).count()
+}
+
+fn extract_snippet(text: &str, query: &str, window: usize) -> String {
+    let lower = text.to_lowercase();
+    if let Some(pos) = lower.find(query) {
+        let start = pos.saturating_sub(window / 2);
+        let end = (pos + query.len() + window / 2).min(text.len());
+        let mut snippet = String::new();
+        if start > 0 { snippet.push_str("..."); }
+        snippet.push_str(&text[start..end]);
+        if end < text.len() { snippet.push_str("..."); }
+        snippet
+    } else {
+        text.chars().take(window).collect()
+    }
+}
+
+#[tauri::command]
+pub async fn search_session_content(query: String) -> Vec<ContentSearchResult> {
+    tokio::task::spawn_blocking(move || {
+        let query_lower = query.to_lowercase();
+        if query_lower.len() < 2 {
+            return vec![];
+        }
+
+        // Snapshot cache data, then release lock
+        let cached_entries: Vec<(String, Vec<String>, String)> = {
+            let cache = CACHE.lock().unwrap();
+            match cache.as_ref() {
+                Some(map) => map
+                    .values()
+                    .map(|e| {
+                        (
+                            e.session.session_id.clone(),
+                            e.session.user_messages.clone(),
+                            e.session.full_path.clone(),
+                        )
+                    })
+                    .collect(),
+                None => return vec![],
+            }
+        };
+
+        let mut results: Vec<ContentSearchResult> = Vec::new();
+
+        for (session_id, user_messages, full_path) in &cached_entries {
+            let mut score: f64 = 0.0;
+            let mut matched_fields: Vec<String> = Vec::new();
+            let mut best_snippet: Option<String> = None;
+
+            // Tier 1: search cached user_messages (no disk I/O)
+            for msg in user_messages {
+                let count = count_occurrences(msg, &query_lower);
+                if count > 0 {
+                    score += count as f64 * 3.0;
+                    if !matched_fields.contains(&"user_messages".to_string()) {
+                        matched_fields.push("user_messages".to_string());
+                    }
+                    if best_snippet.is_none() {
+                        best_snippet = Some(extract_snippet(msg, &query_lower, 120));
+                    }
+                }
+            }
+
+            // Tier 2: read JSONL for assistant text and tool content
+            if let Ok(content) = fs::read_to_string(full_path) {
+                for line in content.lines() {
+                    if !line.to_lowercase().contains(&query_lower) {
+                        continue;
+                    }
+                    if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
+                        let entry_type = entry.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                        if entry_type == "assistant" {
+                            if let Some(blocks) = entry
+                                .get("message")
+                                .and_then(|m| m.get("content"))
+                                .and_then(|c| c.as_array())
+                            {
+                                for block in blocks {
+                                    let btype = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                                    if btype == "text" {
+                                        if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                                            let count = count_occurrences(text, &query_lower);
+                                            if count > 0 {
+                                                score += count as f64 * 1.0;
+                                                if !matched_fields.contains(&"assistant_text".to_string()) {
+                                                    matched_fields.push("assistant_text".to_string());
+                                                }
+                                                if best_snippet.is_none() {
+                                                    best_snippet = Some(extract_snippet(text, &query_lower, 120));
+                                                }
+                                            }
+                                        }
+                                    } else if btype == "tool_use" {
+                                        let input_str = serde_json::to_string(&block.get("input"))
+                                            .unwrap_or_default();
+                                        let count = count_occurrences(&input_str, &query_lower);
+                                        if count > 0 {
+                                            score += count as f64 * 0.5;
+                                            if !matched_fields.contains(&"tool_content".to_string()) {
+                                                matched_fields.push("tool_content".to_string());
+                                            }
+                                            if best_snippet.is_none() {
+                                                best_snippet = Some(extract_snippet(&input_str, &query_lower, 120));
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if score > 0.0 {
+                results.push(ContentSearchResult {
+                    session_id: session_id.clone(),
+                    score,
+                    matched_fields,
+                    snippet: best_snippet.unwrap_or_default(),
+                });
+            }
+        }
+
+        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        results.truncate(50);
+        results
+    }).await.unwrap_or_default()
 }

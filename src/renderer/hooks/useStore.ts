@@ -3,12 +3,14 @@ import { useSessions } from './useSessions'
 import { useGTD } from './useGTD'
 import { useFilters } from './useFilters'
 import { useToast } from './useToast'
+import { useContentSearch } from './useContentSearch'
 
 export function useStore() {
   const { toasts, addToast, removeToast } = useToast()
   const sessions = useSessions(addToast)
   const gtd = useGTD()
   const filters = useFilters(sessions.sessions, gtd.getGTD)
+  const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
 
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
@@ -32,9 +34,19 @@ export function useStore() {
     || filters.filterTag !== null
     || filters.filterStarred
 
+  const filteredSessions = useMemo(() => {
+    const base = filters.filteredSessions
+    if (contentResults.size === 0) return base
+    const seen = new Set(base.map(s => s.sessionId))
+    const extras = sessions.sessions
+      .filter(s => contentResults.has(s.sessionId) && !seen.has(s.sessionId))
+      .sort((a, b) => (contentResults.get(b.sessionId)?.score ?? 0) - (contentResults.get(a.sessionId)?.score ?? 0))
+    return [...base, ...extras]
+  }, [filters.filteredSessions, contentResults, sessions.sessions])
+
   return {
     loading: sessions.loading,
-    filteredSessions: filters.filteredSessions,
+    filteredSessions,
     statusCounts: filters.statusCounts,
     selectedSession,
     selectedSessionId: sessions.selectedSessionId,
@@ -71,5 +83,7 @@ export function useStore() {
     hasFilters,
     toasts,
     removeToast,
+    contentResults,
+    isSearching,
   }
 }

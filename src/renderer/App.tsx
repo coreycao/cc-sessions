@@ -195,12 +195,15 @@ export default function App() {
               <input
                 ref={searchRef}
                 type="text"
-                placeholder="Search... ⌘K"
+                placeholder="Search sessions... ⌘K"
                 value={store.searchQuery}
                 onChange={e => store.setSearchQuery(e.target.value)}
                 aria-label="Search sessions"
-                className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-3 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3 transition-colors"
+                className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-8 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3 transition-colors"
               />
+              {store.isSearching && (
+                <LoaderCircle className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-content-4 animate-spin" />
+              )}
             </div>
           </div>
         </div>
@@ -246,6 +249,7 @@ export default function App() {
           selectSession={store.selectSession}
           getGTD={store.getGTD}
           hasFilters={store.hasFilters}
+          contentResults={store.contentResults}
         />
 
         {store.selectedSession ? (

@@ -23,6 +23,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             scanner::scan_sessions,
+            scanner::search_session_content,
             gtd::load_gtd_store,
             gtd::save_gtd_store,
             commands::read_session_content,

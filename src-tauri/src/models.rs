@@ -55,6 +55,15 @@ pub(crate) struct JsonlEntry {
     pub ai_title: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ContentSearchResult {
+    pub session_id: String,
+    pub score: f64,
+    pub matched_fields: Vec<String>,
+    pub snippet: String,
+}
+
 #[derive(Deserialize)]
 pub(crate) struct JsonlMessage {
     pub role: Option<String>,

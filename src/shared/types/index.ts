@@ -108,3 +108,12 @@ export interface UserTextTurn {
 }
 
 export type ConversationTurn = AssistantTurn | UserTextTurn | SystemMessage
+
+// ---- Content Search Types ----
+
+export interface ContentSearchResult {
+  sessionId: string
+  score: number
+  matchedFields: string[]
+  snippet: string
+}
