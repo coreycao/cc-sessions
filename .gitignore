@@ -4,3 +4,14 @@ src-tauri/target/
 src-tauri/gen/
 .DS_Store
 *.log
+
+# Local agent/browser tooling state
+.playwright-mcp/
+.codex/
+.claude/
+.agents/
+AGENTS.md
+
+# Local editor state
+.vscode/
+*.code-workspace
