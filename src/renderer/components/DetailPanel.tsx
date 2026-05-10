@@ -1,14 +1,13 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-import rehypeHighlight from 'rehype-highlight'
 import type { SessionInfo, GTDMetadata } from '../../shared/types'
 import { formatDate, GTD_STATUS_CONFIG, GTD_STATUS_LIST } from '../lib/utils'
+import { parseConversation } from '../lib/parseConversation'
+import { TurnRenderer, FullscreenMessageModal } from './ConversationMessage'
 import {
   Inbox, CircleDot, LoaderCircle, Clock, CircleCheck, Archive,
-  Star, MessageSquare, GitBranch, Calendar, X, Plus, FileText,
-  Trash2, RotateCcw, Maximize2, Copy, Check, AlertTriangle,
+  Star, MessageSquare, GitBranch, Calendar, X, Plus,
+  Trash2, RotateCcw, AlertTriangle,
 } from 'lucide-react'
 
 const STATUS_ICONS: Record<string, any> = { Inbox, CircleDot, LoaderCircle, Clock, CircleCheck, Archive }
@@ -343,73 +342,18 @@ function ActionTip({ label, children }: { label: string; children: React.ReactNo
 function ConversationPreview({ content, sessionId }: { content: string; sessionId: string }) {
   const [expandedMsg, setExpandedMsg] = useState<{ role: string; text: string; timestamp: string } | null>(null)
 
-  const messages = useMemo(() => {
-    if (!content) return []
-    const lines = content.split('\n').filter(l => l.trim())
-    const result: { role: string; text: string; timestamp: string }[] = []
+  const turns = useMemo(() => parseConversation(content), [content, sessionId])
 
-    for (const line of lines) {
-      try {
-        const entry = JSON.parse(line)
-        if (entry.type === 'user' && entry.message?.role === 'user') {
-          const text = typeof entry.message.content === 'string'
-            ? entry.message.content
-            : Array.isArray(entry.message.content)
-              ? entry.message.content.filter((c: any) => c.type === 'text').map((c: any) => c.text).join('\n')
-              : ''
-          if (text && !text.startsWith('Generate a short, clear title')) {
-            result.push({ role: 'user', text, timestamp: entry.timestamp })
-          }
-        } else if (entry.type === 'assistant' && entry.message?.role === 'assistant') {
-          const blocks = Array.isArray(entry.message.content) ? entry.message.content : []
-          for (const block of blocks) {
-            if (block.type === 'text' && block.text) {
-              result.push({ role: 'assistant', text: block.text, timestamp: entry.timestamp })
-            }
-          }
-        }
-      } catch {}
-    }
-    return result
-  }, [content, sessionId])
-
-  if (messages.length === 0) {
+  if (turns.length === 0) {
     return <div className="text-content-4 text-xs">No conversation content available.</div>
   }
 
   return (
     <>
       <div className="space-y-4 flex flex-col">
-        {messages.map((msg, i) => {
-          const isUser = msg.role === 'user'
-          const isLong = msg.text.length > 800
-          return (
-            <div key={i} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-              <div className={`relative group max-w-[80%] rounded-lg px-3 py-2 ${isUser ? 'bg-blue-500/15 border border-blue-500/20' : 'bg-surface-2 border border-edge/60'}`}>
-                <div className={`flex items-center gap-2 mb-1 ${isUser ? 'justify-end' : ''}`}>
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${isUser ? 'text-blue-400/80' : 'text-emerald-400/80'}`}>
-                    {isUser ? 'You' : 'Claude'}
-                  </span>
-                  {msg.timestamp && (
-                    <span className="text-[10px] text-content-5">{formatDate(msg.timestamp)}</span>
-                  )}
-                </div>
-                <div className="text-xs text-content-2 whitespace-pre-wrap leading-relaxed break-words font-mono">
-                  {isLong ? msg.text.slice(0, 800) + '...' : msg.text}
-                </div>
-                {isLong && (
-                  <button
-                    onClick={() => setExpandedMsg(msg)}
-                    className={`absolute bottom-1.5 ${isUser ? 'left-2' : 'right-2'} opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-surface-3/80 text-content-4 hover:text-content-2`}
-                    title="View full content"
-                  >
-                    <Maximize2 className="w-3.5 h-3.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
+        {turns.map(turn => (
+          <TurnRenderer key={turn.id} turn={turn} onExpand={setExpandedMsg} />
+        ))}
       </div>
       {expandedMsg && (
         <FullscreenMessageModal
@@ -418,133 +362,6 @@ function ConversationPreview({ content, sessionId }: { content: string; sessionI
         />
       )}
     </>
-  )
-}
-
-function FullscreenMessageModal({ message, onClose }: {
-  message: { role: string; text: string; timestamp: string }
-  onClose: () => void
-}) {
-  const isUser = message.role === 'user'
-  const [copied, setCopied] = useState(false)
-  const contentRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [onClose])
-
-  const handleCopy = useCallback(() => {
-    const text = message.text
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        () => { setCopied(true); setTimeout(() => setCopied(false), 2000) },
-        () => fallbackCopy(text),
-      )
-    } else {
-      fallbackCopy(text)
-    }
-    function fallbackCopy(t: string) {
-      const ta = document.createElement('textarea')
-      ta.value = t
-      ta.style.cssText = 'position:fixed;left:-9999px'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
-  }, [message.text])
-
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex flex-col bg-surface/95 backdrop-blur-sm modal-animate-in">
-      {/* Header */}
-      <div className="relative flex items-center justify-center px-6 py-3 border-b border-edge/50 shrink-0">
-        <div className="flex items-center gap-3">
-          <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${isUser ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'}`}>
-            {isUser ? 'You' : 'Claude'}
-          </span>
-          {message.timestamp && (
-            <span className="text-xs text-content-4">{formatDate(message.timestamp)}</span>
-          )}
-          <span className="text-[10px] text-content-5">{message.text.length.toLocaleString()} chars</span>
-        </div>
-        <div className="absolute right-6 flex items-center gap-1">
-          <button
-            onClick={handleCopy}
-            className="p-1.5 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors cursor-pointer"
-            title="Copy content"
-          >
-            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors cursor-pointer"
-            title="Close (Esc)"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div ref={contentRef} className="flex-1 overflow-y-auto">
-        <div className="max-w-4xl mx-auto px-8 py-6">
-          {isUser ? (
-            <div className="text-sm text-content leading-relaxed whitespace-pre-wrap font-mono">
-              {message.text}
-            </div>
-          ) : (
-            <article className="markdown-body text-sm text-content leading-relaxed">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
-                components={{
-                  pre: ({ children, ...props }) => (
-                    <pre className="relative group/code" {...props}>
-                      {children}
-                    </pre>
-                  ),
-                  code: ({ className, children, ...props }) => {
-                    const isInline = !className
-                    if (isInline) {
-                      return <code className="px-1.5 py-0.5 rounded bg-surface-3 text-[13px] font-mono text-content-2" {...props}>{children}</code>
-                    }
-                    return (
-                      <code className={`${className || ''} text-[13px]`} {...props}>
-                        {children}
-                      </code>
-                    )
-                  },
-                  table: ({ children }) => (
-                    <div className="overflow-x-auto my-4">
-                      <table className="min-w-full border-collapse border border-edge/50">{children}</table>
-                    </div>
-                  ),
-                  th: ({ children }) => (
-                    <th className="border border-edge/50 px-3 py-2 bg-surface-2 text-left text-xs font-semibold text-content-2">{children}</th>
-                  ),
-                  td: ({ children }) => (
-                    <td className="border border-edge/50 px-3 py-2 text-xs text-content-2">{children}</td>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-3 border-content-4/30 pl-4 my-3 text-content-3 italic">{children}</blockquote>
-                  ),
-                  a: ({ href, children }) => (
-                    <a href={href} className="text-blue-400 hover:text-blue-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
-                  ),
-                }}
-              >
-                {message.text}
-              </ReactMarkdown>
-            </article>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body
   )
 }
 
