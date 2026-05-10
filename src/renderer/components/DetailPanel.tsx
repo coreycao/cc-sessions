@@ -128,6 +128,12 @@ export function DetailPanel({
           </div>
         </div>
 
+        <NoteInput
+          value={gtd.notes}
+          updatedAt={gtd.updatedAt}
+          onSave={notes => updateSessionGTD(selectedSession.sessionId, { notes })}
+        />
+
         <div className="flex items-center gap-4 text-[11px] text-content-4">
           <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(selectedSession.created).toLocaleDateString()}</span>
           <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount} msgs</span>
@@ -147,6 +153,77 @@ export function DetailPanel({
           onConfirm={() => { setShowDeleteConfirm(false); deleteSession(selectedSession) }}
           onCancel={() => setShowDeleteConfirm(false)}
         />
+      )}
+    </div>
+  )
+}
+
+function NoteInput({ value, updatedAt, onSave }: {
+  value: string
+  updatedAt: string
+  onSave: (notes: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  const startEdit = useCallback(() => {
+    setDraft(value)
+    setEditing(true)
+  }, [value])
+
+  const save = useCallback(() => {
+    const trimmed = draft.trim()
+    if (trimmed !== value.trim()) {
+      onSave(trimmed)
+    }
+    setEditing(false)
+  }, [draft, value, onSave])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') { e.stopPropagation(); setEditing(false); setDraft(value) }
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.stopPropagation(); save() }
+  }, [save, value])
+
+  if (editing) {
+    return (
+      <div className="flex items-start gap-3">
+        <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14 pt-1.5">Notes</span>
+        <div className="flex-1 min-w-0">
+          <textarea
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={save}
+            onKeyDown={handleKeyDown}
+            placeholder="Add a note..."
+            rows={1}
+            autoFocus
+            className="w-full bg-surface-2/60 border border-edge rounded-md px-2 py-1.5 text-[11px] text-content-2 placeholder-content-4 focus:outline-none focus:border-content-3 resize-none leading-relaxed"
+          />
+          <span className="text-[9px] text-content-5 mt-0.5 block">⌘Enter to save · Esc to cancel</span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-start gap-3">
+      <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14 pt-1.5">Notes</span>
+      {value ? (
+        <div
+          onClick={startEdit}
+          className="flex-1 min-w-0 cursor-pointer bg-surface-2/40 rounded-md px-2 py-1.5 hover:bg-surface-2/80 transition-colors"
+          title="Click to edit"
+        >
+          <p className="text-[11px] text-content-2 leading-relaxed line-clamp-2">{value}</p>
+          {updatedAt && <span className="text-[9px] text-content-5 mt-0.5 block">{formatDate(updatedAt)}</span>}
+        </div>
+      ) : (
+        <button
+          onClick={startEdit}
+          className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors py-1.5"
+        >
+          <Plus className="w-3 h-3" />Add a note...
+        </button>
       )}
     </div>
   )
@@ -203,7 +280,7 @@ function TagInput({ value, onChange, onSubmit, onClose, suggestions }: {
           value={value}
           onChange={e => { onChange(e.target.value); setOpen(true) }}
           onKeyDown={e => {
-            if (e.key === 'Escape') onClose()
+            if (e.key === 'Escape') { e.stopPropagation(); onClose() }
             if (e.key === 'ArrowDown') { e.preventDefault(); setHighlighted(i => Math.min(i + 1, filtered.length - 1)) }
             if (e.key === 'ArrowUp') { e.preventDefault(); setHighlighted(i => Math.max(i - 1, -1)) }
             if (e.key === 'Enter' && highlighted >= 0 && highlighted < filtered.length) { e.preventDefault(); select(filtered[highlighted]) }
