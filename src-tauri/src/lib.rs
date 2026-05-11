@@ -6,7 +6,7 @@ mod scanner;
 
 use tauri::Manager;
 
-use gtd::{load_gtd_from_file, gtd_store_path, AppState};
+use gtd::{load_gtd_from_file, load_session_cache, gtd_store_path, session_cache_path, AppState};
 
 pub fn run() {
     tauri::Builder::default()
@@ -16,8 +16,11 @@ pub fn run() {
         .setup(|app| {
             let gtd_path = gtd_store_path(app.handle());
             let initial_store = load_gtd_from_file(&gtd_path);
+            let cache_path = session_cache_path(app.handle());
+            let initial_cache = load_session_cache(&cache_path);
             app.manage(AppState {
                 gtd_store: std::sync::Mutex::new(initial_store),
+                cache: std::sync::Mutex::new(initial_cache),
             });
             Ok(())
         })

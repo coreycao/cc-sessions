@@ -1,20 +1,17 @@
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
-use std::sync::Mutex;
-use std::time::SystemTime;
 
+use crate::gtd::{session_cache_path, save_session_cache_to_file, AppState};
 use crate::helpers::{extract_text, project_name_from_dir, projects_dir};
-use crate::models::{ContentSearchResult, JsonlEntry, SessionInfo};
+use crate::models::{ContentSearchResult, JsonlEntry, SessionCacheEntry, SessionInfo};
 
-struct CacheEntry {
+struct ParsedSession {
     session: SessionInfo,
-    modified: SystemTime,
+    assistant_texts: Vec<String>,
+    tool_inputs: Vec<String>,
 }
 
-static CACHE: Mutex<Option<HashMap<String, CacheEntry>>> = Mutex::new(None);
-
-fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<SessionInfo> {
+fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<ParsedSession> {
     let content = fs::read_to_string(file_path).ok()?;
     let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
     if lines.is_empty() {
@@ -33,6 +30,8 @@ fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<Sessio
     let mut cwd = String::new();
     let mut entrypoint = String::new();
     let mut user_messages: Vec<String> = Vec::new();
+    let mut assistant_texts: Vec<String> = Vec::new();
+    let mut tool_inputs: Vec<String> = Vec::new();
 
     for line in &lines {
         if let Ok(entry) = serde_json::from_str::<JsonlEntry>(line) {
@@ -81,6 +80,29 @@ fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<Sessio
                     message_count += 1;
                     if let Some(v) = entry.session_id {
                         session_id = v;
+                    }
+                    if let Some(msg) = &entry.message {
+                        if let Some(content) = &msg.content {
+                            if let Some(blocks) = content.as_array() {
+                                for block in blocks {
+                                    let btype = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                                    if btype == "text" {
+                                        if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
+                                            if !text.is_empty() {
+                                                assistant_texts.push(text.chars().take(1000).collect());
+                                            }
+                                        }
+                                    } else if btype == "tool_use" {
+                                        if let Some(input) = block.get("input") {
+                                            let input_str = serde_json::to_string(input).unwrap_or_default();
+                                            if !input_str.is_empty() {
+                                                tool_inputs.push(input_str.chars().take(500).collect());
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
                 Some("ai-title") => {
@@ -138,38 +160,39 @@ fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<Sessio
         cwd.clone()
     };
 
-    Some(SessionInfo {
-        session_id,
-        project_path: project_path.clone(),
-        project_name: project_path,
-        full_path: file_path.to_string_lossy().to_string(),
-        title,
-        first_prompt,
-        message_count,
-        created,
-        modified,
-        git_branch,
-        is_sidechain,
-        version,
-        cwd,
-        entrypoint,
-        user_messages,
-        assistant_summary: String::new(),
+    Some(ParsedSession {
+        session: SessionInfo {
+            session_id,
+            project_path: project_path.clone(),
+            project_name: project_path,
+            full_path: file_path.to_string_lossy().to_string(),
+            title,
+            first_prompt,
+            message_count,
+            created,
+            modified,
+            git_branch,
+            is_sidechain,
+            version,
+            cwd,
+            entrypoint,
+            user_messages,
+            assistant_summary: String::new(),
+        },
+        assistant_texts,
+        tool_inputs,
     })
 }
 
 #[tauri::command]
-pub fn scan_sessions() -> Vec<SessionInfo> {
+pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Vec<SessionInfo> {
     let pdir = projects_dir();
     if !pdir.exists() {
         return vec![];
     }
 
-    let mut cache = CACHE.lock().unwrap();
-    if cache.is_none() {
-        *cache = Some(HashMap::new());
-    }
-    let cache = cache.as_mut().unwrap();
+    let mut cache = state.cache.lock().unwrap();
+    let mut dirty = false;
 
     let mut sessions: Vec<SessionInfo> = Vec::new();
     let mut seen_keys: Vec<String> = Vec::new();
@@ -203,31 +226,42 @@ pub fn scan_sessions() -> Vec<SessionInfo> {
 
                 let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
 
-                let cached = cache.get(&key);
+                let cached = cache.entries.get(&key);
                 let use_cache = cached.is_some()
                     && mtime.is_some()
-                    && cached.unwrap().modified == mtime.unwrap();
+                    && cached.unwrap().to_system_time() == mtime.unwrap();
 
                 if use_cache {
                     sessions.push(cached.unwrap().session.clone());
-                } else if let Some(session) = parse_session_file(&fp, &dir_name) {
+                } else if let Some(parsed) = parse_session_file(&fp, &dir_name) {
                     if let Some(mt) = mtime {
-                        cache.insert(
+                        cache.entries.insert(
                             key.clone(),
-                            CacheEntry {
-                                session: session.clone(),
-                                modified: mt,
-                            },
+                            SessionCacheEntry::from_session_and_mtime(
+                                parsed.session.clone(),
+                                mt,
+                                parsed.assistant_texts,
+                                parsed.tool_inputs,
+                            ),
                         );
+                        dirty = true;
                     }
-                    sessions.push(session);
+                    sessions.push(parsed.session);
                 }
             }
         }
     }
 
     // Evict deleted files from cache
-    cache.retain(|k, _| seen_keys.contains(k));
+    let before = cache.entries.len();
+    cache.entries.retain(|k, _| seen_keys.contains(k));
+    if cache.entries.len() != before {
+        dirty = true;
+    }
+
+    if dirty {
+        let _ = save_session_cache_to_file(&session_cache_path(&app), &cache);
+    }
 
     sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
     sessions
@@ -253,39 +287,37 @@ fn extract_snippet(text: &str, query: &str, window: usize) -> String {
 }
 
 #[tauri::command]
-pub async fn search_session_content(query: String) -> Vec<ContentSearchResult> {
+pub async fn search_session_content(query: String, state: tauri::State<'_, AppState>) -> Result<Vec<ContentSearchResult>, String> {
+    // Snapshot cache data before spawning, since State can't be moved into 'static closure
+    let cached_entries: Vec<(String, Vec<String>, Vec<String>, Vec<String>)> = {
+        let cache = state.cache.lock().unwrap();
+        cache
+            .entries
+            .values()
+            .map(|e| {
+                (
+                    e.session.session_id.clone(),
+                    e.session.user_messages.clone(),
+                    e.assistant_texts.clone(),
+                    e.tool_inputs.clone(),
+                )
+            })
+            .collect()
+    };
+
     tokio::task::spawn_blocking(move || {
         let query_lower = query.to_lowercase();
         if query_lower.len() < 2 {
-            return vec![];
+            return Ok(vec![]);
         }
-
-        // Snapshot cache data, then release lock
-        let cached_entries: Vec<(String, Vec<String>, String)> = {
-            let cache = CACHE.lock().unwrap();
-            match cache.as_ref() {
-                Some(map) => map
-                    .values()
-                    .map(|e| {
-                        (
-                            e.session.session_id.clone(),
-                            e.session.user_messages.clone(),
-                            e.session.full_path.clone(),
-                        )
-                    })
-                    .collect(),
-                None => return vec![],
-            }
-        };
 
         let mut results: Vec<ContentSearchResult> = Vec::new();
 
-        for (session_id, user_messages, full_path) in &cached_entries {
+        for (session_id, user_messages, assistant_texts, tool_inputs) in &cached_entries {
             let mut score: f64 = 0.0;
             let mut matched_fields: Vec<String> = Vec::new();
             let mut best_snippet: Option<String> = None;
 
-            // Tier 1: search cached user_messages (no disk I/O)
             for msg in user_messages {
                 let count = count_occurrences(msg, &query_lower);
                 if count > 0 {
@@ -299,52 +331,28 @@ pub async fn search_session_content(query: String) -> Vec<ContentSearchResult> {
                 }
             }
 
-            // Tier 2: read JSONL for assistant text and tool content
-            if let Ok(content) = fs::read_to_string(full_path) {
-                for line in content.lines() {
-                    if !line.to_lowercase().contains(&query_lower) {
-                        continue;
+            for text in assistant_texts {
+                let count = count_occurrences(text, &query_lower);
+                if count > 0 {
+                    score += count as f64 * 1.0;
+                    if !matched_fields.contains(&"assistant_text".to_string()) {
+                        matched_fields.push("assistant_text".to_string());
                     }
-                    if let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) {
-                        let entry_type = entry.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                        if entry_type == "assistant" {
-                            if let Some(blocks) = entry
-                                .get("message")
-                                .and_then(|m| m.get("content"))
-                                .and_then(|c| c.as_array())
-                            {
-                                for block in blocks {
-                                    let btype = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
-                                    if btype == "text" {
-                                        if let Some(text) = block.get("text").and_then(|t| t.as_str()) {
-                                            let count = count_occurrences(text, &query_lower);
-                                            if count > 0 {
-                                                score += count as f64 * 1.0;
-                                                if !matched_fields.contains(&"assistant_text".to_string()) {
-                                                    matched_fields.push("assistant_text".to_string());
-                                                }
-                                                if best_snippet.is_none() {
-                                                    best_snippet = Some(extract_snippet(text, &query_lower, 120));
-                                                }
-                                            }
-                                        }
-                                    } else if btype == "tool_use" {
-                                        let input_str = serde_json::to_string(&block.get("input"))
-                                            .unwrap_or_default();
-                                        let count = count_occurrences(&input_str, &query_lower);
-                                        if count > 0 {
-                                            score += count as f64 * 0.5;
-                                            if !matched_fields.contains(&"tool_content".to_string()) {
-                                                matched_fields.push("tool_content".to_string());
-                                            }
-                                            if best_snippet.is_none() {
-                                                best_snippet = Some(extract_snippet(&input_str, &query_lower, 120));
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                    if best_snippet.is_none() {
+                        best_snippet = Some(extract_snippet(text, &query_lower, 120));
+                    }
+                }
+            }
+
+            for input in tool_inputs {
+                let count = count_occurrences(input, &query_lower);
+                if count > 0 {
+                    score += count as f64 * 0.5;
+                    if !matched_fields.contains(&"tool_content".to_string()) {
+                        matched_fields.push("tool_content".to_string());
+                    }
+                    if best_snippet.is_none() {
+                        best_snippet = Some(extract_snippet(input, &query_lower, 120));
                     }
                 }
             }
@@ -361,6 +369,6 @@ pub async fn search_session_content(query: String) -> Vec<ContentSearchResult> {
 
         results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         results.truncate(50);
-        results
-    }).await.unwrap_or_default()
+        Ok(results)
+    }).await.map_err(|e| e.to_string())?
 }
