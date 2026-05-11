@@ -17,7 +17,7 @@ export interface SessionInfo {
   assistantSummary: string
 }
 
-export type GTDStatus = 'inbox' | 'todo' | 'in-progress' | 'waiting' | 'done' | 'archived'
+export type SessionStatus = 'new' | 'archived'
 
 export interface GTDMetadata {
   sessionId: string

@@ -25,13 +25,7 @@ export function relativeProjectName(name: string): string {
   return name.replace(/^~\//, '').replace(/^corey\//, '~/')
 }
 
-export const GTD_STATUS_CONFIG: Record<string, { label: string; color: string; icon: string }> = {
-  'inbox': { label: 'Inbox', color: 'bg-zinc-500', icon: 'Inbox' },
-  'todo': { label: 'Todo', color: 'bg-blue-500', icon: 'CircleDot' },
-  'in-progress': { label: 'In Progress', color: 'bg-amber-500', icon: 'LoaderCircle' },
-  'waiting': { label: 'Waiting', color: 'bg-orange-500', icon: 'Clock' },
-  'done': { label: 'Done', color: 'bg-emerald-500', icon: 'CircleCheck' },
-  'archived': { label: 'Archived', color: 'bg-zinc-700', icon: 'Archive' },
+export const STATUS_CONFIG: Record<string, { label: string; dotColor: string }> = {
+  'new': { label: 'New', dotColor: 'bg-blue-500' },
+  'archived': { label: 'Archived', dotColor: 'bg-zinc-600' },
 }
-
-export const GTD_STATUS_LIST = ['inbox', 'todo', 'in-progress', 'waiting', 'done', 'archived'] as const

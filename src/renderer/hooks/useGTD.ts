@@ -1,6 +1,15 @@
 import { useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { GTDMetadata, AppStore } from '../../shared/types'
+import type { GTDMetadata, AppStore, SessionStatus } from '../../shared/types'
+
+const STATUS_MIGRATION: Record<string, SessionStatus> = {
+  'inbox': 'new',
+  'todo': 'new',
+  'in-progress': 'new',
+  'waiting': 'new',
+  'done': 'archived',
+  'archived': 'archived',
+}
 
 const EMPTY_TAGS: string[] = []
 const defaultGTDCache = new Map<string, GTDMetadata>()
@@ -8,7 +17,7 @@ const defaultGTDCache = new Map<string, GTDMetadata>()
 export function getDefaultGTD(sessionId: string): GTDMetadata {
   let gtd = defaultGTDCache.get(sessionId)
   if (!gtd) {
-    gtd = { sessionId, status: 'inbox', tags: EMPTY_TAGS, notes: '', starred: false, updatedAt: '' }
+    gtd = { sessionId, status: 'new', tags: EMPTY_TAGS, notes: '', starred: false, updatedAt: '' }
     defaultGTDCache.set(sessionId, gtd)
   }
   return gtd
@@ -26,7 +35,14 @@ export function useGTD() {
   allTagsRef.current = allTags
 
   const initFromStore = useCallback((store: AppStore) => {
-    setGtdData(store.gtdData || {})
+    const migrated: Record<string, GTDMetadata> = {}
+    for (const [sid, gtd] of Object.entries(store.gtdData || {})) {
+      const mapped = STATUS_MIGRATION[gtd.status]
+      migrated[sid] = mapped && mapped !== gtd.status
+        ? { ...gtd, status: mapped }
+        : gtd
+    }
+    setGtdData(migrated)
     setAllTags(store.tags || [])
   }, [])
 

@@ -224,8 +224,6 @@ export default function App() {
           setFilterStatus={store.setFilterStatus}
           filterTag={store.filterTag}
           setFilterTag={store.setFilterTag}
-          filterStarred={store.filterStarred}
-          setFilterStarred={store.setFilterStarred}
           allTags={store.allTags}
           tagCounts={store.tagCounts}
           renameTag={store.renameTag}

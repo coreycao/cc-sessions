@@ -32,7 +32,6 @@ export function useStore() {
     || filters.searchQuery !== ''
     || filters.filterStatus !== 'all'
     || filters.filterTag !== null
-    || filters.filterStarred
 
   const filteredSessions = useMemo(() => {
     const base = filters.filteredSessions
@@ -59,8 +58,6 @@ export function useStore() {
     setFilterStatus: filters.setFilterStatus,
     filterTag: filters.filterTag,
     setFilterTag: filters.setFilterTag,
-    filterStarred: filters.filterStarred,
-    setFilterStarred: filters.setFilterStarred,
     allTags: gtd.allTags,
     tagCounts: filters.tagCounts,
     projects: filters.projects,

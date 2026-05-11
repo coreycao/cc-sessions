@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react'
-import type { SessionInfo, GTDMetadata, GTDStatus, Project } from '../../shared/types'
+import type { SessionInfo, GTDMetadata, SessionStatus, Project } from '../../shared/types'
+
+export type FilterView = 'all' | 'new' | 'archived' | 'starred'
 
 export function useFilters(
   sessions: SessionInfo[],
@@ -7,9 +9,8 @@ export function useFilters(
 ) {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filterStatus, setFilterStatus] = useState<GTDStatus | 'all'>('all')
+  const [filterStatus, setFilterStatus] = useState<FilterView>('new')
   const [filterTag, setFilterTag] = useState<string | null>(null)
-  const [filterStarred, setFilterStarred] = useState(false)
 
   const filteredSessions = useMemo(() => {
     let result = sessions
@@ -22,17 +23,16 @@ export function useFilters(
         s.firstPrompt.toLowerCase().includes(q)
       )
     }
-    if (filterStatus !== 'all') {
+    if (filterStatus === 'starred') {
+      result = result.filter(s => getGTD(s.sessionId).starred)
+    } else if (filterStatus !== 'all') {
       result = result.filter(s => getGTD(s.sessionId).status === filterStatus)
     }
     if (filterTag) {
       result = result.filter(s => getGTD(s.sessionId).tags.includes(filterTag!))
     }
-    if (filterStarred) {
-      result = result.filter(s => getGTD(s.sessionId).starred)
-    }
     return result
-  }, [sessions, selectedProject, searchQuery, filterStatus, filterTag, filterStarred, getGTD])
+  }, [sessions, selectedProject, searchQuery, filterStatus, filterTag, getGTD])
 
   const projects = useMemo((): Project[] => {
     const map = new Map<string, { count: number; lastMod: string }>()
@@ -51,11 +51,11 @@ export function useFilters(
   }, [sessions])
 
   const statusCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: sessions.length }
+    const counts: Record<string, number> = { all: sessions.length, starred: 0, new: 0, archived: 0 }
     for (const s of sessions) {
       const gtd = getGTD(s.sessionId)
       counts[gtd.status] = (counts[gtd.status] || 0) + 1
-      if (gtd.starred) counts.starred = (counts.starred || 0) + 1
+      if (gtd.starred) counts.starred++
     }
     return counts
   }, [sessions, getGTD])
@@ -79,8 +79,6 @@ export function useFilters(
     setFilterStatus,
     filterTag,
     setFilterTag,
-    filterStarred,
-    setFilterStarred,
     filteredSessions,
     projects,
     statusCounts,

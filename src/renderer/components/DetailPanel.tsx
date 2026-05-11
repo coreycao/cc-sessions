@@ -1,16 +1,14 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionInfo, GTDMetadata } from '../../shared/types'
-import { formatDate, GTD_STATUS_CONFIG, GTD_STATUS_LIST } from '../lib/utils'
+import { formatDate } from '../lib/utils'
 import { parseConversation } from '../lib/parseConversation'
 import { TurnRenderer, FullscreenMessageModal } from './ConversationMessage'
 import {
-  Inbox, CircleDot, LoaderCircle, Clock, CircleCheck, Archive,
+  Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus,
-  Trash2, RotateCcw, AlertTriangle,
+  Trash2, RotateCcw, AlertTriangle, FileText, FileCode,
 } from 'lucide-react'
-
-const STATUS_ICONS: Record<string, any> = { Inbox, CircleDot, LoaderCircle, Clock, CircleCheck, Archive }
 
 interface DetailPanelProps {
   selectedSession: SessionInfo
@@ -37,6 +35,7 @@ export function DetailPanel({
 }: DetailPanelProps) {
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [compact, setCompact] = useState(false)
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface">
@@ -48,6 +47,22 @@ export function DetailPanel({
           <X className="w-4 h-4" />
         </button>
         <h2 className="text-sm font-medium text-content truncate flex-1" data-tauri-drag-region>{selectedSession.title}</h2>
+        <ActionTip label={compact ? 'Full view' : 'Compact view'}>
+          <button
+            onClick={() => setCompact(v => !v)}
+            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${compact ? 'text-blue-400' : 'text-content-4 hover:text-content-2'}`}
+          >
+            {compact ? <FileCode className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
+          </button>
+        </ActionTip>
+        <ActionTip label={gtd.status === 'archived' ? 'Unarchive' : 'Archive'}>
+          <button
+            onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}
+            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
+          >
+            {gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+          </button>
+        </ActionTip>
         <ActionTip label="Star">
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
@@ -74,29 +89,8 @@ export function DetailPanel({
         </ActionTip>
       </div>
 
-      {/* GTD Controls */}
+      {/* Metadata */}
       <div className="px-4 py-3 border-b border-edge/50 space-y-3">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Status</span>
-          <div className="flex gap-1 flex-wrap">
-            {GTD_STATUS_LIST.map(status => {
-              const config = GTD_STATUS_CONFIG[status]
-              const Icon = STATUS_ICONS[config.icon]
-              const isActive = gtd.status === status
-              return (
-                <button
-                  key={status}
-                  onClick={() => updateSessionGTD(selectedSession.sessionId, { status })}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-medium transition-all duration-150 ${isActive ? `${config.color} text-white shadow-sm shadow-surface-2` : 'bg-surface-2 text-content-3 hover:bg-surface-3 hover:text-content-2'}`}
-                >
-                  <Icon className="w-3 h-3" />
-                  {config.label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
         <div className="flex items-center gap-3">
           <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Tags</span>
           <div className="flex items-center gap-1.5 flex-wrap">
@@ -143,7 +137,7 @@ export function DetailPanel({
 
       {/* Conversation Preview */}
       <div className="flex-1 overflow-y-auto p-4">
-        <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} />
+        <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} />
       </div>
 
       {showDeleteConfirm && (
@@ -339,7 +333,7 @@ function ActionTip({ label, children }: { label: string; children: React.ReactNo
   )
 }
 
-function ConversationPreview({ content, sessionId }: { content: string; sessionId: string }) {
+function ConversationPreview({ content, sessionId, compact }: { content: string; sessionId: string; compact: boolean }) {
   const [expandedMsg, setExpandedMsg] = useState<{ role: string; text: string; timestamp: string } | null>(null)
 
   const turns = useMemo(() => parseConversation(content), [content, sessionId])
@@ -352,7 +346,7 @@ function ConversationPreview({ content, sessionId }: { content: string; sessionI
     <>
       <div className="space-y-4 flex flex-col">
         {turns.map(turn => (
-          <TurnRenderer key={turn.id} turn={turn} onExpand={setExpandedMsg} />
+          <TurnRenderer key={turn.id} turn={turn} onExpand={setExpandedMsg} compact={compact} />
         ))}
       </div>
       {expandedMsg && (

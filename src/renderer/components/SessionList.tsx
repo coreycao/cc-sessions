@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
-import { formatDate, relativeProjectName, GTD_STATUS_CONFIG } from '../lib/utils'
+import { formatDate, relativeProjectName, STATUS_CONFIG } from '../lib/utils'
 import { MessageSquare, GitBranch, Star, FileText, Search } from 'lucide-react'
 
 const ITEM_HEIGHT = 80
@@ -70,7 +70,7 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
           <div style={{ position: 'absolute', top: startIndex * ITEM_HEIGHT, left: 0, right: 0 }}>
             {visibleItems.map(session => {
               const gtd = getGTD(session.sessionId)
-              const statusConfig = GTD_STATUS_CONFIG[gtd.status]
+              const statusConfig = STATUS_CONFIG[gtd.status] || STATUS_CONFIG['new']
               const isSelected = selectedSessionId === session.sessionId
 
               return (
@@ -83,7 +83,7 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
                   style={{ height: ITEM_HEIGHT }}
                 >
                   <div className="flex items-start gap-2 py-2.5">
-                    <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${statusConfig.color} ${gtd.status === 'in-progress' ? 'animate-pulse' : ''}`} />
+                    <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${statusConfig.dotColor}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">
                         {gtd.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />}

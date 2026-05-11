@@ -1,21 +1,16 @@
 import { useState, useCallback, useRef, useEffect, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { GTD_STATUS_CONFIG, GTD_STATUS_LIST } from '../lib/utils'
+import type { FilterView } from '../hooks/useFilters'
 import {
-  Inbox, CircleDot, LoaderCircle, Clock, CircleCheck, Archive,
-  Star, Tag, LayoutList, Pencil, Trash, Plus, Settings, RefreshCw,
+  LayoutList, Circle, Star, Archive,
+  Tag, Pencil, Trash, Plus, Settings, RefreshCw,
 } from 'lucide-react'
-import type { GTDStatus } from '../../shared/types'
-
-const STATUS_ICONS: Record<string, any> = { Inbox, CircleDot, LoaderCircle, Clock, CircleCheck, Archive }
 
 interface SidebarProps {
-  filterStatus: GTDStatus | 'all'
-  setFilterStatus: (s: GTDStatus | 'all') => void
+  filterStatus: FilterView
+  setFilterStatus: (s: FilterView) => void
   filterTag: string | null
   setFilterTag: (t: string | null) => void
-  filterStarred: boolean
-  setFilterStarred: (v: boolean) => void
   allTags: string[]
   tagCounts: Record<string, number>
   renameTag: (oldTag: string, newTag: string) => Promise<void>
@@ -33,10 +28,16 @@ interface SidebarProps {
   syncing: boolean
 }
 
+const FILTER_ITEMS: { key: FilterView; icon: typeof LayoutList; label: string }[] = [
+  { key: 'all', icon: LayoutList, label: 'All' },
+  { key: 'new', icon: Circle, label: 'New' },
+  { key: 'starred', icon: Star, label: 'Starred' },
+  { key: 'archived', icon: Archive, label: 'Archived' },
+]
+
 export function Sidebar({
   filterStatus, setFilterStatus,
   filterTag, setFilterTag,
-  filterStarred, setFilterStarred,
   allTags, tagCounts, renameTag, deleteTag, createTag,
   statusCounts,
   sidebarWidth, sidebarCollapsed, isResizing, startResize,
@@ -96,44 +97,23 @@ export function Sidebar({
       style={!sidebarCollapsed ? { width: sidebarWidth } : undefined}
     >
       <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden" style={{ width: sidebarWidth }}>
-        {/* Status filters */}
+        {/* Filters */}
         <div className="px-2 py-1.5 border-b border-edge/50">
           <div className="space-y-0.5">
-            <FilterButton
-              active={filterStatus === 'all' && !filterTag && !filterStarred}
-              onClick={() => { setFilterStatus('all'); setFilterTag(null); setFilterStarred(false) }}
-              icon={<LayoutList className="w-3.5 h-3.5" />}
-              label="All"
-              count={statusCounts.all || 0}
-            />
-            {GTD_STATUS_LIST.map(status => {
-              const config = GTD_STATUS_CONFIG[status]
-              const Icon = STATUS_ICONS[config.icon]
-              return (
-                <div key={status} className="flex items-stretch">
-                  <span className="w-4 flex-shrink-0 flex justify-center">
-                    <span className="w-px bg-edge/60" />
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <FilterButton
-                      active={filterStatus === status && !filterTag && !filterStarred}
-                      onClick={() => { setFilterStatus(filterStatus === status ? 'all' : status); setFilterTag(null); setFilterStarred(false) }}
-                      icon={<Icon className="w-3.5 h-3.5" />}
-                      label={config.label}
-                      count={statusCounts[status] || 0}
-                    />
-                  </div>
-                </div>
-              )
+            {FILTER_ITEMS.flatMap(({ key, icon: Icon, label }, i) => {
+              const items = [
+                <FilterButton
+                  key={key}
+                  active={filterStatus === key && !filterTag}
+                  onClick={() => { setFilterStatus(key); setFilterTag(null) }}
+                  icon={<Icon className="w-3.5 h-3.5" />}
+                  label={label}
+                  count={statusCounts[key] || 0}
+                />,
+              ]
+              if (i === 2) items.unshift(<div key={`sep-${i}`} className="my-1 mx-2 border-t border-edge/40" />)
+              return items
             })}
-            <div className="my-1 mx-2 border-t border-edge/40" />
-            <FilterButton
-              active={filterStarred && filterStatus === 'all' && !filterTag}
-              onClick={() => { setFilterStarred(!filterStarred); setFilterStatus('all'); setFilterTag(null) }}
-              icon={<Star className="w-3.5 h-3.5" />}
-              label="Starred"
-              count={statusCounts.starred || 0}
-            />
           </div>
         </div>
 
@@ -180,7 +160,7 @@ export function Sidebar({
                   <FilterButton
                     key={tag}
                     active={filterTag === tag}
-                    onClick={() => { setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all'); setFilterStarred(false) }}
+                    onClick={() => { setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
                     onContextMenu={e => handleTagContextMenu(e, tag)}
                     icon={<Tag className="w-3 h-3" />}
                     label={tag}

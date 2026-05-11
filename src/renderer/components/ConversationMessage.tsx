@@ -21,17 +21,18 @@ import {
 
 // ---- Turn-level renderer ----
 
-export function TurnRenderer({ turn, onExpand }: {
+export function TurnRenderer({ turn, onExpand, compact }: {
   turn: ConversationTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
+  compact?: boolean
 }) {
   switch (turn.kind) {
     case 'user_turn':
       return <UserMessageBubble message={turn.message} />
     case 'assistant_turn':
-      return <AssistantTurnBubble turn={turn} onExpand={onExpand} />
+      return <AssistantTurnBubble turn={turn} onExpand={onExpand} compact={compact} />
     case 'system':
-      return <SystemBanner message={turn} />
+      return compact ? null : <SystemBanner message={turn} />
     default:
       return null
   }
@@ -60,14 +61,20 @@ function UserMessageBubble({ message }: { message: TextMessage }) {
 
 // ---- Assistant turn ----
 
-function AssistantTurnBubble({ turn, onExpand }: {
+function AssistantTurnBubble({ turn, onExpand, compact }: {
   turn: AssistantTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
+  compact?: boolean
 }) {
   const { messages, timestamp } = turn
   if (messages.length === 0) return null
 
   const firstTs = timestamp || messages[0].timestamp
+  const visibleMessages = compact
+    ? messages.filter(m => m.kind === 'text')
+    : messages
+
+  if (visibleMessages.length === 0) return null
 
   return (
     <div className="flex flex-col items-start">
@@ -76,7 +83,7 @@ function AssistantTurnBubble({ turn, onExpand }: {
           <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/80">Claude</span>
           {firstTs && <span className="text-[10px] text-content-5">{formatDate(firstTs)}</span>}
         </div>
-        {messages.map((msg, i) => {
+        {visibleMessages.map(msg => {
           switch (msg.kind) {
             case 'thinking':
               return <ThinkingSection key={msg.id} message={msg} />
@@ -125,19 +132,61 @@ function AssistantTextBlock({ message, onExpand }: {
   const isLong = message.content.length > 800
   return (
     <div className="relative group rounded-lg bg-surface-2 border border-edge/60 px-3 py-2">
-      <div className="text-xs text-content-2 whitespace-pre-wrap leading-relaxed break-words font-mono">
-        {isLong ? message.content.slice(0, 800) + '...' : message.content}
+      <div className="text-xs text-content-2 leading-relaxed break-words">
+        <MarkdownContent content={isLong ? message.content.slice(0, 800) + '\n\n...' : message.content} />
       </div>
       {isLong && (
         <button
           onClick={() => onExpand({ role: 'assistant', text: message.content, timestamp: message.timestamp })}
-          className="absolute bottom-1.5 right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md hover:bg-surface-3/80 text-content-4 hover:text-content-2"
+          className="absolute bottom-1.5 right-2 opacity-0 group-hover:opacity-100 group-hover:text-blue-400 transition-all p-1 rounded-md hover:bg-surface-3/80 text-content-4"
           title="View full content"
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
       )}
     </div>
+  )
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <article className="markdown-body text-xs">
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
+        components={{
+          pre: ({ children, ...props }) => (
+            <pre className="relative group/code" {...props}>{children}</pre>
+          ),
+          code: ({ className, children, ...props }) => {
+            const isInline = !className
+            if (isInline) {
+              return <code className="px-1 py-0.5 rounded bg-surface-3 text-[11px] font-mono text-content-2" {...props}>{children}</code>
+            }
+            return <code className={`${className || ''} text-[11px]`} {...props}>{children}</code>
+          },
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-3">
+              <table className="min-w-full border-collapse border border-edge/50">{children}</table>
+            </div>
+          ),
+          th: ({ children }) => (
+            <th className="border border-edge/50 px-2 py-1.5 bg-surface-2 text-left text-[11px] font-semibold text-content-2">{children}</th>
+          ),
+          td: ({ children }) => (
+            <td className="border border-edge/50 px-2 py-1.5 text-[11px] text-content-2">{children}</td>
+          ),
+          blockquote: ({ children }) => (
+            <blockquote className="border-l-3 border-content-4/30 pl-3 my-2 text-content-3 italic">{children}</blockquote>
+          ),
+          a: ({ href, children }) => (
+            <a href={href} className="text-blue-400 hover:text-blue-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </article>
   )
 }
 
