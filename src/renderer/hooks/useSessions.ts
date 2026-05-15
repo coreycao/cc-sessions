@@ -118,6 +118,7 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
     setSelectedSessionId,
     loadData,
     selectSession,
+    loadSessionContent,
     deleteSession,
     restoreSession,
     batchSelectedIds,

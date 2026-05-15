@@ -1,4 +1,5 @@
-import { useEffect, useCallback, useMemo } from 'react'
+import { useEffect, useCallback, useMemo, useRef } from 'react'
+import { listen } from '@tauri-apps/api/event'
 import { useSessions } from './useSessions'
 import { useGTD } from './useGTD'
 import { useFilters } from './useFilters'
@@ -27,6 +28,21 @@ export function useStore() {
     () => sessions.sessions.find(s => s.sessionId === sessions.selectedSessionId) || null,
     [sessions.sessions, sessions.selectedSessionId]
   )
+
+  // Auto-refresh when session files change on disk
+  const selectedPathRef = useRef<string | null>(null)
+  selectedPathRef.current = selectedSession?.fullPath ?? null
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    listen('session-files-changed', async () => {
+      await loadData()
+      if (selectedPathRef.current) {
+        sessions.loadSessionContent(selectedPathRef.current)
+      }
+    }).then(fn => { unlisten = fn })
+    return () => { unlisten?.() }
+  }, [loadData, sessions.loadSessionContent])
 
   const hasFilters = filters.selectedProject !== null
     || filters.searchQuery !== ''
