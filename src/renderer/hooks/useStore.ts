@@ -82,5 +82,15 @@ export function useStore() {
     removeToast,
     contentResults,
     isSearching,
+    batchSelectedIds: sessions.batchSelectedIds,
+    lastClickedIndex: sessions.lastClickedIndex,
+    toggleBatchSelect: sessions.toggleBatchSelect,
+    batchSelectRange: sessions.batchSelectRange,
+    selectAllBatch: sessions.selectAllBatch,
+    clearBatchSelection: sessions.clearBatchSelection,
+    batchDeleteSessions: sessions.batchDeleteSessions,
+    batchUpdateGTD: gtd.batchUpdateGTD,
+    batchAddTag: gtd.batchAddTag,
+    batchRemoveTag: gtd.batchRemoveTag,
   }
 }

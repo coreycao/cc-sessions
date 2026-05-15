@@ -116,6 +116,44 @@ export function useGTD() {
     await persistGTD(gtdDataRef.current, [...allTagsRef.current, trimmed])
   }, [persistGTD])
 
+  const batchUpdateGTD = useCallback(async (sessionIds: string[], updates: Partial<GTDMetadata>) => {
+    const gtd = { ...gtdDataRef.current }
+    const now = new Date().toISOString()
+    for (const sid of sessionIds) {
+      const current = gtd[sid] || getDefaultGTD(sid)
+      gtd[sid] = { ...current, ...updates, updatedAt: now }
+    }
+    await persistGTD(gtd)
+  }, [persistGTD])
+
+  const batchAddTag = useCallback(async (sessionIds: string[], tag: string) => {
+    const trimmed = tag.trim().toLowerCase()
+    if (!trimmed) return
+    const gtd = { ...gtdDataRef.current }
+    const now = new Date().toISOString()
+    for (const sid of sessionIds) {
+      const current = gtd[sid] || getDefaultGTD(sid)
+      if (!current.tags.includes(trimmed)) {
+        gtd[sid] = { ...current, tags: [...current.tags, trimmed], updatedAt: now }
+      }
+    }
+    const tags = allTagsRef.current
+    const newTags = tags.includes(trimmed) ? tags : [...tags, trimmed]
+    await persistGTD(gtd, newTags)
+  }, [persistGTD])
+
+  const batchRemoveTag = useCallback(async (sessionIds: string[], tag: string) => {
+    const gtd = { ...gtdDataRef.current }
+    const now = new Date().toISOString()
+    for (const sid of sessionIds) {
+      const current = gtd[sid] || getDefaultGTD(sid)
+      if (current.tags.includes(tag)) {
+        gtd[sid] = { ...current, tags: current.tags.filter(t => t !== tag), updatedAt: now }
+      }
+    }
+    await persistGTD(gtd)
+  }, [persistGTD])
+
   return {
     gtdData,
     allTags,
@@ -131,5 +169,8 @@ export function useGTD() {
     renameTag,
     deleteTag,
     createTag,
+    batchUpdateGTD,
+    batchAddTag,
+    batchRemoveTag,
   }
 }

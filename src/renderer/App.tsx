@@ -6,7 +6,9 @@ import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
 import { DetailPanel } from './components/DetailPanel'
+import { BatchActions } from './components/BatchActions'
 import { ToastContainer } from './components/Toast'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 type Theme = 'light' | 'dark' | 'system'
 
@@ -26,10 +28,6 @@ export default function App() {
   const [syncing, setSyncing] = useState(false)
   const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
   const searchRef = useRef<HTMLInputElement>(null)
-  const selectedSessionIdRef = useRef(store.selectedSessionId)
-  selectedSessionIdRef.current = store.selectedSessionId
-  const filteredSessionsRef = useRef(store.filteredSessions)
-  filteredSessionsRef.current = store.filteredSessions
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
   const settingsBtnRef = useRef<HTMLButtonElement>(null)
@@ -89,21 +87,25 @@ export default function App() {
         searchRef.current?.focus()
       }
       if (e.key === 'Escape') {
-        store.setSelectedSessionId(null)
-        store.setShowTagInput(false)
+        if (store.batchSelectedIds.size > 0) {
+          store.clearBatchSelection()
+        } else {
+          store.setSelectedSessionId(null)
+          store.setShowTagInput(false)
+        }
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault()
         setSidebarCollapsed(v => !v)
       }
-      if (!selectedSessionIdRef.current && (e.key === 'ArrowDown' || e.key === 'ArrowUp') && filteredSessionsRef.current.length > 0) {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
         e.preventDefault()
-        store.setSelectedSessionId(filteredSessionsRef.current[0].sessionId)
+        store.selectAllBatch(store.filteredSessions)
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [store.setSelectedSessionId, store.setShowTagInput])
+  }, [store.setSelectedSessionId, store.setShowTagInput, store.clearBatchSelection, store.selectAllBatch, store.batchSelectedIds.size, store.filteredSessions])
 
   const startResize = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -137,6 +139,7 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary>
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Unified title bar */}
       <header className="h-[38px] flex items-center border-b border-edge/70 flex-shrink-0 relative" data-tauri-drag-region>
@@ -241,14 +244,32 @@ export default function App() {
           syncing={syncing}
         />
 
-        <SessionList
-          filteredSessions={store.filteredSessions}
-          selectedSessionId={store.selectedSessionId}
-          selectSession={store.selectSession}
-          getGTD={store.getGTD}
-          hasFilters={store.hasFilters}
-          contentResults={store.contentResults}
-        />
+        <div className="flex flex-col w-[320px] flex-shrink-0 overflow-hidden">
+          <BatchActions
+            batchSelectedIds={store.batchSelectedIds}
+            getGTD={store.getGTD}
+            allTags={store.allTags}
+            batchUpdateGTD={store.batchUpdateGTD}
+            batchAddTag={store.batchAddTag}
+            batchDeleteSessions={store.batchDeleteSessions}
+            clearBatchSelection={store.clearBatchSelection}
+            loadData={store.loadData}
+            filterStatus={store.filterStatus}
+            filteredCount={store.filteredSessions.length}
+          />
+          <SessionList
+            filteredSessions={store.filteredSessions}
+            selectedSessionId={store.selectedSessionId}
+            selectSession={store.selectSession}
+            getGTD={store.getGTD}
+            hasFilters={store.hasFilters}
+            contentResults={store.contentResults}
+            batchSelectedIds={store.batchSelectedIds}
+            toggleBatchSelect={store.toggleBatchSelect}
+            batchSelectRange={store.batchSelectRange}
+            lastClickedIndex={store.lastClickedIndex}
+          />
+        </div>
 
         {store.selectedSession ? (
           <DetailPanel
@@ -279,5 +300,6 @@ export default function App() {
       </div>
       <ToastContainer toasts={store.toasts} removeToast={store.removeToast} />
     </div>
+    </ErrorBoundary>
   )
 }
