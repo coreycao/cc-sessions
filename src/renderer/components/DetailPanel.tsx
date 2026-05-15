@@ -4,6 +4,7 @@ import type { SessionInfo, GTDMetadata } from '../../shared/types'
 import { formatDate } from '../lib/utils'
 import { parseConversation } from '../lib/parseConversation'
 import { TurnRenderer, FullscreenMessageModal } from './ConversationMessage'
+import { InlineErrorBoundary } from './ErrorBoundary'
 import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus,
@@ -137,7 +138,9 @@ export function DetailPanel({
 
       {/* Conversation Preview */}
       <div className="flex-1 overflow-y-auto p-4">
-        <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} />
+        <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
+          <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} />
+        </InlineErrorBoundary>
       </div>
 
       {showDeleteConfirm && (
@@ -329,6 +332,32 @@ function ActionTip({ label, children }: { label: string; children: React.ReactNo
         </div>,
         document.body
       )}
+    </div>
+  )
+}
+
+function PlainConversation({ content }: { content: string }) {
+  const turns = useMemo(() => parseConversation(content), [content])
+  if (turns.length === 0) {
+    return <pre className="text-[11px] text-content-3 whitespace-pre-wrap break-all">{content}</pre>
+  }
+  return (
+    <div className="space-y-3">
+      {turns.map(turn => {
+        if (turn.kind === 'user_turn') {
+          return <pre key={turn.id} className="text-xs text-content-2 whitespace-pre-wrap bg-surface-2 rounded-md p-3">{turn.message.content}</pre>
+        }
+        if (turn.kind === 'assistant_turn') {
+          const texts = turn.messages.filter((m): m is Extract<typeof m, { kind: 'text' }> => m.kind === 'text')
+          if (texts.length === 0) return null
+          return (
+            <div key={turn.id} className="space-y-2">
+              {texts.map(m => <pre key={m.id} className="text-xs text-content whitespace-pre-wrap">{m.content}</pre>)}
+            </div>
+          )
+        }
+        return null
+      })}
     </div>
   )
 }

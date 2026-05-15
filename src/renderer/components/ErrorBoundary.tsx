@@ -44,3 +44,33 @@ export class ErrorBoundary extends Component<Props, State> {
     return this.props.children
   }
 }
+
+interface InlineErrorBoundaryProps {
+  children: ReactNode
+  fallback: ReactNode
+}
+
+interface InlineErrorBoundaryState {
+  hasError: boolean
+}
+
+export class InlineErrorBoundary extends Component<InlineErrorBoundaryProps, InlineErrorBoundaryState> {
+  state: InlineErrorBoundaryState = { hasError: false }
+
+  static getDerivedStateFromError(): InlineErrorBoundaryState {
+    return { hasError: true }
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error('InlineErrorBoundary caught:', error, info.componentStack)
+  }
+
+  render() {
+    if (this.state.hasError) return this.props.fallback
+    return this.props.children
+  }
+
+  reset() {
+    this.setState({ hasError: false })
+  }
+}
