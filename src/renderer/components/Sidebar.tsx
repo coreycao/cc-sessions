@@ -99,12 +99,12 @@ export const Sidebar = memo(function Sidebar({
 
   return (
     <div
-      className={`relative flex-shrink-0 flex flex-col bg-surface overflow-hidden ${sidebarCollapsed ? 'w-0 border-r-0' : 'border-r border-edge/70'} ${isResizing ? '' : 'transition-[width,border-color] duration-200 ease-in-out'}`}
+      className={`relative flex-shrink-0 flex flex-col bg-surface overflow-hidden ${sidebarCollapsed ? 'w-0 border-r-0' : 'border-r border-edge/40'} ${isResizing ? '' : 'transition-[width,border-color] duration-200 ease-in-out'}`}
       style={!sidebarCollapsed ? { width: sidebarWidth } : undefined}
     >
       <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden" style={{ width: sidebarWidth }}>
         {/* Filters */}
-        <div className="px-2 py-1.5 border-b border-edge/50">
+        <div className="px-2 py-1.5 border-b border-edge/30">
           <div className="space-y-0.5">
             {FILTER_ITEMS.flatMap(({ key, icon: Icon, label }, i) => {
               const items = [
@@ -124,7 +124,7 @@ export const Sidebar = memo(function Sidebar({
         </div>
 
         {/* Tags */}
-        <div className="px-2 py-1.5 border-b border-edge/50">
+        <div className="px-2 py-1.5 border-b border-edge/30">
           <button
             onClick={() => setTagsCollapsed(v => !v)}
             className="flex items-center justify-between mb-1 px-2 w-full group"
@@ -212,7 +212,7 @@ export const Sidebar = memo(function Sidebar({
         )}
 
         {/* Saved */}
-        <div className="px-2 py-1.5 border-b border-edge/50">
+        <div className="px-2 py-1.5 border-b border-edge/30">
           <FilterButton
             active={view === 'saved'}
             onClick={() => setView('saved')}
@@ -223,7 +223,7 @@ export const Sidebar = memo(function Sidebar({
         </div>
 
         <div className="flex-1" />
-        <div className="px-2 py-1.5 border-t border-edge/50">
+        <div className="px-2 py-1.5 border-t border-edge/30">
           <button
             ref={settingsBtnRef}
             onClick={() => setSettingsMenuOpen(v => !v)}
@@ -287,7 +287,7 @@ function FilterButton({ active, onClick, onContextMenu, icon, label, count, tool
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${active ? 'bg-surface-3/80 text-content' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${active ? 'bg-accent-subtle text-accent font-medium' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
     >
       <span className="flex-shrink-0">{icon}</span>
       <span className="truncate">{label}</span>

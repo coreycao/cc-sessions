@@ -94,10 +94,10 @@ export function BatchActions({
 
   return (
     <>
-      <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/70 bg-surface-2/60">
+      <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/30 bg-surface-2/60">
         {count > 0 ? (
           <>
-            <span className="text-[11px] text-blue-400 font-medium tabular-nums">{count} selected</span>
+            <span className="text-[11px] text-accent font-medium tabular-nums">{count} selected</span>
             <div className="flex-1" />
             <button onClick={handleArchive} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors" title={allArchived ? 'Unarchive' : 'Archive'}>
               {allArchived ? <Circle className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}

@@ -59,7 +59,7 @@ export const DetailPanel = memo(function DetailPanel({
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface">
-      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/50" data-tauri-drag-region>
+      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/30" data-tauri-drag-region>
         <button
           onClick={() => setSelectedSessionId(null)}
           className="p-1 rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
@@ -70,7 +70,7 @@ export const DetailPanel = memo(function DetailPanel({
         <ActionTip label={compact ? 'Full view' : 'Compact view'}>
           <button
             onClick={() => setCompact(v => !v)}
-            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${compact ? 'text-blue-400' : 'text-content-4 hover:text-content-2'}`}
+            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${compact ? 'text-accent' : 'text-content-4 hover:text-content-2'}`}
           >
             {compact ? <FileCode className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
           </button>
@@ -110,7 +110,7 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Metadata */}
-      <div className="px-4 py-3 border-b border-edge/50 space-y-3">
+      <div className="px-4 py-3 bg-surface-2/30 space-y-3">
         <div className="flex items-center gap-3">
           <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Tags</span>
           <div className="flex items-center gap-1.5 flex-wrap">

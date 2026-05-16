@@ -158,7 +158,7 @@ export default function App() {
     <ErrorBoundary>
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Unified title bar */}
-      <header className="h-[38px] flex items-center border-b border-edge/70 flex-shrink-0 relative" data-tauri-drag-region>
+      <header className="h-[38px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/70" data-tauri-drag-region>
         <div className="w-[72px] flex-shrink-0" />
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -172,7 +172,7 @@ export default function App() {
         <button
           ref={projectBtnRef}
           onClick={toggleProjectMenu}
-          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-md px-1.5 transition-colors ${store.selectedProject ? 'text-blue-400 hover:bg-blue-500/10' : 'text-content-3 hover:bg-surface-3 hover:text-content-2'}`}
+          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-md px-1.5 transition-colors ${store.selectedProject ? 'text-accent hover:bg-accent-subtle' : 'text-content-3 hover:bg-surface-3 hover:text-content-2'}`}
           title={currentProjectTitle}
           aria-label={`Filter by project: ${currentProjectTitle}`}
         >
@@ -187,7 +187,7 @@ export default function App() {
           >
             <button
               onClick={() => { store.setSelectedProject(null); setProjectMenuOpen(false) }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${!store.selectedProject ? 'text-blue-400 bg-surface-3' : 'text-content-2 hover:bg-surface-3'}`}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
             >
               <FolderOpen className="w-3.5 h-3.5" />
               All Projects
@@ -197,7 +197,7 @@ export default function App() {
               <button
                 key={p.name}
                 onClick={() => { store.setSelectedProject(store.selectedProject === p.name ? null : p.name); setProjectMenuOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${store.selectedProject === p.name ? 'text-blue-400 bg-surface-3' : 'text-content-2 hover:bg-surface-3'}`}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
                 <FolderOpen className="w-3.5 h-3.5" />
                 <span className="truncate flex-1 text-left">{p.name}</span>
@@ -218,7 +218,7 @@ export default function App() {
                 value={store.searchQuery}
                 onChange={e => store.setSearchQuery(e.target.value)}
                 aria-label="Search sessions"
-                className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-8 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3 transition-colors"
+                className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-8 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
               />
               {store.isSearching ? (
                 <LoaderCircle className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-content-4 animate-spin" />
@@ -304,7 +304,7 @@ export default function App() {
             </>
           ) : (
             <>
-              <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/70 bg-surface-2/60">
+              <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/30 bg-surface-2/60">
                 <span className="text-[11px] text-content-3 font-medium absolute inset-x-0 flex items-center justify-center pointer-events-none">
                   Saved <span className="text-content-4 tabular-nums ml-0.5">({store.savedMessages.length})</span>
                 </span>

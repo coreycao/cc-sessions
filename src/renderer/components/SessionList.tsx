@@ -40,7 +40,7 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
 
   if (filteredSessions.length === 0) {
     return (
-      <div className="flex-1 min-h-0 border-r border-edge/70 flex flex-col bg-surface" role="list" aria-label="Session list">
+      <div className="flex-1 min-h-0 border-r border-edge/40 flex flex-col bg-surface" role="list" aria-label="Session list">
         <div className="flex-1 flex flex-col items-center justify-center text-content-4 text-xs gap-2">
           {hasFilters ? (
             <>
@@ -66,7 +66,7 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
   const visibleItems = filteredSessions.slice(startIndex, endIndex + 1)
 
   return (
-    <div className="flex-1 min-h-0 border-r border-edge/70 flex flex-col bg-surface" role="list" aria-label="Session list">
+    <div className="flex-1 min-h-0 border-r border-edge/40 flex flex-col bg-surface" role="list" aria-label="Session list">
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto"
@@ -100,7 +100,7 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
                       lastClickedIndex.current = actualIndex
                     }
                   }}
-                  className={`group w-full text-left px-3 border-b border-edge-2/50 transition-colors ${isSelected ? 'bg-surface-3/60' : 'hover:bg-surface-2/60'} ${isBatchSelected ? 'bg-blue-500/[0.08] ring-2 ring-blue-400/40 ring-inset' : ''}`}
+                  className={`group w-full text-left px-3 border-b border-edge-2/50 transition-colors ${isSelected ? 'bg-accent-subtle shadow-[inset_2px_0_0_0_var(--color-accent)]' : 'hover:bg-surface-2/60'} ${isBatchSelected ? 'bg-accent-subtle ring-2 ring-accent/40 ring-inset' : ''}`}
                   style={{ height: ITEM_HEIGHT }}
                 >
                   <div className="flex items-start gap-2 py-2.5">
@@ -114,12 +114,12 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
                         }}
                       >
                         {isBatchSelected
-                          ? <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+                          ? <CheckSquare className="w-3.5 h-3.5 text-accent" />
                           : <Square className="w-3.5 h-3.5 text-content-4" />
                         }
                       </span>
                     )}
-                    <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${statusConfig.dotColor}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full mt-[5px] flex-shrink-0 ring-1 ring-white/80 dark:ring-surface/80 ${statusConfig.dotColor}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">
                         {gtd.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />}
