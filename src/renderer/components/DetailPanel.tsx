@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect, memo, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionInfo, GTDMetadata, SavedMessage } from '../../shared/types'
 import { formatDate } from '../lib/utils'
@@ -385,17 +385,24 @@ function ConversationPreview({ content, sessionId, compact, actions }: { content
   const [expandedMsg, setExpandedMsg] = useState<{ role: string; text: string; timestamp: string } | null>(null)
 
   const turns = useMemo(() => parseConversation(content), [content, sessionId])
+  const visibleCount = useProgressiveMount(turns.length, sessionId)
 
   if (turns.length === 0) {
     return <div className="text-content-4 text-xs">No conversation content available.</div>
   }
 
+  const visibleTurns = visibleCount >= turns.length ? turns : turns.slice(0, visibleCount)
+  const remaining = turns.length - visibleCount
+
   return (
     <>
       <div className="space-y-4 flex flex-col">
-        {turns.map(turn => (
-          <TurnRenderer key={turn.id} turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} />
+        {visibleTurns.map((turn, i) => (
+          <div key={turn.id} className="turn-enter" style={{ animationDelay: `${Math.min(i, 12) * 8}ms` }}>
+            <TurnRenderer turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} />
+          </div>
         ))}
+        {remaining > 0 && <LoadingIndicator remaining={remaining} total={turns.length} />}
       </div>
       {expandedMsg && (
         <FullscreenMessageModal
@@ -404,6 +411,61 @@ function ConversationPreview({ content, sessionId, compact, actions }: { content
         />
       )}
     </>
+  )
+}
+
+/**
+ * Progressively mounts a list in batches across animation frames so the main
+ * thread isn't blocked when rendering large conversations. First batch is small
+ * (fast first paint); subsequent batches grow to drain the queue quickly.
+ */
+function useProgressiveMount(total: number, resetKey: string): number {
+  const [visibleCount, setVisibleCount] = useState(() => Math.min(total, FIRST_BATCH))
+
+  useEffect(() => {
+    // Reset on session switch / content change.
+    setVisibleCount(Math.min(total, FIRST_BATCH))
+    if (total <= FIRST_BATCH) return
+
+    let cancelled = false
+    let rafId = 0
+    let current = Math.min(total, FIRST_BATCH)
+
+    const step = () => {
+      if (cancelled) return
+      const batch = current < 80 ? BATCH_SIZE : BATCH_SIZE_LARGE
+      const next = Math.min(total, current + batch)
+      current = next
+      startTransition(() => setVisibleCount(next))
+      if (next < total) {
+        rafId = requestAnimationFrame(step)
+      }
+    }
+
+    rafId = requestAnimationFrame(step)
+    return () => {
+      cancelled = true
+      cancelAnimationFrame(rafId)
+    }
+  }, [total, resetKey])
+
+  return visibleCount
+}
+
+const FIRST_BATCH = 20
+const BATCH_SIZE = 12
+const BATCH_SIZE_LARGE = 24
+
+function LoadingIndicator({ remaining, total }: { remaining: number; total: number }) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-2 text-[10px] text-content-5">
+      <span className="inline-flex gap-0.5">
+        <span className="w-1 h-1 rounded-full bg-content-4 animate-pulse" style={{ animationDelay: '0ms' }} />
+        <span className="w-1 h-1 rounded-full bg-content-4 animate-pulse" style={{ animationDelay: '150ms' }} />
+        <span className="w-1 h-1 rounded-full bg-content-4 animate-pulse" style={{ animationDelay: '300ms' }} />
+      </span>
+      <span>Loading {total - remaining} / {total} messages…</span>
+    </div>
   )
 }
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, memo } from 'react'
 import { createPortal } from 'react-dom'
 import { invoke } from '@tauri-apps/api/core'
 import ReactMarkdown from 'react-markdown'
@@ -31,7 +31,7 @@ export interface MessageActions {
 
 // ---- Turn-level renderer ----
 
-export function TurnRenderer({ turn, onExpand, compact, actions }: {
+export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact, actions }: {
   turn: ConversationTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
   compact?: boolean
@@ -47,7 +47,7 @@ export function TurnRenderer({ turn, onExpand, compact, actions }: {
     default:
       return null
   }
-}
+})
 
 // ---- User message ----
 
@@ -240,7 +240,7 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[\/\\?%*:|"<>\s]+/g, '-').slice(0, 200)
 }
 
-function MarkdownContent({ content }: { content: string }) {
+const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   return (
     <article className="markdown-body text-xs">
       <ReactMarkdown
@@ -280,7 +280,7 @@ function MarkdownContent({ content }: { content: string }) {
       </ReactMarkdown>
     </article>
   )
-}
+})
 
 // ---- Tool call ----
 
