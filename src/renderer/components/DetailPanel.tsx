@@ -8,7 +8,7 @@ import type { MessageActions } from './ConversationMessage'
 import { InlineErrorBoundary } from './ErrorBoundary'
 import {
   Archive, Circle,
-  Star, MessageSquare, GitBranch, Calendar, X, Plus,
+  Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
   Trash2, RotateCcw, AlertTriangle, FileText, FileCode,
 } from 'lucide-react'
 
@@ -115,9 +115,10 @@ export const DetailPanel = memo(function DetailPanel({
           <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Tags</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             {gtd.tags.map(tag => (
-              <span key={tag} className="group flex items-center gap-1 text-[11px] bg-surface-3/80 text-content-2 px-2 py-0.5 rounded-md hover:bg-surface-3">
+              <span key={tag} className="group flex items-center gap-1 text-[11px] bg-surface-3/80 text-content-2 pl-2 pr-1.5 py-0.5 rounded-md hover:bg-surface-3">
                 {tag}
-                <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content opacity-0 group-hover:opacity-100 transition-opacity">
+                <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
+                <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
                   <X className="w-2.5 h-2.5" />
                 </button>
               </span>

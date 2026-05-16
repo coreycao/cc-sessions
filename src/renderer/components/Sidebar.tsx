@@ -4,7 +4,7 @@ import type { FilterView } from '../hooks/useFilters'
 import type { View } from '../hooks/useStore'
 import {
   LayoutList, Circle, Star, Archive,
-  Tag, Pencil, Trash, Plus, Settings, RefreshCw, Bookmark,
+  Tag, Pencil, Trash, Plus, Settings, RefreshCw, Bookmark, ChevronDown,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -87,6 +87,7 @@ export const Sidebar = memo(function Sidebar({
 
   const [showNewTag, setShowNewTag] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
+  const [tagsCollapsed, setTagsCollapsed] = useState(false)
 
   const submitNewTag = useCallback(async () => {
     if (newTagValue.trim()) {
@@ -124,56 +125,68 @@ export const Sidebar = memo(function Sidebar({
 
         {/* Tags */}
         <div className="px-2 py-1.5 border-b border-edge/50">
-          <div className="flex items-center justify-between mb-1 px-2">
+          <button
+            onClick={() => setTagsCollapsed(v => !v)}
+            className="flex items-center justify-between mb-1 px-2 w-full group"
+          >
             <span className="text-[10px] font-medium uppercase tracking-wider text-content-4">Tags</span>
-            <button
-              onClick={() => setShowNewTag(true)}
-              className="text-content-4 hover:text-content-2 transition-colors"
-              title="New tag"
-            >
-              <Plus className="w-3 h-3" />
-            </button>
-          </div>
-          {showNewTag && (
-            <form onSubmit={e => { e.preventDefault(); submitNewTag() }} className="px-2 mb-1">
-              <input
-                type="text"
-                value={newTagValue}
-                onChange={e => setNewTagValue(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Escape') { setShowNewTag(false); setNewTagValue('') } }}
-                placeholder="new tag..."
-                className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
-                autoFocus
-              />
-            </form>
-          )}
-          {allTags.length > 0 && (
-            <div className="space-y-0.5">
-              {allTags.map(tag => (
-                editingTag === tag ? (
-                  <form key={tag} onSubmit={e => { e.preventDefault(); submitEditTag() }} className="px-2">
-                    <input
-                      type="text"
-                      value={editValue}
-                      onChange={e => setEditValue(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Escape') { setEditingTag(null); setEditValue('') } }}
-                      className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
-                      autoFocus
-                    />
-                  </form>
-                ) : (
-                  <FilterButton
-                    key={tag}
-                    active={view === 'sessions' && filterTag === tag}
-                    onClick={() => { setView('sessions'); setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
-                    onContextMenu={e => handleTagContextMenu(e, tag)}
-                    icon={<Tag className="w-3 h-3" />}
-                    label={tag}
-                    count={tagCounts[tag] || 0}
+            <span className="flex items-center gap-0.5">
+              {allTags.length > 0 && !tagsCollapsed && (
+                <button
+                  onClick={e => { e.stopPropagation(); setShowNewTag(true) }}
+                  className="text-content-4 hover:text-content-2 transition-colors"
+                  title="New tag"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              )}
+              <ChevronDown className={`w-3 h-3 text-content-4 group-hover:text-content-3 transition-transform ${tagsCollapsed ? '-rotate-90' : ''}`} />
+            </span>
+          </button>
+          {!tagsCollapsed && (
+            <>
+              {showNewTag && (
+                <form onSubmit={e => { e.preventDefault(); submitNewTag() }} className="px-2 mb-1">
+                  <input
+                    type="text"
+                    value={newTagValue}
+                    onChange={e => setNewTagValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Escape') { setShowNewTag(false); setNewTagValue('') } }}
+                    placeholder="new tag..."
+                    className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
+                    autoFocus
                   />
-                )
-              ))}
-            </div>
+                </form>
+              )}
+              {allTags.length > 0 && (
+                <div className="space-y-0.5">
+                  {allTags.map(tag => (
+                    editingTag === tag ? (
+                      <form key={tag} onSubmit={e => { e.preventDefault(); submitEditTag() }} className="px-2">
+                        <input
+                          type="text"
+                          value={editValue}
+                          onChange={e => setEditValue(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Escape') { setEditingTag(null); setEditValue('') } }}
+                          className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
+                          autoFocus
+                        />
+                      </form>
+                    ) : (
+                      <FilterButton
+                        key={tag}
+                        active={view === 'sessions' && filterTag === tag}
+                        onClick={() => { setView('sessions'); setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
+                        onContextMenu={e => handleTagContextMenu(e, tag)}
+                        icon={<Tag className="w-3 h-3" />}
+                        label={tag}
+                        count={tagCounts[tag] || 0}
+                      />
+                    )
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
         {ctxMenu && createPortal(
