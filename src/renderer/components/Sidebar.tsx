@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, type RefObject } from 'react'
+import { useState, useCallback, useRef, useEffect, memo, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { FilterView } from '../hooks/useFilters'
 import {
@@ -35,7 +35,7 @@ const FILTER_ITEMS: { key: FilterView; icon: typeof LayoutList; label: string }[
   { key: 'archived', icon: Archive, label: 'Archived' },
 ]
 
-export function Sidebar({
+export const Sidebar = memo(function Sidebar({
   filterStatus, setFilterStatus,
   filterTag, setFilterTag,
   allTags, tagCounts, renameTag, deleteTag, createTag,
@@ -229,7 +229,7 @@ export function Sidebar({
       )}
     </div>
   )
-}
+})
 
 function FilterButton({ active, onClick, onContextMenu, icon, label, count, tooltip }: {
   active: boolean

@@ -1,12 +1,21 @@
 use std::fs;
 use std::path::Path;
 
+use tauri::Manager;
+
 use crate::gtd::{session_cache_path, save_session_cache_to_file, AppState};
 use crate::helpers::{extract_text, project_name_from_dir, projects_dir};
 use crate::models::{ContentSearchResult, JsonlEntry, SessionCacheEntry, SessionInfo};
 
 struct ParsedSession {
     session: SessionInfo,
+    assistant_texts: Vec<String>,
+    tool_inputs: Vec<String>,
+}
+
+struct IndexChange {
+    session_id: String,
+    user_messages: Vec<String>,
     assistant_texts: Vec<String>,
     tool_inputs: Vec<String>,
 }
@@ -193,6 +202,7 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
 
     let mut cache = state.cache.lock().unwrap();
     let mut dirty = false;
+    let mut index_additions: Vec<IndexChange> = Vec::new();
 
     let mut sessions: Vec<SessionInfo> = Vec::new();
     let mut seen_keys: Vec<String> = Vec::new();
@@ -234,6 +244,12 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
                 if use_cache {
                     sessions.push(cached.unwrap().session.clone());
                 } else if let Some(parsed) = parse_session_file(&fp, &dir_name) {
+                    index_additions.push(IndexChange {
+                        session_id: parsed.session.session_id.clone(),
+                        user_messages: parsed.session.user_messages.clone(),
+                        assistant_texts: parsed.assistant_texts.clone(),
+                        tool_inputs: parsed.tool_inputs.clone(),
+                    });
                     if let Some(mt) = mtime {
                         cache.entries.insert(
                             key.clone(),
@@ -252,8 +268,14 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
         }
     }
 
-    // Evict deleted files from cache
+    // Evict deleted files from cache and collect session IDs for index removal
     let before = cache.entries.len();
+    let evicted_ids: Vec<String> = cache
+        .entries
+        .iter()
+        .filter(|(k, _)| !seen_keys.contains(k))
+        .map(|(_, v)| v.session.session_id.clone())
+        .collect();
     cache.entries.retain(|k, _| seen_keys.contains(k));
     if cache.entries.len() != before {
         dirty = true;
@@ -263,112 +285,38 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
         let _ = save_session_cache_to_file(&session_cache_path(&app), &cache);
     }
 
+    // Apply incremental index updates
+    if !index_additions.is_empty() || !evicted_ids.is_empty() {
+        if let Ok(mut idx) = state.search_index.try_write() {
+            for change in &index_additions {
+                idx.index_session(
+                    &change.session_id,
+                    &change.user_messages,
+                    &change.assistant_texts,
+                    &change.tool_inputs,
+                );
+            }
+            for id in &evicted_ids {
+                idx.delete_session(id);
+            }
+            idx.commit_and_reload().ok();
+        }
+    }
+
     sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
     sessions
 }
 
-fn count_occurrences(haystack: &str, needle: &str) -> usize {
-    haystack.to_lowercase().matches(needle).count()
-}
-
-fn extract_snippet(text: &str, query: &str, window: usize) -> String {
-    let lower = text.to_lowercase();
-    if let Some(pos) = lower.find(query) {
-        let start = pos.saturating_sub(window / 2);
-        let end = (pos + query.len() + window / 2).min(text.len());
-        let mut snippet = String::new();
-        if start > 0 { snippet.push_str("..."); }
-        snippet.push_str(&text[start..end]);
-        if end < text.len() { snippet.push_str("..."); }
-        snippet
-    } else {
-        text.chars().take(window).collect()
-    }
-}
-
 #[tauri::command]
-pub async fn search_session_content(query: String, state: tauri::State<'_, AppState>) -> Result<Vec<ContentSearchResult>, String> {
-    // Snapshot cache data before spawning, since State can't be moved into 'static closure
-    let cached_entries: Vec<(String, Vec<String>, Vec<String>, Vec<String>)> = {
-        let cache = state.cache.lock().unwrap();
-        cache
-            .entries
-            .values()
-            .map(|e| {
-                (
-                    e.session.session_id.clone(),
-                    e.session.user_messages.clone(),
-                    e.assistant_texts.clone(),
-                    e.tool_inputs.clone(),
-                )
-            })
-            .collect()
-    };
+pub async fn search_session_content(query: String, app: tauri::AppHandle) -> Result<Vec<ContentSearchResult>, String> {
+    let query_lower = query.trim().to_lowercase();
+    if query_lower.len() < 2 {
+        return Ok(vec![]);
+    }
 
     tokio::task::spawn_blocking(move || {
-        let query_lower = query.to_lowercase();
-        if query_lower.len() < 2 {
-            return Ok(vec![]);
-        }
-
-        let mut results: Vec<ContentSearchResult> = Vec::new();
-
-        for (session_id, user_messages, assistant_texts, tool_inputs) in &cached_entries {
-            let mut score: f64 = 0.0;
-            let mut matched_fields: Vec<String> = Vec::new();
-            let mut best_snippet: Option<String> = None;
-
-            for msg in user_messages {
-                let count = count_occurrences(msg, &query_lower);
-                if count > 0 {
-                    score += count as f64 * 3.0;
-                    if !matched_fields.contains(&"user_messages".to_string()) {
-                        matched_fields.push("user_messages".to_string());
-                    }
-                    if best_snippet.is_none() {
-                        best_snippet = Some(extract_snippet(msg, &query_lower, 120));
-                    }
-                }
-            }
-
-            for text in assistant_texts {
-                let count = count_occurrences(text, &query_lower);
-                if count > 0 {
-                    score += count as f64 * 1.0;
-                    if !matched_fields.contains(&"assistant_text".to_string()) {
-                        matched_fields.push("assistant_text".to_string());
-                    }
-                    if best_snippet.is_none() {
-                        best_snippet = Some(extract_snippet(text, &query_lower, 120));
-                    }
-                }
-            }
-
-            for input in tool_inputs {
-                let count = count_occurrences(input, &query_lower);
-                if count > 0 {
-                    score += count as f64 * 0.5;
-                    if !matched_fields.contains(&"tool_content".to_string()) {
-                        matched_fields.push("tool_content".to_string());
-                    }
-                    if best_snippet.is_none() {
-                        best_snippet = Some(extract_snippet(input, &query_lower, 120));
-                    }
-                }
-            }
-
-            if score > 0.0 {
-                results.push(ContentSearchResult {
-                    session_id: session_id.clone(),
-                    score,
-                    matched_fields,
-                    snippet: best_snippet.unwrap_or_default(),
-                });
-            }
-        }
-
-        results.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-        results.truncate(50);
-        Ok(results)
-    }).await.map_err(|e| e.to_string())?
+        let state = app.state::<AppState>();
+        let idx = state.search_index.read().map_err(|e| e.to_string())?;
+        idx.search(&query_lower, 50)
+    }).await.map_err(|e| format!("Search task failed: {}", e))?
 }

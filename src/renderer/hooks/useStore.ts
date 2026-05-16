@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { useSessions } from './useSessions'
 import { useGTD } from './useGTD'
@@ -12,6 +12,13 @@ export function useStore() {
   const gtd = useGTD()
   const filters = useFilters(sessions.sessions, gtd.getGTD)
   const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
+  const [indexReady, setIndexReady] = useState(true)
+
+  useEffect(() => {
+    let unlisten: (() => void) | undefined
+    listen('search-index-ready', () => setIndexReady(true)).then(fn => { unlisten = fn })
+    return () => { unlisten?.() }
+  }, [])
 
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
@@ -98,6 +105,7 @@ export function useStore() {
     removeToast,
     contentResults,
     isSearching,
+    indexReady,
     batchSelectedIds: sessions.batchSelectedIds,
     lastClickedIndex: sessions.lastClickedIndex,
     toggleBatchSelect: sessions.toggleBatchSelect,

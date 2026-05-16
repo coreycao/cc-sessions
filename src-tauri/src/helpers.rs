@@ -45,6 +45,21 @@ fn infer_existing_path(encoded: &str) -> Option<String> {
     Some(path.to_string_lossy().to_string())
 }
 
+pub fn extract_snippet(text: &str, query: &str, window: usize) -> String {
+    let lower = text.to_lowercase();
+    if let Some(pos) = lower.find(query) {
+        let start = pos.saturating_sub(window / 2);
+        let end = (pos + query.len() + window / 2).min(text.len());
+        let mut snippet = String::new();
+        if start > 0 { snippet.push_str("..."); }
+        snippet.push_str(&text[start..end]);
+        if end < text.len() { snippet.push_str("..."); }
+        snippet
+    } else {
+        text.chars().take(window).collect()
+    }
+}
+
 pub fn extract_text(content: &serde_json::Value) -> String {
     match content {
         serde_json::Value::String(s) => s.clone(),

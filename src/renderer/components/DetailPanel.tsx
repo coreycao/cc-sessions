@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionInfo, GTDMetadata } from '../../shared/types'
 import { formatDate } from '../lib/utils'
@@ -28,7 +28,7 @@ interface DetailPanelProps {
   setNewTag: (v: string) => void
 }
 
-export function DetailPanel({
+export const DetailPanel = memo(function DetailPanel({
   selectedSession, sessionContent, getGTD,
   updateSessionGTD, addTag, removeTag, allTags,
   deleteSession, restoreSession, setSelectedSessionId,
@@ -152,7 +152,7 @@ export function DetailPanel({
       )}
     </div>
   )
-}
+})
 
 function NoteInput({ value, updatedAt, onSave }: {
   value: string

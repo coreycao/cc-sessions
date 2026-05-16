@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionInfo, AppStore } from '../shared/types'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen } from 'lucide-react'
+import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
@@ -204,8 +204,19 @@ export default function App() {
                 aria-label="Search sessions"
                 className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-8 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3 transition-colors"
               />
-              {store.isSearching && (
+              {store.isSearching ? (
                 <LoaderCircle className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-content-4 animate-spin" />
+              ) : store.searchQuery ? (
+                <button
+                  onClick={() => store.setSearchQuery('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              ) : null}
+              {!store.indexReady && store.searchQuery.length >= 2 && (
+                <span className="absolute -bottom-4 left-0 text-[10px] text-content-4 animate-pulse whitespace-nowrap">Building index...</span>
               )}
             </div>
           </div>

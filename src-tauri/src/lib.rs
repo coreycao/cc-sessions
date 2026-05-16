@@ -3,11 +3,12 @@ mod gtd;
 mod helpers;
 mod models;
 mod scanner;
+mod search_index;
 
 use notify::Watcher;
 use tauri::{Emitter, Manager};
 
-use gtd::{load_gtd_from_file, load_session_cache, gtd_store_path, session_cache_path, AppState};
+use gtd::{load_gtd_from_file, load_session_cache, gtd_store_path, session_cache_path, search_index_dir, AppState};
 
 pub fn run() {
     tauri::Builder::default()
@@ -19,10 +20,48 @@ pub fn run() {
             let initial_store = load_gtd_from_file(&gtd_path);
             let cache_path = session_cache_path(app.handle());
             let initial_cache = load_session_cache(&cache_path);
+
+            let index_path = search_index_dir(app.handle());
+            let search_idx = search_index::SearchIndex::open_or_create(&index_path)
+                .expect("Failed to open search index");
+
+            let needs_build = search_idx.session_count() == 0;
+
             app.manage(AppState {
                 gtd_store: std::sync::Mutex::new(initial_store),
                 cache: std::sync::Mutex::new(initial_cache),
+                search_index: std::sync::RwLock::new(search_idx),
             });
+
+            // Background initial index build for first run
+            if needs_build {
+                let handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    let state = handle.state::<AppState>();
+
+                    // Snapshot cache entries
+                    let entries: Vec<_> = {
+                        let cache = state.cache.lock().unwrap();
+                        cache.entries.values().cloned().collect()
+                    };
+
+                    // Batch index in groups of 20
+                    for chunk in entries.chunks(20) {
+                        let mut idx = state.search_index.write().unwrap();
+                        for entry in chunk {
+                            idx.index_session(
+                                &entry.session.session_id,
+                                &entry.session.user_messages,
+                                &entry.assistant_texts,
+                                &entry.tool_inputs,
+                            );
+                        }
+                        idx.commit_and_reload().ok();
+                    }
+
+                    let _ = handle.emit("search-index-ready", ());
+                });
+            }
 
             // Watch ~/.claude/projects/ for session file changes
             let app_handle = app.handle().clone();

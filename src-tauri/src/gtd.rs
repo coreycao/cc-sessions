@@ -1,15 +1,17 @@
 use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 use tauri::Manager;
 
 use crate::models::{AppStore, SessionCache};
+use crate::search_index::SearchIndex;
 
 pub struct AppState {
     pub gtd_store: Mutex<AppStore>,
     pub cache: Mutex<SessionCache>,
+    pub search_index: RwLock<SearchIndex>,
 }
 
 pub fn gtd_store_path(app: &tauri::AppHandle) -> PathBuf {
@@ -24,6 +26,13 @@ pub fn session_cache_path(app: &tauri::AppHandle) -> PathBuf {
         .app_data_dir()
         .expect("no app data dir")
         .join("session-cache.json")
+}
+
+pub fn search_index_dir(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("no app data dir")
+        .join("search-index")
 }
 
 pub fn load_session_cache(path: &Path) -> SessionCache {

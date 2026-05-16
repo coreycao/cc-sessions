@@ -27,9 +27,7 @@ export function useContentSearch(searchQuery: string) {
       } catch (e) {
         console.error('Content search failed:', e)
       } finally {
-        if (seq === seqRef.current) {
-          setIsSearching(false)
-        }
+        setIsSearching(false)
       }
     }, 300)
 
