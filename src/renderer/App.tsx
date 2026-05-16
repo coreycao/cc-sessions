@@ -101,6 +101,7 @@ export default function App() {
         setSidebarCollapsed(v => !v)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
+        if (document.activeElement === searchRef.current) return
         e.preventDefault()
         store.selectAllBatch(store.filteredSessions)
       }
