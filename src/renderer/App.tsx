@@ -1,12 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionInfo, AppStore } from '../shared/types'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X } from 'lucide-react'
+import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
 import { DetailPanel } from './components/DetailPanel'
 import { BatchActions } from './components/BatchActions'
+import { SavedMessagesList } from './components/SavedMessagesList'
+import { SavedMessageDetail } from './components/SavedMessageDetail'
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
@@ -126,6 +128,20 @@ export default function App() {
 
   const currentProjectName = projectDisplayName(store.selectedProject)
   const currentProjectTitle = store.selectedProject || 'All Projects'
+
+  const selectedSavedMessage = useMemo(
+    () => store.savedMessages.find(m => m.id === store.selectedSavedId) || null,
+    [store.savedMessages, store.selectedSavedId]
+  )
+
+  const jumpToSession = useCallback((sessionId: string) => {
+    store.setView('sessions')
+    store.setSelectedSavedId(null)
+    const session = store.sessions.find(s => s.sessionId === sessionId)
+    if (session) {
+      store.selectSession(session)
+    }
+  }, [store.sessions, store.setView, store.setSelectedSavedId, store.selectSession])
 
   if (store.loading) {
     return (
@@ -253,60 +269,102 @@ export default function App() {
           settingsBtnRef={settingsBtnRef}
           onSync={handleSync}
           syncing={syncing}
+          view={store.view}
+          setView={store.setView}
+          savedCount={store.savedMessages.length}
         />
 
         <div className="flex flex-col w-[320px] flex-shrink-0 overflow-hidden">
-          <BatchActions
-            batchSelectedIds={store.batchSelectedIds}
-            getGTD={store.getGTD}
-            allTags={store.allTags}
-            batchUpdateGTD={store.batchUpdateGTD}
-            batchAddTag={store.batchAddTag}
-            batchDeleteSessions={store.batchDeleteSessions}
-            clearBatchSelection={store.clearBatchSelection}
-            loadData={store.loadData}
-            filterStatus={store.filterStatus}
-            filteredCount={store.filteredSessions.length}
-          />
-          <SessionList
-            filteredSessions={store.filteredSessions}
-            selectedSessionId={store.selectedSessionId}
-            selectSession={store.selectSession}
-            getGTD={store.getGTD}
-            hasFilters={store.hasFilters}
-            contentResults={store.contentResults}
-            batchSelectedIds={store.batchSelectedIds}
-            toggleBatchSelect={store.toggleBatchSelect}
-            batchSelectRange={store.batchSelectRange}
-            lastClickedIndex={store.lastClickedIndex}
-          />
+          {store.view === 'sessions' ? (
+            <>
+              <BatchActions
+                batchSelectedIds={store.batchSelectedIds}
+                getGTD={store.getGTD}
+                allTags={store.allTags}
+                batchUpdateGTD={store.batchUpdateGTD}
+                batchAddTag={store.batchAddTag}
+                batchDeleteSessions={store.batchDeleteSessions}
+                clearBatchSelection={store.clearBatchSelection}
+                loadData={store.loadData}
+                filterStatus={store.filterStatus}
+                filteredCount={store.filteredSessions.length}
+              />
+              <SessionList
+                filteredSessions={store.filteredSessions}
+                selectedSessionId={store.selectedSessionId}
+                selectSession={store.selectSession}
+                getGTD={store.getGTD}
+                hasFilters={store.hasFilters}
+                contentResults={store.contentResults}
+                batchSelectedIds={store.batchSelectedIds}
+                toggleBatchSelect={store.toggleBatchSelect}
+                batchSelectRange={store.batchSelectRange}
+                lastClickedIndex={store.lastClickedIndex}
+              />
+            </>
+          ) : (
+            <>
+              <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/70 bg-surface-2/60">
+                <span className="text-[11px] text-content-3 font-medium absolute inset-x-0 flex items-center justify-center pointer-events-none">
+                  Saved <span className="text-content-4 tabular-nums ml-0.5">({store.savedMessages.length})</span>
+                </span>
+              </div>
+              <SavedMessagesList
+                savedMessages={store.savedMessages}
+                selectedSavedId={store.selectedSavedId}
+                setSelectedSavedId={store.setSelectedSavedId}
+              />
+            </>
+          )}
         </div>
 
-        {store.selectedSession ? (
-          <DetailPanel
-            selectedSession={store.selectedSession}
-            sessionContent={store.sessionContent}
-            getGTD={store.getGTD}
-            updateSessionGTD={store.updateSessionGTD}
-            addTag={store.addTag}
-            removeTag={store.removeTag}
-            allTags={store.allTags}
-            deleteSession={store.deleteSession}
-            restoreSession={store.restoreSession}
-            setSelectedSessionId={store.setSelectedSessionId}
-            showTagInput={store.showTagInput}
-            setShowTagInput={store.setShowTagInput}
-            newTag={store.newTag}
-            setNewTag={store.setNewTag}
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-content-4 text-sm flex flex-col items-center gap-3">
-              <FileText className="w-10 h-10 text-content-5" />
-              <span>Select a session to view details</span>
-              <span className="text-[11px] text-content-5">Use ↑↓ keys to navigate, Esc to deselect</span>
+        {store.view === 'sessions' ? (
+          store.selectedSession ? (
+            <DetailPanel
+              selectedSession={store.selectedSession}
+              sessionContent={store.sessionContent}
+              getGTD={store.getGTD}
+              updateSessionGTD={store.updateSessionGTD}
+              addTag={store.addTag}
+              removeTag={store.removeTag}
+              allTags={store.allTags}
+              deleteSession={store.deleteSession}
+              restoreSession={store.restoreSession}
+              setSelectedSessionId={store.setSelectedSessionId}
+              showTagInput={store.showTagInput}
+              setShowTagInput={store.setShowTagInput}
+              newTag={store.newTag}
+              setNewTag={store.setNewTag}
+              isSaved={store.isSaved}
+              addSavedMessage={store.addSavedMessage}
+              removeSavedMessage={store.removeSavedMessage}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-content-4 text-sm flex flex-col items-center gap-3">
+                <FileText className="w-10 h-10 text-content-5" />
+                <span>Select a session to view details</span>
+                <span className="text-[11px] text-content-5">Use ↑↓ keys to navigate, Esc to deselect</span>
+              </div>
             </div>
-          </div>
+          )
+        ) : (
+          selectedSavedMessage ? (
+            <SavedMessageDetail
+              message={selectedSavedMessage}
+              sessions={store.sessions}
+              removeSavedMessage={store.removeSavedMessage}
+              setSelectedSavedId={store.setSelectedSavedId}
+              onJumpToSession={jumpToSession}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center">
+              <div className="text-content-4 text-sm flex flex-col items-center gap-3">
+                <Bookmark className="w-10 h-10 text-content-5" />
+                <span>Select a saved message to view it</span>
+              </div>
+            </div>
+          )
         )}
       </div>
       <ToastContainer toasts={store.toasts} removeToast={store.removeToast} />

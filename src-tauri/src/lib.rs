@@ -2,6 +2,7 @@ mod commands;
 mod gtd;
 mod helpers;
 mod models;
+mod saved;
 mod scanner;
 mod search_index;
 
@@ -9,6 +10,7 @@ use notify::Watcher;
 use tauri::{Emitter, Manager};
 
 use gtd::{load_gtd_from_file, load_session_cache, gtd_store_path, session_cache_path, search_index_dir, AppState};
+use saved::{load_saved_messages_from_file, saved_messages_path};
 
 pub fn run() {
     tauri::Builder::default()
@@ -27,10 +29,14 @@ pub fn run() {
 
             let needs_build = search_idx.session_count() == 0;
 
+            let saved_path = saved_messages_path(app.handle());
+            let initial_saved = load_saved_messages_from_file(&saved_path);
+
             app.manage(AppState {
                 gtd_store: std::sync::Mutex::new(initial_store),
                 cache: std::sync::Mutex::new(initial_cache),
                 search_index: std::sync::RwLock::new(search_idx),
+                saved_messages: std::sync::Mutex::new(initial_saved),
             });
 
             // Background initial index build for first run
@@ -124,9 +130,12 @@ pub fn run() {
             scanner::search_session_content,
             gtd::load_gtd_store,
             gtd::save_gtd_store,
+            saved::load_saved_messages,
+            saved::save_saved_messages,
             commands::read_session_content,
             commands::delete_session,
             commands::restore_session,
+            commands::export_markdown,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -41,6 +41,26 @@ pub struct AppStore {
     pub tags: Vec<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedMessage {
+    pub id: String,
+    pub session_id: String,
+    pub session_title: String,
+    pub project_path: String,
+    pub message_id: String,
+    pub role: String,
+    pub content: String,
+    pub timestamp: String,
+    pub saved_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedMessagesStore {
+    pub messages: Vec<SavedMessage>,
+}
+
 #[derive(Deserialize)]
 pub(crate) struct JsonlEntry {
     #[serde(rename = "type")]

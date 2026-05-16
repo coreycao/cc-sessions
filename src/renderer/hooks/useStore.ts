@@ -5,6 +5,9 @@ import { useGTD } from './useGTD'
 import { useFilters } from './useFilters'
 import { useToast } from './useToast'
 import { useContentSearch } from './useContentSearch'
+import { useSavedMessages } from './useSavedMessages'
+
+export type View = 'sessions' | 'saved'
 
 export function useStore() {
   const { toasts, addToast, removeToast } = useToast()
@@ -12,7 +15,10 @@ export function useStore() {
   const gtd = useGTD()
   const filters = useFilters(sessions.sessions, gtd.getGTD)
   const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
+  const saved = useSavedMessages()
   const [indexReady, setIndexReady] = useState(true)
+  const [view, setView] = useState<View>('sessions')
+  const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
 
   useEffect(() => {
     let unlisten: (() => void) | undefined
@@ -68,6 +74,7 @@ export function useStore() {
 
   return {
     loading: sessions.loading,
+    sessions: sessions.sessions,
     filteredSessions,
     statusCounts: filters.statusCounts,
     selectedSession,
@@ -116,5 +123,13 @@ export function useStore() {
     batchUpdateGTD: gtd.batchUpdateGTD,
     batchAddTag: gtd.batchAddTag,
     batchRemoveTag: gtd.batchRemoveTag,
+    view,
+    setView,
+    savedMessages: saved.savedMessages,
+    addSavedMessage: saved.addSavedMessage,
+    removeSavedMessage: saved.removeSavedMessage,
+    isSaved: saved.isSaved,
+    selectedSavedId,
+    setSelectedSavedId,
   }
 }

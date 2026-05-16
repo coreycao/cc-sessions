@@ -2,6 +2,8 @@ use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
 
+use tauri_plugin_dialog::DialogExt;
+
 use crate::helpers::projects_dir;
 
 fn validate_session_path(file_path: &str) -> Result<PathBuf, String> {
@@ -52,4 +54,25 @@ pub fn restore_session(cwd: String, session_id: String) -> Result<String, String
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok("success".into())
+}
+
+#[tauri::command]
+pub async fn export_markdown(
+    app: tauri::AppHandle,
+    suggested_name: String,
+    content: String,
+) -> Result<Option<String>, String> {
+    let file_path = app
+        .dialog()
+        .file()
+        .add_filter("Markdown", &["md"])
+        .set_file_name(&suggested_name)
+        .blocking_save_file();
+
+    let Some(path) = file_path else { return Ok(None) };
+
+    let path_str = path.to_string();
+    let pb = std::path::PathBuf::from(&path_str);
+    fs::write(&pb, content).map_err(|e| e.to_string())?;
+    Ok(Some(path_str))
 }

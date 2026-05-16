@@ -40,6 +40,22 @@ export interface AppStore {
   tags: string[]
 }
 
+export interface SavedMessage {
+  id: string
+  sessionId: string
+  sessionTitle: string
+  projectPath: string
+  messageId: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  savedAt: string
+}
+
+export interface SavedMessagesStore {
+  messages: SavedMessage[]
+}
+
 // ---- Conversation Rendering Types ----
 
 export interface TextMessage {

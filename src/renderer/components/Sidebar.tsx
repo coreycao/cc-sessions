@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useEffect, memo, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import type { FilterView } from '../hooks/useFilters'
+import type { View } from '../hooks/useStore'
 import {
   LayoutList, Circle, Star, Archive,
-  Tag, Pencil, Trash, Plus, Settings, RefreshCw,
+  Tag, Pencil, Trash, Plus, Settings, RefreshCw, Bookmark,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -26,6 +27,9 @@ interface SidebarProps {
   settingsBtnRef: RefObject<HTMLButtonElement | null>
   onSync: () => Promise<void>
   syncing: boolean
+  view: View
+  setView: (v: View) => void
+  savedCount: number
 }
 
 const FILTER_ITEMS: { key: FilterView; icon: typeof LayoutList; label: string }[] = [
@@ -42,6 +46,7 @@ export const Sidebar = memo(function Sidebar({
   statusCounts,
   sidebarWidth, sidebarCollapsed, isResizing, startResize,
   settingsMenuOpen, setSettingsMenuOpen, settingsBtnRef, onSync, syncing,
+  view, setView, savedCount,
 }: SidebarProps) {
   const [ctxMenu, setCtxMenu] = useState<{ tag: string; x: number; y: number } | null>(null)
   const [editingTag, setEditingTag] = useState<string | null>(null)
@@ -104,8 +109,8 @@ export const Sidebar = memo(function Sidebar({
               const items = [
                 <FilterButton
                   key={key}
-                  active={filterStatus === key && !filterTag}
-                  onClick={() => { setFilterStatus(key); setFilterTag(null) }}
+                  active={view === 'sessions' && filterStatus === key && !filterTag}
+                  onClick={() => { setView('sessions'); setFilterStatus(key); setFilterTag(null) }}
                   icon={<Icon className="w-3.5 h-3.5" />}
                   label={label}
                   count={statusCounts[key] || 0}
@@ -159,8 +164,8 @@ export const Sidebar = memo(function Sidebar({
                 ) : (
                   <FilterButton
                     key={tag}
-                    active={filterTag === tag}
-                    onClick={() => { setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
+                    active={view === 'sessions' && filterTag === tag}
+                    onClick={() => { setView('sessions'); setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
                     onContextMenu={e => handleTagContextMenu(e, tag)}
                     icon={<Tag className="w-3 h-3" />}
                     label={tag}
@@ -192,6 +197,17 @@ export const Sidebar = memo(function Sidebar({
           </div>,
           document.body
         )}
+
+        {/* Saved */}
+        <div className="px-2 py-1.5 border-b border-edge/50">
+          <FilterButton
+            active={view === 'saved'}
+            onClick={() => setView('saved')}
+            icon={<Bookmark className="w-3.5 h-3.5" />}
+            label="Saved"
+            count={savedCount}
+          />
+        </div>
 
         <div className="flex-1" />
         <div className="px-2 py-1.5 border-t border-edge/50">

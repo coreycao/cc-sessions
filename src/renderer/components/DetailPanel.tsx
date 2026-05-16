@@ -1,9 +1,10 @@
 import { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react'
 import { createPortal } from 'react-dom'
-import type { SessionInfo, GTDMetadata } from '../../shared/types'
+import type { SessionInfo, GTDMetadata, SavedMessage } from '../../shared/types'
 import { formatDate } from '../lib/utils'
 import { parseConversation } from '../lib/parseConversation'
 import { TurnRenderer, FullscreenMessageModal } from './ConversationMessage'
+import type { MessageActions } from './ConversationMessage'
 import { InlineErrorBoundary } from './ErrorBoundary'
 import {
   Archive, Circle,
@@ -26,6 +27,9 @@ interface DetailPanelProps {
   setShowTagInput: (v: boolean) => void
   newTag: string
   setNewTag: (v: string) => void
+  isSaved: (sessionId: string, messageId: string) => boolean
+  addSavedMessage: (msg: Omit<SavedMessage, 'id' | 'savedAt'>) => Promise<void>
+  removeSavedMessage: (id: string) => Promise<void>
 }
 
 export const DetailPanel = memo(function DetailPanel({
@@ -33,10 +37,25 @@ export const DetailPanel = memo(function DetailPanel({
   updateSessionGTD, addTag, removeTag, allTags,
   deleteSession, restoreSession, setSelectedSessionId,
   showTagInput, setShowTagInput, newTag, setNewTag,
+  isSaved, addSavedMessage, removeSavedMessage,
 }: DetailPanelProps) {
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [compact, setCompact] = useState(false)
+
+  const messageActions: MessageActions = useMemo(() => ({
+    isSaved: (messageId: string) => isSaved(selectedSession.sessionId, messageId),
+    onSave: (msg) => addSavedMessage({
+      sessionId: selectedSession.sessionId,
+      sessionTitle: selectedSession.title,
+      projectPath: selectedSession.projectPath,
+      messageId: msg.id,
+      role: msg.role,
+      content: msg.content,
+      timestamp: msg.timestamp,
+    }),
+    onUnsave: (messageId: string) => removeSavedMessage(`${selectedSession.sessionId}:${messageId}`),
+  }), [selectedSession.sessionId, selectedSession.title, selectedSession.projectPath, isSaved, addSavedMessage, removeSavedMessage])
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface">
@@ -139,7 +158,7 @@ export const DetailPanel = memo(function DetailPanel({
       {/* Conversation Preview */}
       <div className="flex-1 overflow-y-auto p-4">
         <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
-          <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} />
+          <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} actions={messageActions} />
         </InlineErrorBoundary>
       </div>
 
@@ -362,7 +381,7 @@ function PlainConversation({ content }: { content: string }) {
   )
 }
 
-function ConversationPreview({ content, sessionId, compact }: { content: string; sessionId: string; compact: boolean }) {
+function ConversationPreview({ content, sessionId, compact, actions }: { content: string; sessionId: string; compact: boolean; actions: MessageActions }) {
   const [expandedMsg, setExpandedMsg] = useState<{ role: string; text: string; timestamp: string } | null>(null)
 
   const turns = useMemo(() => parseConversation(content), [content, sessionId])
@@ -375,7 +394,7 @@ function ConversationPreview({ content, sessionId, compact }: { content: string;
     <>
       <div className="space-y-4 flex flex-col">
         {turns.map(turn => (
-          <TurnRenderer key={turn.id} turn={turn} onExpand={setExpandedMsg} compact={compact} />
+          <TurnRenderer key={turn.id} turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} />
         ))}
       </div>
       {expandedMsg && (

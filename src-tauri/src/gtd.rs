@@ -5,13 +5,14 @@ use std::sync::{Mutex, RwLock};
 
 use tauri::Manager;
 
-use crate::models::{AppStore, SessionCache};
+use crate::models::{AppStore, SavedMessagesStore, SessionCache};
 use crate::search_index::SearchIndex;
 
 pub struct AppState {
     pub gtd_store: Mutex<AppStore>,
     pub cache: Mutex<SessionCache>,
     pub search_index: RwLock<SearchIndex>,
+    pub saved_messages: Mutex<SavedMessagesStore>,
 }
 
 pub fn gtd_store_path(app: &tauri::AppHandle) -> PathBuf {
