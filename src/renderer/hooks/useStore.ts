@@ -34,8 +34,8 @@ export function useStore() {
   useEffect(() => { loadData() }, [loadData])
 
   const deleteSession = useCallback(async (session: import('../../shared/types').SessionInfo) => {
-    await sessions.deleteSession(session, loadData)
-  }, [sessions.deleteSession, loadData])
+    await sessions.deleteSession(session)
+  }, [sessions.deleteSession])
 
   const selectedSession = useMemo(
     () => sessions.sessions.find(s => s.sessionId === sessions.selectedSessionId) || null,

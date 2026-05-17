@@ -11,7 +11,7 @@ interface BatchActionsProps {
   allTags: string[]
   batchUpdateGTD: (ids: string[], updates: Partial<GTDMetadata>) => Promise<void>
   batchAddTag: (ids: string[], tag: string) => Promise<void>
-  batchDeleteSessions: (ids: Set<string>, reloadAll: () => Promise<void>) => Promise<void>
+  batchDeleteSessions: (ids: Set<string>) => Promise<void>
   clearBatchSelection: () => void
   loadData: () => Promise<void>
   filterStatus: FilterView
@@ -64,7 +64,7 @@ export function BatchActions({
 
   const confirmDelete = async () => {
     setShowDeleteConfirm(false)
-    await batchDeleteSessions(batchSelectedIds, loadData)
+    await batchDeleteSessions(batchSelectedIds)
   }
 
   const openTagMenu = () => {

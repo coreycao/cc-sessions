@@ -42,12 +42,12 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
     loadSessionContent(session.fullPath)
   }, [loadSessionContent])
 
-  const deleteSession = useCallback(async (session: SessionInfo, reloadAll: () => Promise<void>) => {
+  const deleteSession = useCallback(async (session: SessionInfo) => {
     try {
       await invoke('delete_session', { filePath: session.fullPath })
+      setSessions(prev => prev.filter(s => s.sessionId !== session.sessionId))
       setSelectedSessionId(null)
       setSessionContent('')
-      await reloadAll()
       addToast('Session deleted', 'success')
     } catch (e) {
       console.error('Failed to delete session:', e)
@@ -92,22 +92,21 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
     setBatchSelectedIds(new Set())
   }, [])
 
-  const batchDeleteSessions = useCallback(async (
-    ids: Set<string>,
-    reloadAll: () => Promise<void>,
-  ) => {
+  const batchDeleteSessions = useCallback(async (ids: Set<string>) => {
     const targets = Array.from(ids).map(id => sessions.find(s => s.sessionId === id)).filter(Boolean) as SessionInfo[]
     const results = await Promise.allSettled(
       targets.map(s => invoke('delete_session', { filePath: s.fullPath }))
     )
-    const succeeded = results.filter(r => r.status === 'fulfilled').length
+    const succeededIds = new Set(
+      targets.filter((_, i) => results[i].status === 'fulfilled').map(s => s.sessionId)
+    )
     const failed = results.filter(r => r.status === 'rejected').length
-    if (failed > 0) addToast(`Deleted ${succeeded}, failed ${failed}`)
-    else addToast(`Deleted ${succeeded} session${succeeded !== 1 ? 's' : ''}`, 'success')
+    setSessions(prev => prev.filter(s => !succeededIds.has(s.sessionId)))
     setBatchSelectedIds(new Set())
     setSelectedSessionId(null)
     setSessionContent('')
-    await reloadAll()
+    if (failed > 0) addToast(`Deleted ${succeededIds.size}, failed ${failed}`)
+    else addToast(`Deleted ${succeededIds.size} session${succeededIds.size !== 1 ? 's' : ''}`, 'success')
   }, [sessions, addToast])
 
   return {
