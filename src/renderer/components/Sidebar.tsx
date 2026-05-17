@@ -2,10 +2,12 @@ import { useState, useCallback, useRef, useEffect, memo, type RefObject } from '
 import { createPortal } from 'react-dom'
 import type { FilterView } from '../hooks/useFilters'
 import type { View } from '../hooks/useStore'
+import type { SessionInfo } from '../../shared/types'
 import {
   LayoutList, Circle, Star, Archive,
   Tag, Pencil, Trash, Plus, Settings, RefreshCw, Bookmark, ChevronDown,
 } from 'lucide-react'
+import { StatsPanel } from './StatsPanel'
 
 interface SidebarProps {
   filterStatus: FilterView
@@ -27,6 +29,7 @@ interface SidebarProps {
   settingsBtnRef: RefObject<HTMLButtonElement | null>
   onSync: () => Promise<void>
   syncing: boolean
+  sessions: SessionInfo[]
   view: View
   setView: (v: View) => void
   savedCount: number
@@ -46,6 +49,7 @@ export const Sidebar = memo(function Sidebar({
   statusCounts,
   sidebarWidth, sidebarCollapsed, isResizing, startResize,
   settingsMenuOpen, setSettingsMenuOpen, settingsBtnRef, onSync, syncing,
+  sessions,
   view, setView, savedCount,
 }: SidebarProps) {
   const [ctxMenu, setCtxMenu] = useState<{ tag: string; x: number; y: number } | null>(null)
@@ -223,6 +227,7 @@ export const Sidebar = memo(function Sidebar({
         </div>
 
         <div className="flex-1" />
+        <StatsPanel sessions={sessions} />
         <div className="px-2 py-1.5 border-t border-edge/30">
           <button
             ref={settingsBtnRef}

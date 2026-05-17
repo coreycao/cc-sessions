@@ -270,6 +270,7 @@ export default function App() {
           settingsBtnRef={settingsBtnRef}
           onSync={handleSync}
           syncing={syncing}
+          sessions={store.sessions}
           view={store.view}
           setView={store.setView}
           savedCount={store.savedMessages.length}
