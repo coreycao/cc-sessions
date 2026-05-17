@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect, memo, startTransition } from 'react'
 import { createPortal } from 'react-dom'
+import { invoke } from '@tauri-apps/api/core'
 import type { SessionInfo, GTDMetadata, SavedMessage } from '../../shared/types'
 import { formatDate } from '../lib/utils'
 import { parseConversation } from '../lib/parseConversation'
@@ -10,6 +11,7 @@ import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
   Trash2, RotateCcw, AlertTriangle, FileText, FileCode,
+  MoreHorizontal, FileDown,
 } from 'lucide-react'
 
 interface DetailPanelProps {
@@ -42,6 +44,32 @@ export const DetailPanel = memo(function DetailPanel({
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [compact, setCompact] = useState(false)
+  const [showOverflow, setShowOverflow] = useState(false)
+  const overflowRef = useRef<HTMLButtonElement>(null)
+
+  const exportFullSession = useCallback(() => {
+    const turns = parseConversation(sessionContent)
+    const parts: string[] = [`# ${selectedSession.title}\n`]
+    const meta: string[] = []
+    meta.push(`_Date: ${new Date(selectedSession.created).toLocaleString()}_`)
+    if (selectedSession.gitBranch) meta.push(`_Branch: ${selectedSession.gitBranch}_`)
+    if (selectedSession.messageCount) meta.push(`_Messages: ${selectedSession.messageCount}_`)
+    if (gtd.tags.length) meta.push(`_Tags: ${gtd.tags.join(', ')}_`)
+    parts.push(meta.join('\n') + '\n')
+    for (const turn of turns) {
+      if (turn.kind === 'user_turn') {
+        parts.push(`## You\n\n${turn.message.content}\n`)
+      } else if (turn.kind === 'assistant_turn') {
+        for (const m of turn.messages) {
+          if (m.kind === 'text') parts.push(`## Claude\n\n${m.content}\n`)
+          else if (m.kind === 'thinking') parts.push(`## Claude (thinking)\n\n${m.content}\n`)
+        }
+      }
+    }
+    const name = selectedSession.title.replace(/[\/\\?%*:|"<>\s]+/g, '-').slice(0, 100)
+    invoke('export_markdown', { suggestedName: `${name}.md`, content: parts.join('\n') })
+      .catch(e => console.error('Export failed:', e))
+  }, [sessionContent, selectedSession, gtd.tags])
 
   const messageActions: MessageActions = useMemo(() => ({
     isSaved: (messageId: string) => isSaved(selectedSession.sessionId, messageId),
@@ -67,14 +95,6 @@ export const DetailPanel = memo(function DetailPanel({
           <X className="w-4 h-4" />
         </button>
         <h2 className="text-sm font-medium text-content truncate flex-1" data-tauri-drag-region>{selectedSession.title}</h2>
-        <ActionTip label={compact ? 'Full view' : 'Compact view'}>
-          <button
-            onClick={() => setCompact(v => !v)}
-            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${compact ? 'text-accent' : 'text-content-4 hover:text-content-2'}`}
-          >
-            {compact ? <FileCode className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
-          </button>
-        </ActionTip>
         <ActionTip label={gtd.status === 'archived' ? 'Unarchive' : 'Archive'}>
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}
@@ -99,14 +119,27 @@ export const DetailPanel = memo(function DetailPanel({
             <RotateCcw className="w-4 h-4" />
           </button>
         </ActionTip>
-        <ActionTip label="Delete">
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </ActionTip>
+        <div className="relative">
+          <ActionTip label="More actions">
+            <button
+              ref={overflowRef}
+              onClick={() => setShowOverflow(v => !v)}
+              className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </ActionTip>
+          {showOverflow && (
+            <OverflowMenu
+              anchorRef={overflowRef}
+              compact={compact}
+              onClose={() => setShowOverflow(false)}
+              onToggleCompact={() => { setCompact(v => !v); setShowOverflow(false) }}
+              onExport={() => { exportFullSession(); setShowOverflow(false) }}
+              onDelete={() => { setShowDeleteConfirm(true); setShowOverflow(false) }}
+            />
+          )}
+        </div>
       </div>
 
       {/* Metadata */}
@@ -326,6 +359,55 @@ function TagInput({ value, onChange, onSubmit, onClose, suggestions }: {
         document.body
       )}
     </div>
+  )
+}
+
+function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onExport, onDelete }: {
+  anchorRef: React.RefObject<HTMLButtonElement | null>
+  compact: boolean
+  onClose: () => void
+  onToggleCompact: () => void
+  onExport: () => void
+  onDelete: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const r = anchorRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.right })
+    }
+  }, [anchorRef])
+
+  useEffect(() => {
+    const click = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
+    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', click)
+    document.addEventListener('keydown', key)
+    return () => { document.removeEventListener('mousedown', click); document.removeEventListener('keydown', key) }
+  }, [onClose])
+
+  return createPortal(
+    <div
+      ref={ref}
+      className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[180px]"
+      style={{ top: pos.top, right: window.innerWidth - pos.left }}
+    >
+      <button onClick={onToggleCompact} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
+        <span className="text-content-4">{compact ? <FileCode className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}</span>
+        {compact ? 'Full view' : 'Compact view'}
+      </button>
+      <button onClick={onExport} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
+        <span className="text-content-4"><FileDown className="w-3.5 h-3.5" /></span>
+        Export as Markdown
+      </button>
+      <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-red-400 hover:bg-surface-3">
+        <span><Trash2 className="w-3.5 h-3.5" /></span>
+        Delete
+      </button>
+    </div>,
+    document.body,
   )
 }
 
