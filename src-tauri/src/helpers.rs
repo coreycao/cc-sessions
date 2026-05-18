@@ -77,3 +77,46 @@ pub fn extract_text(content: &serde_json::Value) -> String {
         _ => String::new(),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn project_name_from_dir_decodes_claude_project_directory_names() {
+        assert_eq!(
+            project_name_from_dir("-definitely-not-a-real-root-nested-project"),
+            "/definitely/not/a/real/root/nested/project"
+        );
+        assert_eq!(project_name_from_dir("-"), "");
+    }
+
+    #[test]
+    fn extract_snippet_returns_context_around_case_insensitive_match() {
+        let snippet = extract_snippet("before searchable phrase after", "searchable", 12);
+
+        assert!(snippet.starts_with("..."));
+        assert!(snippet.contains("searchable"));
+        assert!(snippet.ends_with("..."));
+    }
+
+    #[test]
+    fn extract_snippet_falls_back_to_window_when_query_is_missing() {
+        assert_eq!(extract_snippet("abcdef", "missing", 3), "abc");
+    }
+
+    #[test]
+    fn extract_text_handles_strings_and_text_blocks() {
+        assert_eq!(extract_text(&json!("plain text")), "plain text");
+        assert_eq!(
+            extract_text(&json!([
+                { "type": "text", "text": "first" },
+                { "type": "image", "source": "ignored" },
+                { "type": "text", "text": "second" }
+            ])),
+            "first second"
+        );
+        assert_eq!(extract_text(&json!({ "type": "text" })), "");
+    }
+}

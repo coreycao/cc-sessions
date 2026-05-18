@@ -204,3 +204,67 @@ impl SearchIndex {
         builder.build()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::UNIX_EPOCH;
+
+    fn unique_temp_dir() -> std::path::PathBuf {
+        std::env::temp_dir().join(format!(
+            "cc-sessions-search-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ))
+    }
+
+    #[test]
+    fn search_returns_indexed_sessions_with_matched_fields_and_snippets() {
+        let dir = unique_temp_dir();
+        let mut index = SearchIndex::open_or_create(&dir).unwrap();
+
+        index.index_session(
+            "session-1",
+            &["please add tests".to_string()],
+            &["the automated test suite now covers parsing".to_string()],
+            &["pnpm test".to_string()],
+        );
+        index.index_session(
+            "session-2",
+            &["unrelated prompt".to_string()],
+            &["nothing to see here".to_string()],
+            &[],
+        );
+        index.commit_and_reload().unwrap();
+
+        let results = index.search("automated", 10).unwrap();
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].session_id, "session-1");
+        assert_eq!(results[0].matched_fields, vec!["assistant_text"]);
+        assert!(results[0].snippet.contains("automated"));
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn delete_session_removes_documents_from_the_index() {
+        let dir = unique_temp_dir();
+        let mut index = SearchIndex::open_or_create(&dir).unwrap();
+
+        index.index_session("session-1", &["delete me".to_string()], &[], &[]);
+        index.commit_and_reload().unwrap();
+        assert_eq!(index.session_count(), 1);
+
+        index.delete_session("session-1");
+        index.commit_and_reload().unwrap();
+
+        assert_eq!(index.session_count(), 0);
+        assert!(index.search("delete", 10).unwrap().is_empty());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+}
