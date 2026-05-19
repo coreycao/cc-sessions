@@ -103,7 +103,7 @@ export const Sidebar = memo(function Sidebar({
 
   return (
     <div
-      className={`relative flex-shrink-0 flex flex-col bg-surface-2/35 overflow-hidden ${sidebarCollapsed ? 'w-0 border-r-0' : 'border-r border-edge/50'} ${isResizing ? '' : 'transition-[width,border-color] duration-200 ease-in-out'}`}
+      className={`relative flex-shrink-0 flex flex-col bg-surface overflow-hidden ${sidebarCollapsed ? 'w-0 border-r-0' : 'border-r border-edge/40'} ${isResizing ? '' : 'transition-[width,border-color] duration-200 ease-in-out'}`}
       style={!sidebarCollapsed ? { width: sidebarWidth } : undefined}
     >
       <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden" style={{ width: sidebarWidth }}>
@@ -157,7 +157,7 @@ export const Sidebar = memo(function Sidebar({
                     onChange={e => setNewTagValue(e.target.value)}
                     onKeyDown={e => { if (e.key === 'Escape') { setShowNewTag(false); setNewTagValue('') } }}
                     placeholder="new tag..."
-                    className="w-full bg-surface border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+                    className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
                     autoFocus
                   />
                 </form>
@@ -172,7 +172,7 @@ export const Sidebar = memo(function Sidebar({
                           value={editValue}
                           onChange={e => setEditValue(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Escape') { setEditingTag(null); setEditValue('') } }}
-                          className="w-full bg-surface border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+                          className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
                           autoFocus
                         />
                       </form>
@@ -195,7 +195,7 @@ export const Sidebar = memo(function Sidebar({
         </div>
         {ctxMenu && createPortal(
           <div
-            className="fixed z-[9999] bg-surface-2 border border-edge rounded-md shadow-xl py-1 min-w-[120px]"
+            className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[120px]"
             style={{ top: ctxMenu.y, left: ctxMenu.x }}
             onClick={e => e.stopPropagation()}
           >
@@ -207,7 +207,7 @@ export const Sidebar = memo(function Sidebar({
             </button>
             <button
               onClick={() => { deleteTag(ctxMenu.tag); setCtxMenu(null) }}
-              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-danger hover:bg-danger-subtle transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-red-400 hover:bg-surface-3 transition-colors"
             >
               <Trash className="w-3 h-3" />Delete tag
             </button>
@@ -239,7 +239,7 @@ export const Sidebar = memo(function Sidebar({
           </button>
           {settingsMenuOpen && createPortal(
             <div
-              className="fixed z-[9999] bg-surface-2 border border-edge rounded-md shadow-xl py-1 min-w-[160px]"
+              className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[160px]"
               style={{ bottom: window.innerHeight - (settingsBtnRef.current?.getBoundingClientRect().top || 0) + 4, left: settingsBtnRef.current?.getBoundingClientRect().left || 0 }}
             >
               <button
@@ -258,7 +258,7 @@ export const Sidebar = memo(function Sidebar({
       {!sidebarCollapsed && (
         <div
           onMouseDown={startResize}
-          className="absolute top-0 bottom-0 right-0 w-1.5 cursor-col-resize hover:bg-accent/20 z-10"
+          className="absolute top-0 bottom-0 right-0 w-1.5 cursor-col-resize hover:bg-blue-500/20 z-10"
         />
       )}
     </div>
@@ -292,7 +292,7 @@ function FilterButton({ active, onClick, onContextMenu, icon, label, count, tool
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${active ? 'bg-accent-subtle text-accent font-medium shadow-[inset_2px_0_0_0_var(--color-accent)]' : 'text-content-3 hover:bg-surface hover:text-content-2'}`}
+      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${active ? 'bg-accent-subtle text-accent font-medium' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
     >
       <span className="flex-shrink-0">{icon}</span>
       <span className="truncate">{label}</span>
@@ -305,7 +305,7 @@ function FilterButton({ active, onClick, onContextMenu, icon, label, count, tool
       <div ref={wrapRef} onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
         {btn}
         {showTip && createPortal(
-          <div className="fixed z-[9999] px-2.5 py-1 rounded-md bg-surface-3 text-[11px] text-content-2 shadow-lg border border-edge pointer-events-none" style={{ top: tipPos.top, left: tipPos.left }}>
+          <div className="fixed z-[9999] px-2.5 py-1 rounded bg-surface-3 text-[11px] text-content-2 shadow-lg border border-edge pointer-events-none" style={{ top: tipPos.top, left: tipPos.left }}>
             {tooltip}
           </div>,
           document.body

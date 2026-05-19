@@ -1,9 +1,9 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
 import { formatDate, relativeProjectName, STATUS_CONFIG } from '../lib/utils'
-import { Calendar, MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
+import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
 
-const ITEM_HEIGHT = 88
+const ITEM_HEIGHT = 80
 const OVERSCAN = 5
 
 interface SessionListProps {
@@ -103,7 +103,7 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
                   className={`group w-full text-left px-3 border-b border-edge-2/50 transition-colors ${isSelected ? 'bg-accent-subtle shadow-[inset_2px_0_0_0_var(--color-accent)]' : 'hover:bg-surface-2/60'} ${isBatchSelected ? 'bg-accent-subtle ring-2 ring-accent/40 ring-inset' : ''}`}
                   style={{ height: ITEM_HEIGHT }}
                 >
-                  <div className="flex items-start gap-2.5 py-2.5">
+                  <div className="flex items-start gap-2 py-2.5">
                     {hasBatchSelection && (
                       <span
                         className="mt-1 flex-shrink-0"
@@ -119,28 +119,31 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
                         }
                       </span>
                     )}
+                    <span className={`w-2.5 h-2.5 rounded-full mt-[5px] flex-shrink-0 ring-1 ring-white/80 dark:ring-surface/80 ${statusConfig.dotColor}`} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className={`h-2 w-2 rounded-full flex-shrink-0 ring-1 ring-white/80 dark:ring-surface/80 ${statusConfig.dotColor}`} title={statusConfig.label} />
-                        {gtd.starred && <Star className="w-3 h-3 text-warning fill-warning flex-shrink-0" />}
+                      <div className="flex items-center gap-1">
+                        {gtd.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />}
                         <span className={`text-xs font-medium truncate ${isSelected ? 'text-content' : 'text-content-2'}`}>
                           {session.title}
                         </span>
                       </div>
-                      <div className="text-[11px] text-content-4 mt-1 truncate">
+                      <div className="text-[11px] text-content-4 mt-0.5 truncate">
                         {relativeProjectName(session.projectName)}
                       </div>
                       {contentResults.has(session.sessionId) && (
-                        <div className="mt-1 flex min-w-0 items-center gap-1 text-[10px] text-content-3">
-                          <span className="shrink-0 rounded bg-tool-subtle px-1 py-0.5 font-medium text-tool">Content</span>
-                          <span className="truncate italic">{contentResults.get(session.sessionId)!.snippet}</span>
+                        <div className="text-[10px] text-content-3 mt-0.5 truncate italic">
+                          {contentResults.get(session.sessionId)!.snippet}
                         </div>
                       )}
-                      <div className="flex items-center gap-1.5 mt-1.5 overflow-hidden">
-                        <MetaPill icon={<MessageSquare className="w-2.5 h-2.5" />}>{session.messageCount}</MetaPill>
-                        <MetaPill icon={<Calendar className="w-2.5 h-2.5" />}>{formatDate(session.modified)}</MetaPill>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] text-content-4 flex items-center gap-0.5">
+                          <MessageSquare className="w-2.5 h-2.5" />{session.messageCount}
+                        </span>
+                        <span className="text-[10px] text-content-4">{formatDate(session.modified)}</span>
                         {session.gitBranch && session.gitBranch !== 'HEAD' && (
-                          <MetaPill icon={<GitBranch className="w-2.5 h-2.5" />} truncate>{session.gitBranch}</MetaPill>
+                          <span className="text-[10px] text-content-4 flex items-center gap-0.5">
+                            <GitBranch className="w-2.5 h-2.5" />{session.gitBranch}
+                          </span>
                         )}
                       </div>
                     </div>
@@ -152,18 +155,5 @@ export function SessionList({ filteredSessions, selectedSessionId, selectSession
         </div>
       </div>
     </div>
-  )
-}
-
-function MetaPill({ icon, children, truncate }: {
-  icon: React.ReactNode
-  children: React.ReactNode
-  truncate?: boolean
-}) {
-  return (
-    <span className={`inline-flex h-5 min-w-0 items-center gap-1 rounded border border-edge/50 bg-surface-2/70 px-1.5 text-[10px] text-content-4 ${truncate ? 'max-w-[96px]' : 'shrink-0'}`}>
-      <span className="shrink-0 text-content-5">{icon}</span>
-      <span className={truncate ? 'truncate' : 'tabular-nums'}>{children}</span>
-    </span>
   )
 }

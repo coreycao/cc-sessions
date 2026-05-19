@@ -129,10 +129,10 @@ function MetricCard({ label, value, sub, accent }: {
   accent?: boolean
 }) {
   return (
-    <div className="relative overflow-hidden rounded-md border border-edge/40 bg-surface/60 px-2.5 py-2">
+    <div className="relative overflow-hidden rounded-lg bg-surface-2/60 px-2.5 py-2">
       {/* Decorative accent dot */}
       {accent && (
-        <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-accent/70" />
+        <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-accent/60" />
       )}
       <div className="text-[10px] text-content-4 leading-none mb-1">{label}</div>
       <div className="text-sm font-semibold text-content tabular-nums leading-none">{value}</div>

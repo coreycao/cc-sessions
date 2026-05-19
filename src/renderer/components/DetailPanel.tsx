@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo, useEffect, useLayoutEffect, memo, startTransition } from 'react'
+import { useState, useCallback, useRef, useMemo, useEffect, memo, startTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { invoke } from '@tauri-apps/api/core'
 import type { SessionInfo, GTDMetadata, SavedMessage } from '../../shared/types'
@@ -46,11 +46,6 @@ export const DetailPanel = memo(function DetailPanel({
   const [compact, setCompact] = useState(false)
   const [showOverflow, setShowOverflow] = useState(false)
   const overflowRef = useRef<HTMLButtonElement>(null)
-  const conversationScrollRef = useRef<HTMLDivElement>(null)
-
-  useLayoutEffect(() => {
-    conversationScrollRef.current?.scrollTo({ top: 0, left: 0 })
-  }, [selectedSession.sessionId])
 
   const exportFullSession = useCallback(() => {
     const turns = parseConversation(sessionContent)
@@ -92,7 +87,7 @@ export const DetailPanel = memo(function DetailPanel({
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface">
-      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/40 bg-surface-2/40" data-tauri-drag-region>
+      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/30" data-tauri-drag-region>
         <button
           onClick={() => setSelectedSessionId(null)}
           className="p-1 rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
@@ -103,7 +98,7 @@ export const DetailPanel = memo(function DetailPanel({
         <ActionTip label={gtd.status === 'archived' ? 'Unarchive' : 'Archive'}>
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}
-            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-content-4' : 'text-content-4 hover:text-content-2'}`}
+            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
           >
             {gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
           </button>
@@ -111,9 +106,9 @@ export const DetailPanel = memo(function DetailPanel({
         <ActionTip label="Star">
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
-            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.starred ? 'text-warning' : 'text-content-4 hover:text-content-2'}`}
+            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.starred ? 'text-amber-400' : 'text-content-4 hover:text-content-2'}`}
           >
-            <Star className={`w-4 h-4 ${gtd.starred ? 'fill-warning' : ''}`} />
+            <Star className={`w-4 h-4 ${gtd.starred ? 'fill-amber-400' : ''}`} />
           </button>
         </ActionTip>
         <ActionTip label="Resume in Terminal">
@@ -148,12 +143,12 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Metadata */}
-      <div className="px-4 py-3 bg-surface-2/25 border-b border-edge/30 space-y-3">
+      <div className="px-4 py-3 bg-surface-2/30 space-y-3">
         <div className="flex items-center gap-3">
           <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Tags</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             {gtd.tags.map(tag => (
-              <span key={tag} className="group flex items-center gap-1 text-[11px] bg-tool-subtle text-content-2 pl-2 pr-1.5 py-0.5 rounded hover:bg-surface-3">
+              <span key={tag} className="group flex items-center gap-1 text-[11px] bg-surface-3/80 text-content-2 pl-2 pr-1.5 py-0.5 rounded-md hover:bg-surface-3">
                 {tag}
                 <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
                 <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
@@ -195,12 +190,10 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Conversation Preview */}
-      <div ref={conversationScrollRef} className="flex-1 overflow-y-auto px-5 py-4">
-        <div className="mx-auto max-w-5xl">
-          <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
-            <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} actions={messageActions} />
-          </InlineErrorBoundary>
-        </div>
+      <div className="flex-1 overflow-y-auto p-4">
+        <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
+          <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} actions={messageActions} />
+        </InlineErrorBoundary>
       </div>
 
       {showDeleteConfirm && (
@@ -253,7 +246,7 @@ function NoteInput({ value, updatedAt, onSave }: {
             placeholder="Add a note..."
             rows={1}
             autoFocus
-          className="w-full bg-surface border border-edge rounded-md px-2 py-1.5 text-[11px] text-content-2 placeholder-content-4 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 resize-none leading-relaxed"
+            className="w-full bg-surface-2/60 border border-edge rounded-md px-2 py-1.5 text-[11px] text-content-2 placeholder-content-4 focus:outline-none focus:border-content-3 resize-none leading-relaxed"
           />
           <span className="text-[9px] text-content-5 mt-0.5 block">⌘Enter to save · Esc to cancel</span>
         </div>
@@ -267,7 +260,7 @@ function NoteInput({ value, updatedAt, onSave }: {
       {value ? (
         <div
           onClick={startEdit}
-          className="flex-1 min-w-0 cursor-pointer bg-surface/70 border border-edge/40 rounded-md px-2 py-1.5 hover:bg-surface-2/80 transition-colors"
+          className="flex-1 min-w-0 cursor-pointer bg-surface-2/40 rounded-md px-2 py-1.5 hover:bg-surface-2/80 transition-colors"
           title="Click to edit"
         >
           <p className="text-[11px] text-content-2 leading-relaxed line-clamp-2">{value}</p>
@@ -343,7 +336,7 @@ function TagInput({ value, onChange, onSubmit, onClose, suggestions }: {
           }}
           onFocus={() => setOpen(true)}
           placeholder="tag name..."
-          className="bg-surface border border-edge rounded-md px-2 py-0.5 text-[11px] text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 w-24"
+          className="bg-surface-2 border border-edge rounded-md px-2 py-0.5 text-[11px] text-content placeholder-content-4 focus:outline-none focus:border-content-3 w-24"
           autoFocus
         />
       </form>
@@ -398,7 +391,7 @@ function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onExport, 
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-[9999] bg-surface-2 border border-edge rounded-md shadow-xl py-1 min-w-[180px]"
+      className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[180px]"
       style={{ top: pos.top, right: window.innerWidth - pos.left }}
     >
       <button onClick={onToggleCompact} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
@@ -409,7 +402,7 @@ function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onExport, 
         <span className="text-content-4"><FileDown className="w-3.5 h-3.5" /></span>
         Export as Markdown
       </button>
-      <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-danger hover:bg-danger-subtle">
+      <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-red-400 hover:bg-surface-3">
         <span><Trash2 className="w-3.5 h-3.5" /></span>
         Delete
       </button>
@@ -454,7 +447,7 @@ function PlainConversation({ content }: { content: string }) {
     <div className="space-y-3">
       {turns.map(turn => {
         if (turn.kind === 'user_turn') {
-          return <pre key={turn.id} className="text-xs text-content-2 whitespace-pre-wrap bg-user-subtle border border-user/20 rounded-md p-3">{turn.message.content}</pre>
+          return <pre key={turn.id} className="text-xs text-content-2 whitespace-pre-wrap bg-surface-2 rounded-md p-3">{turn.message.content}</pre>
         }
         if (turn.kind === 'assistant_turn') {
           const texts = turn.messages.filter((m): m is Extract<typeof m, { kind: 'text' }> => m.kind === 'text')
@@ -572,10 +565,10 @@ function DeleteConfirmDialog({ title, onConfirm, onCancel }: {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm modal-animate-in" onClick={onCancel}>
-      <div className="bg-surface-2 border border-edge rounded-lg shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface-2 border border-edge rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-4">
-          <div className="p-2 rounded-full bg-danger-subtle shrink-0">
-            <AlertTriangle className="w-5 h-5 text-danger" />
+          <div className="p-2 rounded-full bg-red-500/10 shrink-0">
+            <AlertTriangle className="w-5 h-5 text-red-400" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-content mb-1">Delete Session</h3>
@@ -587,13 +580,13 @@ function DeleteConfirmDialog({ title, onConfirm, onCancel }: {
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 rounded-md text-xs font-medium bg-surface-3 text-content-2 hover:bg-surface transition-colors"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-content-2 hover:bg-surface transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-3 py-1.5 rounded-md text-xs font-medium bg-danger text-white hover:opacity-90 transition-opacity"
+            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
           >
             Delete
           </button>

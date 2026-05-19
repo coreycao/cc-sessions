@@ -29,18 +29,6 @@ export interface MessageActions {
   onUnsave: (messageId: string) => void
 }
 
-function RoleChip({ tone, children }: { tone: 'user' | 'assistant'; children: React.ReactNode }) {
-  const toneClass = tone === 'user'
-    ? 'bg-user-subtle text-user border-user/20'
-    : 'bg-assistant-subtle text-assistant border-assistant/20'
-
-  return (
-    <span className={`inline-flex h-4 items-center rounded border px-1.5 text-[9px] font-semibold uppercase tracking-wider ${toneClass}`}>
-      {children}
-    </span>
-  )
-}
-
 // ---- Turn-level renderer ----
 
 export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact, actions }: {
@@ -68,14 +56,14 @@ function UserMessageBubble({ message, actions }: { message: TextMessage; actions
   const ctx = useMessageContextMenu(message, actions)
   const saved = actions?.isSaved(message.id) ?? false
   return (
-    <div className="flex flex-col items-end turn-enter">
+    <div className="flex flex-col items-end">
       <div
-        className="relative group max-w-[82%] rounded-md border border-user/20 bg-user-subtle/80 px-3 py-2 shadow-[inset_2px_0_0_0_var(--color-user)]"
+        className="relative group max-w-[80%] rounded-lg px-3 py-2 bg-blue-500/15 border border-blue-500/20"
         onContextMenu={ctx.handleContextMenu}
       >
         <div className="flex items-center gap-2 mb-1 justify-end">
-          {saved && <Bookmark className="w-3 h-3 text-warning fill-warning" />}
-          <RoleChip tone="user">You</RoleChip>
+          {saved && <Bookmark className="w-3 h-3 text-amber-400 fill-amber-400" />}
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400/80">You</span>
           {message.timestamp && (
             <span className="text-[10px] text-content-5">{formatDate(message.timestamp)}</span>
           )}
@@ -108,10 +96,10 @@ function AssistantTurnBubble({ turn, onExpand, compact, actions }: {
   if (visibleMessages.length === 0) return null
 
   return (
-    <div className="flex flex-col items-start turn-enter">
+    <div className="flex flex-col items-start">
       <div className="max-w-[85%] w-full space-y-2">
         <div className="flex items-center gap-2">
-          <RoleChip tone="assistant">Claude</RoleChip>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/80">Claude</span>
           {firstTs && <span className="text-[10px] text-content-5">{formatDate(firstTs)}</span>}
         </div>
         {visibleMessages.map(msg => {
@@ -136,12 +124,12 @@ function AssistantTurnBubble({ turn, onExpand, compact, actions }: {
 function ThinkingSection({ message }: { message: ThinkingMessage }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="overflow-hidden rounded-md border border-tool/20 bg-tool-subtle/45 shadow-[inset_2px_0_0_0_var(--color-tool)]">
+    <div className="rounded-md border border-edge/30 bg-surface-2/30 overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-content-4 hover:text-content-3 hover:bg-tool-subtle transition-colors"
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-content-4 hover:text-content-3 transition-colors"
       >
-        <Brain className="w-3 h-3 text-tool" />
+        <Brain className="w-3 h-3" />
         <span className="italic">Thinking...</span>
         <span className="ml-auto">{open ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}</span>
       </button>
@@ -166,11 +154,11 @@ function AssistantTextBlock({ message, onExpand, actions }: {
   const saved = actions?.isSaved(message.id) ?? false
   return (
     <div
-      className="relative group rounded-md border border-assistant/20 bg-surface-2/70 px-3 py-2 shadow-[inset_2px_0_0_0_var(--color-assistant)]"
+      className="relative group rounded-lg bg-surface-2 border border-edge/60 px-3 py-2"
       onContextMenu={ctx.handleContextMenu}
     >
       {saved && (
-        <Bookmark className="absolute top-1.5 right-2 w-3 h-3 text-warning fill-warning" />
+        <Bookmark className="absolute top-1.5 right-2 w-3 h-3 text-amber-400 fill-amber-400" />
       )}
       <div className="text-xs text-content-2 leading-relaxed break-words">
         <MarkdownContent content={isLong ? message.content.slice(0, 800) + '\n\n...' : message.content} />
@@ -178,7 +166,7 @@ function AssistantTextBlock({ message, onExpand, actions }: {
       {isLong && (
         <button
           onClick={() => onExpand({ role: 'assistant', text: message.content, timestamp: message.timestamp })}
-          className="absolute bottom-1.5 right-2 opacity-0 group-hover:opacity-100 group-hover:text-accent transition-all p-1 rounded-md hover:bg-surface-3/80 text-content-4"
+          className="absolute bottom-1.5 right-2 opacity-0 group-hover:opacity-100 group-hover:text-blue-400 transition-all p-1 rounded-md hover:bg-surface-3/80 text-content-4"
           title="View full content"
         >
           <Maximize2 className="w-3.5 h-3.5" />
@@ -265,7 +253,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
           code: ({ className, children, ...props }) => {
             const isInline = !className
             if (isInline) {
-              return <code className="px-1 py-0.5 rounded bg-tool-subtle text-[11px] font-mono text-content-2" {...props}>{children}</code>
+              return <code className="px-1 py-0.5 rounded bg-surface-3 text-[11px] font-mono text-content-2" {...props}>{children}</code>
             }
             return <code className={`${className || ''} text-[11px]`} {...props}>{children}</code>
           },
@@ -284,7 +272,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
             <blockquote className="border-l-3 border-content-4/30 pl-3 my-2 text-content-3 italic">{children}</blockquote>
           ),
           a: ({ href, children }) => (
-            <a href={href} className="text-accent hover:text-accent-hover underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
+            <a href={href} className="text-blue-400 hover:text-blue-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
           ),
         }}
       >
@@ -322,15 +310,15 @@ function ToolCallCard({ message }: { message: ToolUseMessage }) {
     : null
 
   return (
-    <div className="overflow-hidden rounded-md border border-tool/25 bg-tool-subtle/50 shadow-[inset_2px_0_0_0_var(--color-tool)]">
+    <div className="rounded-md border border-edge/40 bg-surface-2/50 overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-tool-subtle transition-colors text-left"
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-surface-2/80 transition-colors text-left"
       >
         {open ? <ChevronDown className="w-3 h-3 text-content-4 flex-shrink-0" /> : <ChevronRight className="w-3 h-3 text-content-4 flex-shrink-0" />}
-        <Wrench className="w-3 h-3 text-tool flex-shrink-0" />
-        <span className="font-mono text-[10px] font-semibold text-tool uppercase tracking-wide flex-shrink-0">
+        <Wrench className="w-3 h-3 text-content-4 flex-shrink-0" />
+        <span className="font-mono text-[10px] font-semibold text-content-3 uppercase tracking-wide flex-shrink-0">
           {message.toolName}
         </span>
         {summary && (
@@ -338,8 +326,8 @@ function ToolCallCard({ message }: { message: ToolUseMessage }) {
         )}
         <span className="ml-auto flex items-center gap-1.5 flex-shrink-0">
           {result && (
-            isSuccess ? <CheckCircle2 className="w-3 h-3 text-success" /> :
-            isFailed ? <XCircle className="w-3 h-3 text-danger" /> :
+            isSuccess ? <CheckCircle2 className="w-3 h-3 text-emerald-400" /> :
+            isFailed ? <XCircle className="w-3 h-3 text-red-400" /> :
             null
           )}
           {durationStr && <span className="text-[10px] text-content-5 tabular-nums">{durationStr}</span>}
@@ -362,8 +350,8 @@ function ToolCallCard({ message }: { message: ToolUseMessage }) {
             <div className="px-2.5 py-2 border-t border-edge/20">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-[9px] uppercase tracking-wider text-content-5">Result</span>
-                {isSuccess && <span className="text-[9px] text-success">success</span>}
-                {isFailed && <span className="text-[9px] text-danger">failed</span>}
+                {isSuccess && <span className="text-[9px] text-emerald-400">success</span>}
+                {isFailed && <span className="text-[9px] text-red-400">failed</span>}
                 {durationStr && <span className="text-[9px] text-content-5">{durationStr}</span>}
                 {statsStr && <span className="text-[9px] text-content-5">{statsStr}</span>}
                 {result.totalTokens != null && <span className="text-[9px] text-content-5">{result.totalTokens.toLocaleString()} tokens</span>}
@@ -397,8 +385,8 @@ function SystemBanner({ message }: { message: SystemMessage }) {
       : message.subtype || 'System'
 
   return (
-    <div className="flex items-start gap-2 px-3 py-1.5 rounded-md bg-tool-subtle/35 border border-tool/15 shadow-[inset_2px_0_0_0_var(--color-tool)]">
-      <span className="text-tool mt-0.5 flex-shrink-0">{icon}</span>
+    <div className="flex items-start gap-2 px-3 py-1.5 rounded-md bg-surface-2/30 border border-edge/20">
+      <span className="text-content-5 mt-0.5 flex-shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-content-5">{label}</span>
         {message.content && (
@@ -450,7 +438,7 @@ export function FullscreenMessageModal({ message, onClose }: {
     >
       <div className="relative flex items-center justify-center px-6 py-3 border-b border-edge/50 shrink-0">
         <div className="flex items-center gap-3">
-          <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${isUser ? 'text-user bg-user-subtle' : 'text-assistant bg-assistant-subtle'}`}>
+          <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${isUser ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'}`}>
             {isUser ? 'You' : 'Claude'}
           </span>
           {message.timestamp && (
@@ -464,7 +452,7 @@ export function FullscreenMessageModal({ message, onClose }: {
             className="p-1.5 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors cursor-pointer"
             title="Copy content"
           >
-            {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
+            {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
           <button
             onClick={onClose}
@@ -494,7 +482,7 @@ export function FullscreenMessageModal({ message, onClose }: {
                   code: ({ className, children, ...props }) => {
                     const isInline = !className
                     if (isInline) {
-                      return <code className="px-1.5 py-0.5 rounded bg-tool-subtle text-[13px] font-mono text-content-2" {...props}>{children}</code>
+                      return <code className="px-1.5 py-0.5 rounded bg-surface-3 text-[13px] font-mono text-content-2" {...props}>{children}</code>
                     }
                     return <code className={`${className || ''} text-[13px]`} {...props}>{children}</code>
                   },
@@ -513,7 +501,7 @@ export function FullscreenMessageModal({ message, onClose }: {
                     <blockquote className="border-l-3 border-content-4/30 pl-4 my-3 text-content-3 italic">{children}</blockquote>
                   ),
                   a: ({ href, children }) => (
-                    <a href={href} className="text-accent hover:text-accent-hover underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
+                    <a href={href} className="text-blue-400 hover:text-blue-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
                   ),
                 }}
               >

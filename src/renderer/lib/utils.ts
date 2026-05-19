@@ -26,6 +26,6 @@ export function relativeProjectName(name: string): string {
 }
 
 export const STATUS_CONFIG: Record<string, { label: string; dotColor: string }> = {
-  'new': { label: 'New', dotColor: 'bg-success' },
-  'archived': { label: 'Archived', dotColor: 'bg-content-5' },
+  'new': { label: 'New', dotColor: 'bg-blue-500' },
+  'archived': { label: 'Archived', dotColor: 'bg-zinc-600' },
 }
