@@ -11,7 +11,7 @@ import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
   Trash2, RotateCcw, AlertTriangle, FileText, FileCode,
-  MoreHorizontal, FileDown,
+  MoreHorizontal, FileDown, ChevronUp, ChevronDown,
 } from 'lucide-react'
 
 interface DetailPanelProps {
@@ -46,6 +46,7 @@ export const DetailPanel = memo(function DetailPanel({
   const [compact, setCompact] = useState(false)
   const [showOverflow, setShowOverflow] = useState(false)
   const overflowRef = useRef<HTMLButtonElement>(null)
+  const conversationScrollRef = useRef<HTMLDivElement>(null)
 
   const exportFullSession = useCallback(() => {
     const turns = parseConversation(sessionContent)
@@ -85,8 +86,17 @@ export const DetailPanel = memo(function DetailPanel({
     onUnsave: (messageId: string) => removeSavedMessage(`${selectedSession.sessionId}:${messageId}`),
   }), [selectedSession.sessionId, selectedSession.title, selectedSession.projectPath, isSaved, addSavedMessage, removeSavedMessage])
 
+  const scrollConversation = useCallback((position: 'top' | 'bottom') => {
+    const el = conversationScrollRef.current
+    if (!el) return
+    el.scrollTo({
+      top: position === 'top' ? 0 : el.scrollHeight,
+      behavior: 'smooth',
+    })
+  }, [])
+
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-surface">
+    <div className="relative flex-1 flex flex-col min-w-0 bg-surface">
       <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/30" data-tauri-drag-region>
         <button
           onClick={() => setSelectedSessionId(null)}
@@ -190,10 +200,32 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Conversation Preview */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div ref={conversationScrollRef} className="flex-1 overflow-y-auto p-4">
         <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
           <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} actions={messageActions} />
         </InlineErrorBoundary>
+      </div>
+
+      <div className="absolute bottom-4 right-4 z-20 flex flex-col overflow-hidden rounded-md border border-edge bg-surface-2/95 shadow-lg backdrop-blur">
+        <ActionTip label="Scroll to top">
+          <button
+            onClick={() => scrollConversation('top')}
+            className="h-8 w-8 inline-flex items-center justify-center text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors"
+            aria-label="Scroll conversation to top"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
+        </ActionTip>
+        <div className="h-px bg-edge/70" />
+        <ActionTip label="Scroll to bottom">
+          <button
+            onClick={() => scrollConversation('bottom')}
+            className="h-8 w-8 inline-flex items-center justify-center text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors"
+            aria-label="Scroll conversation to bottom"
+          >
+            <ChevronDown className="w-4 h-4" />
+          </button>
+        </ActionTip>
       </div>
 
       {showDeleteConfirm && (
