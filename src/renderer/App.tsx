@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import type { SessionInfo, AppStore } from '../shared/types'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark } from 'lucide-react'
+import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
@@ -173,12 +173,13 @@ export default function App() {
         <button
           ref={projectBtnRef}
           onClick={toggleProjectMenu}
-          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-md px-1.5 transition-colors ${store.selectedProject ? 'text-accent hover:bg-accent-subtle' : 'text-content-3 hover:bg-surface-3 hover:text-content-2'}`}
+          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-md px-2 border transition-colors ${store.selectedProject ? 'text-accent bg-accent-subtle/60 border-accent/25 hover:bg-accent-subtle' : 'text-content-3 bg-surface-2 border-edge/60 hover:bg-surface-3 hover:text-content-2'}`}
           title={currentProjectTitle}
           aria-label={`Filter by project: ${currentProjectTitle}`}
         >
-          <FolderOpen className="w-4 h-4" />
+          <FolderOpen className="w-3.5 h-3.5" />
           <span className="max-w-[190px] truncate text-xs font-medium" title={currentProjectTitle}>{currentProjectName}</span>
+          <ChevronDown className="w-3 h-3 opacity-40" />
         </button>
         {projectMenuOpen && createPortal(
           <div
@@ -291,6 +292,20 @@ export default function App() {
                 filterStatus={store.filterStatus}
                 filteredCount={store.filteredSessions.length}
               />
+              {store.selectedProject && (
+                <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/30 bg-accent-subtle/30">
+                  <FolderOpen className="w-3 h-3 text-accent" />
+                  <span className="text-[11px] text-content-2 truncate flex-1">{currentProjectName}</span>
+                  <span className="text-[10px] text-content-4 tabular-nums">{store.filteredSessions.length}</span>
+                  <button
+                    onClick={() => store.setSelectedProject(null)}
+                    className="p-0.5 rounded hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+                    aria-label="Clear project filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               <SessionList
                 filteredSessions={store.filteredSessions}
                 selectedSessionId={store.selectedSessionId}
