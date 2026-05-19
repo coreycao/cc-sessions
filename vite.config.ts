@@ -16,7 +16,20 @@ export default defineConfig({
     minify: true,
     target: 'esnext',
     rollupOptions: {
-      output: { format: 'es' },
+      output: {
+        format: 'es',
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('/react/') || id.includes('/react-dom/')) return 'react'
+          if (
+            id.includes('/react-markdown/') ||
+            id.includes('/remark-gfm/') ||
+            id.includes('/rehype-highlight/') ||
+            id.includes('/highlight.js/')
+          ) return 'markdown'
+          if (id.includes('/@tauri-apps/api/')) return 'tauri'
+        },
+      },
     },
   },
   resolve: {
