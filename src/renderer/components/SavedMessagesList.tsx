@@ -15,7 +15,6 @@ export function SavedMessagesList({ savedMessages, selectedSavedId, setSelectedS
         <div className="flex-1 flex flex-col items-center justify-center text-content-4 text-xs gap-2">
           <Bookmark className="w-6 h-6 text-content-5" />
           <span>No saved messages</span>
-          <span className="text-[11px] text-content-5">Right-click a message to save it</span>
         </div>
       </div>
     )
@@ -28,14 +27,14 @@ export function SavedMessagesList({ savedMessages, selectedSavedId, setSelectedS
       <div className="flex-1 overflow-y-auto">
         {sorted.map(msg => {
           const isSelected = selectedSavedId === msg.id
-          const roleColor = msg.role === 'user' ? 'bg-blue-400' : 'bg-emerald-400'
+          const roleColor = msg.role === 'user' ? 'bg-user' : 'bg-assistant'
           return (
             <button
               key={msg.id}
               role="listitem"
               aria-selected={isSelected}
               onClick={() => setSelectedSavedId(msg.id)}
-              className={`group w-full text-left px-3 py-2.5 border-b border-edge-2/50 transition-colors ${isSelected ? 'bg-surface-3/60' : 'hover:bg-surface-2/60'}`}
+              className={`group w-full text-left px-3 py-2.5 border-b border-edge-2/50 transition-colors ${isSelected ? 'bg-accent-subtle shadow-[inset_2px_0_0_0_var(--color-accent)]' : 'hover:bg-surface-2/60'}`}
             >
               <div className="flex items-start gap-2">
                 <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${roleColor}`} title={msg.role} />

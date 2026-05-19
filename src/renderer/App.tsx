@@ -159,7 +159,7 @@ export default function App() {
     <ErrorBoundary>
     <div className="flex flex-col h-screen overflow-hidden bg-surface">
       {/* Unified title bar */}
-      <header className="h-[38px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/70" data-tauri-drag-region>
+      <header className="h-[38px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/80" data-tauri-drag-region>
         <div className="w-[72px] flex-shrink-0" />
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -183,7 +183,7 @@ export default function App() {
         {projectMenuOpen && createPortal(
           <div
             ref={projectMenuRef}
-            className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[200px] max-h-[320px] overflow-y-auto"
+            className="fixed z-[9999] bg-surface-2 border border-edge rounded-md shadow-xl py-1 min-w-[200px] max-h-[320px] overflow-y-auto"
             style={projectMenuPosition}
           >
             <button
@@ -209,17 +209,17 @@ export default function App() {
           document.body
         )}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none" data-tauri-drag-region>
-          <div className="w-64 pointer-events-auto">
+          <div className="w-72 pointer-events-auto">
             <div className="relative">
               <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-content-4" />
               <input
                 ref={searchRef}
                 type="text"
-                placeholder="Search sessions... ⌘K"
+                placeholder="Search title, content, tool output"
                 value={store.searchQuery}
                 onChange={e => store.setSearchQuery(e.target.value)}
                 aria-label="Search sessions"
-                className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-8 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
+                className="w-full bg-surface/80 border border-edge rounded-md pl-8 pr-12 py-1.5 text-xs text-content placeholder-content-4 shadow-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 transition-colors"
               />
               {store.isSearching ? (
                 <LoaderCircle className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-content-4 animate-spin" />
@@ -231,9 +231,11 @@ export default function App() {
                 >
                   <X className="w-3 h-3" />
                 </button>
-              ) : null}
+              ) : (
+                <kbd className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-edge bg-surface-2 px-1.5 py-0.5 text-[9px] leading-none text-content-4">⌘K</kbd>
+              )}
               {!store.indexReady && store.searchQuery.length >= 2 && (
-                <span className="absolute -bottom-4 left-0 text-[10px] text-content-4 animate-pulse whitespace-nowrap">Building index...</span>
+                <span className="absolute -bottom-4 left-0 text-[10px] text-content-4 animate-pulse whitespace-nowrap">Indexing content...</span>
               )}
             </div>
           </div>
@@ -345,8 +347,7 @@ export default function App() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-content-4 text-sm flex flex-col items-center gap-3">
                 <FileText className="w-10 h-10 text-content-5" />
-                <span>Select a session to view details</span>
-                <span className="text-[11px] text-content-5">Use ↑↓ keys to navigate, Esc to deselect</span>
+                <span>Select a session</span>
               </div>
             </div>
           )
@@ -363,7 +364,7 @@ export default function App() {
             <div className="flex-1 flex items-center justify-center">
               <div className="text-content-4 text-sm flex flex-col items-center gap-3">
                 <Bookmark className="w-10 h-10 text-content-5" />
-                <span>Select a saved message to view it</span>
+                <span>Select a saved message</span>
               </div>
             </div>
           )

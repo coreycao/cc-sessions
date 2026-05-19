@@ -47,7 +47,7 @@ export function MessageContextMenu({ x, y, isSaved, onSave, onUnsave, onCopy, on
   return createPortal(
     <div
       ref={ref}
-      className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[180px]"
+      className="fixed z-[9999] bg-surface-2 border border-edge rounded-md shadow-xl py-1 min-w-[180px]"
       style={{ top: y, left: x }}
     >
       {items.map((item, i) => (

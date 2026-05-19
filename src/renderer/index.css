@@ -4,19 +4,31 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-surface: #fafafa;
-  --color-surface-2: #f4f4f6;
-  --color-surface-3: #e8e8ed;
+  --color-surface: #fbfbfc;
+  --color-surface-2: #f5f6f8;
+  --color-surface-3: #e7e9ee;
   --color-content: #18181b;
   --color-content-2: #52525b;
   --color-content-3: #71717a;
   --color-content-4: #a1a1aa;
   --color-content-5: #d4d4d8;
-  --color-edge: #e4e4e8;
-  --color-edge-2: #f0f0f4;
+  --color-edge: #dedfe5;
+  --color-edge-2: #eceef3;
   --color-accent: #2563eb;
   --color-accent-hover: #1d4ed8;
-  --color-accent-subtle: #eff6ff;
+  --color-accent-subtle: #eaf2ff;
+  --color-user: #2563eb;
+  --color-user-subtle: #eaf2ff;
+  --color-assistant: #0f766e;
+  --color-assistant-subtle: #e7f7f3;
+  --color-tool: #64748b;
+  --color-tool-subtle: #eef2f6;
+  --color-success: #059669;
+  --color-success-subtle: #e7f8ef;
+  --color-warning: #d97706;
+  --color-warning-subtle: #fff7e6;
+  --color-danger: #dc2626;
+  --color-danger-subtle: #fff1f2;
 }
 
 :root {
@@ -25,25 +37,38 @@
 }
 
 .dark {
-  --color-surface: #0b0b10;
-  --color-surface-2: #16161e;
-  --color-surface-3: #21212b;
+  --color-surface: #08090d;
+  --color-surface-2: #12141b;
+  --color-surface-3: #1d2029;
   --color-content: #e4e4ec;
   --color-content-2: #a1a1aa;
   --color-content-3: #71717a;
   --color-content-4: #525260;
   --color-content-5: #3f3f4a;
-  --color-edge: #2a2a35;
-  --color-edge-2: #1c1c25;
+  --color-edge: #292d38;
+  --color-edge-2: #1a1d26;
   --color-accent: #3b82f6;
   --color-accent-hover: #2563eb;
-  --color-accent-subtle: #1e293b;
+  --color-accent-subtle: #142033;
+  --color-user: #60a5fa;
+  --color-user-subtle: #111d2f;
+  --color-assistant: #34d399;
+  --color-assistant-subtle: #10241f;
+  --color-tool: #94a3b8;
+  --color-tool-subtle: #1a202a;
+  --color-success: #34d399;
+  --color-success-subtle: #10241f;
+  --color-warning: #fbbf24;
+  --color-warning-subtle: #2b2111;
+  --color-danger: #f87171;
+  --color-danger-subtle: #2b1618;
   --scrollbar-thumb: #3f3f4a;
   --scrollbar-thumb-hover: #525260;
 }
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  text-rendering: geometricPrecision;
 }
 
 ::-webkit-scrollbar {
@@ -106,7 +131,7 @@ body {
 .markdown-body pre {
   margin: 0.8em 0;
   padding: 1em;
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--color-surface-2);
   border: 1px solid var(--color-edge);
   overflow-x: auto;

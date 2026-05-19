@@ -103,12 +103,12 @@ export function BatchActions({
               {allArchived ? <Circle className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
             </button>
             <button onClick={handleStar} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors" title={allStarred ? 'Unstar' : 'Star'}>
-              <Star className={`w-3.5 h-3.5 ${allStarred ? 'text-amber-400 fill-amber-400' : ''}`} />
+              <Star className={`w-3.5 h-3.5 ${allStarred ? 'text-warning fill-warning' : ''}`} />
             </button>
             <button ref={tagBtnRef} onClick={openTagMenu} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors" title="Add tag">
               <Tag className="w-3.5 h-3.5" />
             </button>
-            <button onClick={handleDelete} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors" title="Delete">
+            <button onClick={handleDelete} className="p-1 rounded-md hover:bg-danger-subtle text-content-4 hover:text-danger transition-colors" title="Delete">
               <Trash2 className="w-3.5 h-3.5" />
             </button>
             <button onClick={clearBatchSelection} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors" title="Clear selection">
@@ -125,7 +125,7 @@ export function BatchActions({
       {showTagMenu && createPortal(
         <div
           ref={tagMenuRef}
-          className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[160px] max-h-[240px] overflow-y-auto"
+          className="fixed z-[9999] bg-surface-2 border border-edge rounded-md shadow-xl py-1 min-w-[160px] max-h-[240px] overflow-y-auto"
           style={{ top: tagMenuPos.top, left: tagMenuPos.left }}
         >
           {allTags.length > 0 && allTags.map(tag => (
@@ -173,7 +173,7 @@ function TagCreatorInput({ onSubmit }: { onSubmit: (tag: string) => void }) {
           value={value}
           onChange={e => setValue(e.target.value)}
           placeholder="New tag..."
-          className="flex-1 bg-surface-3/60 border border-edge rounded px-2 py-1 text-[11px] text-content placeholder-content-4 focus:outline-none focus:border-content-3"
+          className="flex-1 bg-surface border border-edge rounded px-2 py-1 text-[11px] text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
         />
         <button type="submit" disabled={!value.trim()} className="p-1 rounded hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors disabled:opacity-30">
           <Plus className="w-3 h-3" />
@@ -196,10 +196,10 @@ function DeleteConfirmDialog({ count, onConfirm, onCancel }: {
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm modal-animate-in" onClick={onCancel}>
-      <div className="bg-surface-2 border border-edge rounded-xl shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
+      <div className="bg-surface-2 border border-edge rounded-lg shadow-2xl w-full max-w-sm mx-4 p-6" onClick={e => e.stopPropagation()}>
         <div className="flex items-start gap-3 mb-4">
-          <div className="p-2 rounded-full bg-red-500/10 shrink-0">
-            <AlertTriangle className="w-5 h-5 text-red-400" />
+          <div className="p-2 rounded-full bg-danger-subtle shrink-0">
+            <AlertTriangle className="w-5 h-5 text-danger" />
           </div>
           <div>
             <h3 className="text-sm font-semibold text-content mb-1">Delete {count} Session{count !== 1 ? 's' : ''}</h3>
@@ -211,13 +211,13 @@ function DeleteConfirmDialog({ count, onConfirm, onCancel }: {
         <div className="flex justify-end gap-2">
           <button
             onClick={onCancel}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-content-2 hover:bg-surface transition-colors"
+            className="px-3 py-1.5 rounded-md text-xs font-medium bg-surface-3 text-content-2 hover:bg-surface transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+            className="px-3 py-1.5 rounded-md text-xs font-medium bg-danger text-white hover:opacity-90 transition-opacity"
           >
             Delete
           </button>

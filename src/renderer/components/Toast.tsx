@@ -13,10 +13,10 @@ export function ToastContainer({ toasts, removeToast }: {
       {toasts.map(toast => (
         <div
           key={toast.id}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg shadow-lg border text-xs font-medium max-w-sm modal-animate-in ${
+          className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-lg border text-xs font-medium max-w-sm modal-animate-in ${
             toast.type === 'error'
-              ? 'bg-red-500/10 border-red-500/30 text-red-400'
-              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              ? 'bg-danger-subtle border-danger/30 text-danger'
+              : 'bg-success-subtle border-success/30 text-success'
           }`}
         >
           {toast.type === 'error' ? <AlertCircle className="w-3.5 h-3.5 shrink-0" /> : <CheckCircle className="w-3.5 h-3.5 shrink-0" />}

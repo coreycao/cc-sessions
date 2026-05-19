@@ -41,7 +41,7 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-surface">
-      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/50" data-tauri-drag-region>
+      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/40 bg-surface-2/40" data-tauri-drag-region>
         <button
           onClick={() => setSelectedSavedId(null)}
           className="p-1 rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
@@ -49,14 +49,14 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
           <X className="w-4 h-4" />
         </button>
         <div className="flex-1 min-w-0 flex items-center gap-2" data-tauri-drag-region>
-          <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />
-          <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${isUser ? 'text-blue-400/80' : 'text-emerald-400/80'}`}>
+          <Bookmark className="w-3.5 h-3.5 text-warning fill-warning flex-shrink-0" />
+          <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider flex-shrink-0 ${isUser ? 'bg-user-subtle text-user border-user/20' : 'bg-assistant-subtle text-assistant border-assistant/20'}`}>
             {isUser ? 'You' : 'Claude'}
           </span>
           {sourceExists ? (
             <button
               onClick={() => onJumpToSession(message.sessionId)}
-              className="text-sm text-content truncate hover:text-blue-400 transition-colors inline-flex items-center gap-1 min-w-0"
+              className="text-sm text-content truncate hover:text-accent transition-colors inline-flex items-center gap-1 min-w-0"
               title="Open source session"
             >
               <span className="truncate">{message.sessionTitle}</span>
@@ -84,26 +84,27 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
         </button>
         <button
           onClick={handleUnsave}
-          className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors"
+          className="p-1 rounded-md hover:bg-danger-subtle text-content-4 hover:text-danger transition-colors"
           title="Unsave"
         >
           <BookmarkMinus className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="px-4 py-2 border-b border-edge/50 flex items-center gap-4 text-[11px] text-content-4">
+      <div className="px-4 py-2 border-b border-edge/40 bg-surface-2/20 flex items-center gap-4 text-[11px] text-content-4">
         <span>Saved {formatDate(message.savedAt)}</span>
         {message.timestamp && <span>Original {formatDate(message.timestamp)}</span>}
         <span className="ml-auto">{message.content.length.toLocaleString()} chars</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
-        {isUser ? (
-          <div className="text-sm text-content leading-relaxed whitespace-pre-wrap font-mono">
-            {message.content}
-          </div>
-        ) : (
-          <article className="markdown-body text-sm text-content leading-relaxed">
+      <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="mx-auto max-w-4xl">
+          {isUser ? (
+            <div className="rounded-md border border-user/20 bg-user-subtle/50 px-4 py-3 text-sm text-content leading-relaxed whitespace-pre-wrap font-mono shadow-[inset_2px_0_0_0_var(--color-user)]">
+              {message.content}
+            </div>
+          ) : (
+            <article className="markdown-body rounded-md border border-assistant/20 bg-surface-2/55 px-4 py-3 text-sm text-content leading-relaxed shadow-[inset_2px_0_0_0_var(--color-assistant)]">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
@@ -114,7 +115,7 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
                 code: ({ className, children, ...props }) => {
                   const isInline = !className
                   if (isInline) {
-                    return <code className="px-1.5 py-0.5 rounded bg-surface-3 text-[13px] font-mono text-content-2" {...props}>{children}</code>
+                    return <code className="px-1.5 py-0.5 rounded bg-tool-subtle text-[13px] font-mono text-content-2" {...props}>{children}</code>
                   }
                   return <code className={`${className || ''} text-[13px]`} {...props}>{children}</code>
                 },
@@ -133,14 +134,15 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
                   <blockquote className="border-l-3 border-content-4/30 pl-4 my-3 text-content-3 italic">{children}</blockquote>
                 ),
                 a: ({ href, children }) => (
-                  <a href={href} className="text-blue-400 hover:text-blue-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
+                  <a href={href} className="text-accent hover:text-accent-hover underline underline-offset-2" target="_blank" rel="noopener noreferrer">{children}</a>
                 ),
               }}
             >
               {message.content}
             </ReactMarkdown>
-          </article>
-        )}
+            </article>
+          )}
+        </div>
       </div>
     </div>
   )
