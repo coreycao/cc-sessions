@@ -234,7 +234,7 @@ export default function App() {
                 </button>
               ) : null}
               {!store.indexReady && store.searchQuery.length >= 2 && (
-                <span className="absolute -bottom-4 left-0 text-[10px] text-content-4 animate-pulse whitespace-nowrap">Building index...</span>
+                <span className="absolute -bottom-4 left-0 text-[10px] text-content-4 animate-pulse whitespace-nowrap">Building search index...</span>
               )}
             </div>
           </div>
@@ -248,6 +248,14 @@ export default function App() {
           {theme === 'light' ? <Sun className="w-3.5 h-3.5" /> : theme === 'dark' ? <Moon className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
         </button>
       </header>
+
+      {/* Index building banner */}
+      {!store.indexReady && (
+        <div className="h-6 flex-shrink-0 flex items-center justify-center gap-1.5 bg-amber-500/10 border-b border-amber-500/20 text-[10px] text-amber-600 dark:text-amber-400">
+          <LoaderCircle className="w-3 h-3 animate-spin" />
+          <span>Building search index...</span>
+        </div>
+      )}
 
       {/* Content area */}
       <div className="flex flex-1 overflow-hidden relative">

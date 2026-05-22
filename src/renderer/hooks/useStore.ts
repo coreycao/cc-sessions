@@ -6,6 +6,7 @@ import { useFilters } from './useFilters'
 import { useToast } from './useToast'
 import { useContentSearch } from './useContentSearch'
 import { useSavedMessages } from './useSavedMessages'
+import { invoke } from '@tauri-apps/api/core'
 
 export type View = 'sessions' | 'saved'
 
@@ -16,7 +17,7 @@ export function useStore() {
   const filters = useFilters(sessions.sessions, gtd.getGTD)
   const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
   const saved = useSavedMessages()
-  const [indexReady, setIndexReady] = useState(true)
+  const [indexReady, setIndexReady] = useState(false)
   const [view, setView] = useState<View>('sessions')
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
 
@@ -29,6 +30,10 @@ export function useStore() {
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
     if (store) gtd.initFromStore(store)
+    try {
+      const ready = await invoke<boolean>('is_index_ready')
+      if (ready) setIndexReady(true)
+    } catch { /* index check is non-critical */ }
   }, [sessions.loadData, gtd.initFromStore])
 
   useEffect(() => { loadData() }, [loadData])
