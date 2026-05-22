@@ -1,13 +1,43 @@
 import type {
   ConversationTurn,
   AssistantTurn,
-  UserTextTurn,
   SystemMessage,
   TextMessage,
   ThinkingMessage,
   ToolUseMessage,
   ToolResultInfo,
 } from '../../shared/types'
+
+// ---- JSONL content block types ----
+
+interface TextBlock {
+  type: 'text'
+  text: string
+}
+
+interface ThinkingBlock {
+  type: 'thinking'
+  thinking: string
+}
+
+interface ToolUseBlock {
+  type: 'tool_use'
+  id: string
+  name: string
+  input: Record<string, unknown>
+}
+
+interface ToolResultBlock {
+  type: 'tool_result'
+  content: string | Array<{ type: string; text?: string }>
+}
+
+interface ImageBlock {
+  type: 'image'
+  source?: unknown
+}
+
+type ContentBlock = TextBlock | ThinkingBlock | ToolUseBlock | ToolResultBlock | ImageBlock | Record<string, unknown>
 
 interface RawEntry {
   type: string
@@ -30,12 +60,22 @@ interface RawEntry {
   isSidechain?: boolean
 }
 
+// ---- Type guards for content blocks ----
+
+function isTextBlock(b: ContentBlock): b is TextBlock {
+  return b.type === 'text' && 'text' in b && typeof (b as TextBlock).text === 'string'
+}
+
+function isToolResultBlock(b: ContentBlock): b is ToolResultBlock {
+  return b.type === 'tool_result'
+}
+
 function extractTextBlocks(content: unknown): string {
   if (typeof content === 'string') return content
   if (Array.isArray(content)) {
-    return content
-      .filter((c: any) => c.type === 'text' && c.text)
-      .map((c: any) => c.text as string)
+    return (content as ContentBlock[])
+      .filter(isTextBlock)
+      .map(c => c.text)
       .join('\n')
   }
   return ''
@@ -46,7 +86,7 @@ function isToolResultEntry(entry: RawEntry): boolean {
   if (entry.sourceToolAssistantUUID) return true
   const content = entry.message.content
   if (Array.isArray(content)) {
-    return content.some((c: any) => c.type === 'tool_result')
+    return (content as ContentBlock[]).some(isToolResultBlock)
   }
   return false
 }
@@ -54,13 +94,14 @@ function isToolResultEntry(entry: RawEntry): boolean {
 function extractToolResultContent(entry: RawEntry): string {
   const content = entry.message?.content
   if (Array.isArray(content)) {
-    return content
-      .filter((c: any) => c.type === 'tool_result')
-      .flatMap((c: any) => {
+    return (content as ContentBlock[])
+      .filter(isToolResultBlock)
+      .flatMap(c => {
         const inner = c.content
         if (typeof inner === 'string') return [inner]
         if (Array.isArray(inner)) {
-          return inner.filter((i: any) => i.type === 'text').map((i: any) => i.text as string)
+          return inner.filter((i): i is { type: string; text: string } => i.type === 'text' && typeof i.text === 'string')
+            .map(i => i.text)
         }
         return []
       })
@@ -155,7 +196,7 @@ export function parseConversation(jsonlContent: string): ConversationTurn[] {
       const content = entry.message?.content
       if (!content) continue
 
-      const blocks = Array.isArray(content) ? content : []
+      const blocks: ContentBlock[] = Array.isArray(content) ? content : []
 
       // Determine if this continues the current assistant turn:
       // Same parentUuid as previous assistant entry = same turn
@@ -175,32 +216,34 @@ export function parseConversation(jsonlContent: string): ConversationTurn[] {
 
       for (const block of blocks) {
         if (!block || typeof block !== 'object') continue
+        const bType = (block as { type?: string }).type
 
-        if (block.type === 'thinking' && block.thinking) {
+        if (bType === 'thinking' && 'thinking' in block) {
           const msg: ThinkingMessage = {
             kind: 'thinking',
             id: `${entry.uuid}-thinking`,
-            content: block.thinking as string,
+            content: (block as ThinkingBlock).thinking,
             timestamp: ts,
           }
           currentAssistantTurn!.messages.push(msg)
-        } else if (block.type === 'text' && block.text) {
+        } else if (bType === 'text' && 'text' in block && typeof (block as TextBlock).text === 'string') {
           const msg: TextMessage = {
             kind: 'text',
             id: `${entry.uuid}-text-${currentAssistantTurn!.messages.length}`,
             role: 'assistant',
-            content: block.text as string,
+            content: (block as TextBlock).text,
             timestamp: ts,
           }
           currentAssistantTurn!.messages.push(msg)
-        } else if (block.type === 'tool_use' && block.name) {
+        } else if (bType === 'tool_use' && 'name' in block) {
+          const tb = block as ToolUseBlock
           const toolResultEntry = toolResultBySource.get(entry.uuid)
           const msg: ToolUseMessage = {
             kind: 'tool_use',
-            id: `${entry.uuid}-tool-${block.id || ''}`,
-            toolCallId: (block.id as string) || '',
-            toolName: block.name as string,
-            toolInput: (block.input as Record<string, unknown>) || {},
+            id: `${entry.uuid}-tool-${tb.id || ''}`,
+            toolCallId: tb.id || '',
+            toolName: tb.name,
+            toolInput: tb.input || {},
             timestamp: ts,
             result: toolResultEntry ? buildToolResultInfo(toolResultEntry) : undefined,
           }
@@ -237,12 +280,11 @@ export function getToolInputSummary(toolName: string, input: Record<string, unkn
       return desc || (prompt ? prompt.slice(0, 80) : '') || ''
     }
     case 'TodoWrite':
-      return `${(input.todos as any[])?.length ?? 0} items`
+      return `${Array.isArray(input.todos) ? input.todos.length : 0} items`
     case 'Skill':
       return get('skill') || ''
     default: {
-      // MCP tools like mcp__server__tool_name
-      const firstVal = Object.values(input).find(v => typeof v === 'string') as string | undefined
+      const firstVal = Object.values(input).find((v): v is string => typeof v === 'string')
       return firstVal?.slice(0, 100) || ''
     }
   }

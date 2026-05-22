@@ -119,4 +119,54 @@ mod tests {
         );
         assert_eq!(extract_text(&json!({ "type": "text" })), "");
     }
+
+    #[test]
+    fn extract_snippet_near_start_of_text() {
+        let result = extract_snippet("match at beginning rest of text", "match", 10);
+        assert!(result.contains("match"));
+        assert!(!result.starts_with("..."));
+    }
+
+    #[test]
+    fn extract_snippet_near_end_of_text() {
+        let result = extract_snippet("long prefix text ending with match", "match", 10);
+        assert!(result.contains("match"));
+        assert!(!result.ends_with("..."));
+    }
+
+    #[test]
+    fn extract_snippet_with_empty_text() {
+        assert_eq!(extract_snippet("", "query", 10), "");
+    }
+
+    #[test]
+    fn extract_snippet_window_larger_than_text() {
+        assert_eq!(extract_snippet("abc", "abc", 100), "abc");
+    }
+
+    #[test]
+    fn extract_text_with_empty_array() {
+        assert_eq!(extract_text(&json!([])), "");
+    }
+
+    #[test]
+    fn extract_text_with_text_blocks_missing_text_field() {
+        assert_eq!(
+            extract_text(&json!([{ "type": "text" }, { "type": "text", "text": "hello" }])),
+            "hello"
+        );
+    }
+
+    #[test]
+    fn extract_text_with_number_and_null() {
+        assert_eq!(extract_text(&json!(42)), "");
+        assert_eq!(extract_text(&json!(null)), "");
+    }
+
+    #[test]
+    fn project_name_from_dir_with_single_segment() {
+        let result = project_name_from_dir("-Users-corey-myproject");
+        // Falls back to path reconstruction since /Users may not exist in test env
+        assert!(result.contains("myproject") || result.contains("Users"));
+    }
 }

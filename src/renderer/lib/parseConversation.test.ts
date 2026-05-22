@@ -150,6 +150,60 @@ describe('parseConversation', () => {
       ],
     })
   })
+
+  it('returns empty array for empty input', () => {
+    expect(parseConversation('')).toEqual([])
+    expect(parseConversation('   \n  \n  ')).toEqual([])
+  })
+
+  it('skips malformed JSON lines gracefully', () => {
+    const turns = parseConversation('not json\n{"type":"user","uuid":"u1","message":{"content":"hi"}}\n{broken')
+    expect(turns).toHaveLength(1)
+    expect(turns[0]).toMatchObject({ kind: 'user_turn', message: { content: 'hi' } })
+  })
+
+  it('skips entries with missing message field', () => {
+    const turns = parseConversation(jsonl([
+      { type: 'user', uuid: 'u1', timestamp: '2026-01-01T00:00:00Z' },
+      { type: 'user', uuid: 'u2', timestamp: '2026-01-01T00:00:01Z', message: { content: 'valid' } },
+    ]))
+    expect(turns).toHaveLength(1)
+    expect(turns[0]).toMatchObject({ id: 'u2' })
+  })
+
+  it('handles tool_result with string content directly', () => {
+    const turns = parseConversation(jsonl([
+      { type: 'user', uuid: 'user-1', message: { content: 'run it' } },
+      {
+        type: 'assistant',
+        uuid: 'assistant-1',
+        parentUuid: 'user-1',
+        message: { content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: 'ls' } }] },
+      },
+      {
+        type: 'user',
+        uuid: 'tool-result-1',
+        sourceToolAssistantUUID: 'assistant-1',
+        message: { content: [{ type: 'tool_result', content: 'plain string result' }] },
+      },
+    ]))
+    const toolMsg = (turns[1] as any).messages[0]
+    expect(toolMsg.result.content).toBe('plain string result')
+  })
+
+  it('does not group assistant turns across user messages', () => {
+    const turns = parseConversation(jsonl([
+      { type: 'user', uuid: 'u1', message: { content: 'first' } },
+      { type: 'assistant', uuid: 'a1', parentUuid: 'u1', message: { content: [{ type: 'text', text: 'one' }] } },
+      { type: 'user', uuid: 'u2', message: { content: 'second' } },
+      { type: 'assistant', uuid: 'a2', parentUuid: 'u2', message: { content: [{ type: 'text', text: 'two' }] } },
+    ]))
+    expect(turns).toHaveLength(4)
+    expect(turns[0]).toMatchObject({ kind: 'user_turn' })
+    expect(turns[1]).toMatchObject({ kind: 'assistant_turn' })
+    expect(turns[2]).toMatchObject({ kind: 'user_turn' })
+    expect(turns[3]).toMatchObject({ kind: 'assistant_turn' })
+  })
 })
 
 describe('getToolInputSummary', () => {
@@ -158,5 +212,23 @@ describe('getToolInputSummary', () => {
     expect(getToolInputSummary('Bash', { command: 'pnpm test' })).toBe('pnpm test')
     expect(getToolInputSummary('TodoWrite', { todos: [{}, {}] })).toBe('2 items')
     expect(getToolInputSummary('mcp__demo__search', { query: 'needle'.repeat(30) })).toHaveLength(100)
+  })
+
+  it('returns empty string for unknown tools with no string values', () => {
+    expect(getToolInputSummary('Unknown', { count: 42, enabled: true })).toBe('')
+  })
+
+  it('handles Edit with filePath variant', () => {
+    expect(getToolInputSummary('Edit', { filePath: '/src/index.ts' })).toBe('index.ts')
+  })
+
+  it('handles Agent with prompt fallback', () => {
+    const prompt = 'Analyze the codebase for improvements and provide suggestions'
+    expect(getToolInputSummary('Agent', { prompt })).toBe(prompt.slice(0, 80))
+  })
+
+  it('handles TodoWrite with missing or non-array todos', () => {
+    expect(getToolInputSummary('TodoWrite', {})).toBe('0 items')
+    expect(getToolInputSummary('TodoWrite', { todos: 'not array' })).toBe('0 items')
   })
 })

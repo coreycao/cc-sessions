@@ -21,7 +21,7 @@ export type SessionStatus = 'new' | 'archived'
 
 export interface GTDMetadata {
   sessionId: string
-  status: GTDStatus
+  status: SessionStatus
   tags: string[]
   notes: string
   starred: boolean
