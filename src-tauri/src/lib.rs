@@ -13,6 +13,13 @@ use gtd::{load_gtd_from_file, load_session_cache, gtd_store_path, session_cache_
 use saved::{load_saved_messages_from_file, saved_messages_path};
 
 pub fn run() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn")),
+        )
+        .init();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
@@ -25,7 +32,7 @@ pub fn run() {
 
             let index_path = search_index_dir(app.handle());
             let search_idx = search_index::SearchIndex::open_or_create(&index_path)
-                .expect("Failed to open search index");
+                .expect("Failed to open search index — check filesystem permissions");
 
             let needs_build = search_idx.session_count() == 0;
 
@@ -62,10 +69,14 @@ pub fn run() {
                                 &entry.tool_inputs,
                             );
                         }
-                        idx.commit_and_reload().ok();
+                        if let Err(e) = idx.commit_and_reload() {
+                            tracing::error!("Initial index commit failed: {e}");
+                        }
                     }
 
-                    let _ = handle.emit("search-index-ready", ());
+                    if let Err(e) = handle.emit("search-index-ready", ()) {
+                        tracing::warn!("Failed to emit search-index-ready: {e}");
+                    }
                 });
             }
 
@@ -76,7 +87,7 @@ pub fn run() {
                 let mut watcher = match notify::recommended_watcher(tx) {
                     Ok(w) => w,
                     Err(e) => {
-                        eprintln!("File watcher failed to start: {e}");
+                        tracing::warn!("File watcher failed to start: {e}");
                         return;
                     }
                 };
@@ -92,7 +103,7 @@ pub fn run() {
                 }
 
                 if let Err(e) = watcher.watch(&watch_path, notify::RecursiveMode::Recursive) {
-                    eprintln!("Failed to watch sessions dir: {e}");
+                    tracing::warn!("Failed to watch sessions dir: {e}");
                     return;
                 }
 
@@ -118,7 +129,7 @@ pub fn run() {
                             while rx.try_recv().is_ok() {}
                             let _ = app_handle.emit("session-files-changed", ());
                         }
-                        Err(e) => eprintln!("Watch error: {e:?}"),
+                        Err(e) => tracing::warn!("Watch error: {e:?}"),
                     }
                 }
             });
@@ -128,6 +139,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scanner::scan_sessions,
             scanner::search_session_content,
+            scanner::is_index_ready,
             gtd::load_gtd_store,
             gtd::save_gtd_store,
             saved::load_saved_messages,

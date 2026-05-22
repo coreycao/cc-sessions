@@ -21,17 +21,17 @@ const MAX_SESSION_SIZE: u64 = 50 * 1024 * 1024; // 50 MB
 #[tauri::command]
 pub fn read_session_content(file_path: String) -> Result<String, String> {
     let path = validate_session_path(&file_path)?;
-    let metadata = fs::metadata(&path).map_err(|e| format!("Cannot read file metadata: {}", e))?;
+    let metadata = fs::metadata(&path).map_err(|e| format!("Cannot read metadata for {}: {e}", path.display()))?;
     if metadata.len() > MAX_SESSION_SIZE {
         return Err(format!("File too large ({} MB), maximum is 50 MB", metadata.len() / 1024 / 1024));
     }
-    fs::read_to_string(&path).map_err(|e| e.to_string())
+    fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {e}", path.display()))
 }
 
 #[tauri::command]
 pub fn delete_session(file_path: String) -> Result<String, String> {
     let path = validate_session_path(&file_path)?;
-    fs::remove_file(&path).map_err(|e| e.to_string())?;
+    fs::remove_file(&path).map_err(|e| format!("Failed to delete {}: {e}", path.display()))?;
     Ok("success".into())
 }
 

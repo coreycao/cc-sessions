@@ -7,7 +7,7 @@ use crate::gtd::{session_cache_path, save_session_cache_to_file, AppState};
 use crate::helpers::{extract_text, project_name_from_dir, projects_dir};
 use crate::models::{ContentSearchResult, JsonlEntry, SessionCacheEntry, SessionInfo};
 
-struct ParsedSession {
+pub(crate) struct ParsedSession {
     session: SessionInfo,
     assistant_texts: Vec<String>,
     tool_inputs: Vec<String>,
@@ -20,8 +20,14 @@ struct IndexChange {
     tool_inputs: Vec<String>,
 }
 
-fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<ParsedSession> {
-    let content = fs::read_to_string(file_path).ok()?;
+pub(crate) fn parse_session_file(file_path: &Path, project_dir_name: &str) -> Option<ParsedSession> {
+    let content = match fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("Failed to read {}: {e}", file_path.display());
+            return None;
+        }
+    };
     let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
     if lines.is_empty() {
         return None;
@@ -282,7 +288,9 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
     }
 
     if dirty {
-        let _ = save_session_cache_to_file(&session_cache_path(&app), &cache);
+        if let Err(e) = save_session_cache_to_file(&session_cache_path(&app), &cache) {
+            tracing::warn!("Failed to save session cache: {e}");
+        }
     }
 
     // Apply incremental index updates
@@ -299,7 +307,9 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
             for id in &evicted_ids {
                 idx.delete_session(id);
             }
-            idx.commit_and_reload().ok();
+            if let Err(e) = idx.commit_and_reload() {
+                tracing::warn!("Incremental index commit failed: {e}");
+            }
         }
     }
 
@@ -319,4 +329,127 @@ pub async fn search_session_content(query: String, app: tauri::AppHandle) -> Res
         let idx = state.search_index.read().map_err(|e| e.to_string())?;
         idx.search(&query_lower, 50)
     }).await.map_err(|e| format!("Search task failed: {}", e))?
+}
+
+#[tauri::command]
+pub fn is_index_ready(state: tauri::State<'_, AppState>) -> bool {
+    state.search_index.read().map(|idx| idx.session_count() > 0).unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use std::path::PathBuf;
+
+    fn write_jsonl(dir: &Path, name: &str, lines: &[&str]) -> PathBuf {
+        let path = dir.join(name);
+        let mut f = fs::File::create(&path).unwrap();
+        for line in lines {
+            writeln!(f, "{line}").unwrap();
+        }
+        path
+    }
+
+    fn temp_session_dir() -> tempfile::TempDir {
+        tempfile::tempdir().unwrap()
+    }
+
+    #[test]
+    fn parse_empty_file_returns_none() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "empty.jsonl", &[""]);
+        assert!(parse_session_file(&path, "test-project").is_none());
+    }
+
+    #[test]
+    fn parse_invalid_json_falls_back_to_file_metadata() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "bad.jsonl", &["not json at all", "also not json"]);
+        // Invalid lines are skipped; parser falls back to file stem as session_id
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.session_id, "bad");
+    }
+
+    #[test]
+    fn parse_minimal_user_entry() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "minimal.jsonl", &[
+            r#"{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:00:00Z","session_id":"s1","message":{"role":"user","content":"Hello"}}"#,
+        ]);
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.session_id, "s1");
+        assert_eq!(parsed.session.message_count, 1);
+        assert_eq!(parsed.session.first_prompt, "Hello");
+        assert_eq!(parsed.session.user_messages, vec!["Hello"]);
+    }
+
+    #[test]
+    fn parse_skips_title_generation_prompts() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "title.jsonl", &[
+            r#"{"type":"user","uuid":"u0","timestamp":"2026-01-15T10:00:00Z","session_id":"s1","message":{"role":"user","content":"Generate a short, clear title for this session"}}"#,
+            r#"{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:01:00Z","session_id":"s1","message":{"role":"user","content":"Real prompt"}}"#,
+        ]);
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.first_prompt, "Real prompt");
+        assert_eq!(parsed.session.user_messages.len(), 1);
+    }
+
+    #[test]
+    fn parse_extracts_assistant_text_and_tool_inputs() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "assistant.jsonl", &[
+            r#"{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:00:00Z","session_id":"s1","message":{"role":"user","content":"read file"}}"#,
+            r#"{"type":"assistant","uuid":"a1","timestamp":"2026-01-15T10:01:00Z","message":{"role":"assistant","content":[{"type":"text","text":"Let me read that."},{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/tmp/test.rs"}}]}}"#,
+        ]);
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.assistant_texts, vec!["Let me read that."]);
+        assert_eq!(parsed.tool_inputs.len(), 1);
+        assert!(parsed.tool_inputs[0].contains("test.rs"));
+    }
+
+    #[test]
+    fn parse_uses_file_stem_as_fallback_session_id() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "abc123.jsonl", &[
+            r#"{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:00:00Z","message":{"role":"user","content":"Hi"}}"#,
+        ]);
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.session_id, "abc123");
+    }
+
+    #[test]
+    fn parse_extracts_git_branch_and_version() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "meta.jsonl", &[
+            r#"{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:00:00Z","session_id":"s1","git_branch":"feature/test","version":"4.0","cwd":"/home/user/project","message":{"role":"user","content":"hi"}}"#,
+        ]);
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.git_branch, "feature/test");
+        assert_eq!(parsed.session.version, "4.0");
+        assert_eq!(parsed.session.cwd, "/home/user/project");
+    }
+
+    #[test]
+    fn parse_ai_title_entry() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "title.jsonl", &[
+            r#"{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:00:00Z","session_id":"s1","message":{"role":"user","content":"hi"}}"#,
+            r#"{"type":"ai-title","uuid":"t1","ai_title":"My Session Title"}"#,
+        ]);
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.title, "My Session Title");
+    }
+
+    #[test]
+    fn parse_truncates_long_user_messages() {
+        let long_text = "x".repeat(600);
+        let dir = temp_session_dir();
+        let path = write_jsonl(dir.path(), "long.jsonl", &[
+            format!(r#"{{"type":"user","uuid":"u1","timestamp":"2026-01-15T10:00:00Z","session_id":"s1","message":{{"role":"user","content":"{long_text}"}}}}"#).as_str(),
+        ].into_iter().collect::<Vec<_>>());
+        let parsed = parse_session_file(&path, "test-project").unwrap();
+        assert_eq!(parsed.session.user_messages[0].len(), 500);
+    }
 }

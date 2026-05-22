@@ -79,14 +79,14 @@ impl SearchIndex {
         let asst_text = assistant_texts.join("\n");
         let tool_text = tool_inputs.join("\n");
 
-        self.writer
-            .add_document(doc!(
+        if let Err(e) = self.writer.add_document(doc!(
                 self.session_id_field => session_id,
                 self.user_messages_field => user_msg_text,
                 self.assistant_text_field => asst_text,
                 self.tool_inputs_field => tool_text,
-            ))
-            .ok();
+        )) {
+            tracing::warn!("Failed to index session {session_id}: {e}");
+        }
     }
 
     pub fn delete_session(&mut self, session_id: &str) {
