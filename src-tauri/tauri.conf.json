@@ -43,5 +43,13 @@
     "macOS": {
       "minimumSystemVersion": "10.15"
     }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/coreycao/cc-sessions/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRBRTc1RjQ0QUIxQUYxNDQKUldSRThScXJSRi9uU3J2bUV3VmtBVXBlaUYwcktrZ25qMU41dmUyVk1VaDR6WG5DTnc0aG45dWsK"
+    }
   }
 }

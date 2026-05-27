@@ -114,6 +114,7 @@ export function useStore() {
     loadData,
     hasFilters,
     toasts,
+    addToast,
     removeToast,
     contentResults,
     isSearching,

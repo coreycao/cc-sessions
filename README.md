@@ -12,6 +12,7 @@ A desktop app for browsing and managing [Claude Code](https://docs.anthropic.com
 - **GTD workflow** — Organize sessions with status tracking (New / Archived), tags, notes, and starring
 - **Inline notes** — Edit session notes directly in the detail panel without switching contexts
 - **Session management** — Delete sessions or resume them directly in Terminal via `claude --resume`
+- **App updates** — Check for signed GitHub release updates from the Settings menu, download them in-app, and relaunch into the new version
 - **Persistent cache** — Session metadata is cached to disk and incrementally updated, avoiding full JSONL re-parsing on every launch
 - **Dark mode** — Light / Dark / System theme support
 
@@ -40,6 +41,23 @@ pnpm tauri dev
 | `pnpm tauri dev` | Start full Tauri dev mode (Rust + frontend with HMR) |
 | `pnpm build` | Build frontend for production |
 | `pnpm tauri build` | Build native app bundle (.dmg on macOS) |
+
+## Release Updates
+
+Releases are built by `.github/workflows/release.yml` when pushing a `v*` tag. The workflow uploads native bundles plus `latest.json`, which the app checks at:
+
+```text
+https://github.com/coreycao/cc-sessions/releases/latest/download/latest.json
+```
+
+Set these GitHub repository secrets before publishing update-enabled releases:
+
+| Secret | Value |
+|--------|-------|
+| `TAURI_SIGNING_PRIVATE_KEY` | Contents of the local updater private key |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Private key password, or empty for the generated passwordless key |
+
+The checked-in updater public key lives in `src-tauri/tauri.conf.json`. Keep private keys out of git.
 
 ## Architecture
 

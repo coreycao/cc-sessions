@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater'
+import { relaunch } from '@tauri-apps/plugin-process'
 import type { SessionInfo, AppStore } from '../shared/types'
 import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
+import type { UpdateState } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
 import { DetailPanel } from './components/DetailPanel'
 import { BatchActions } from './components/BatchActions'
@@ -28,11 +31,15 @@ export default function App() {
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [updateState, setUpdateState] = useState<UpdateState>('idle')
+  const [updateVersion, setUpdateVersion] = useState<string | null>(null)
+  const [updateProgress, setUpdateProgress] = useState<number | null>(null)
   const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
   const searchRef = useRef<HTMLInputElement>(null)
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
   const settingsBtnRef = useRef<HTMLButtonElement>(null)
+  const updateRef = useRef<Update | null>(null)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system')
 
   const handleSync = useCallback(async () => {
@@ -40,6 +47,75 @@ export default function App() {
     setSettingsMenuOpen(false)
     try { await store.loadData() } finally { setSyncing(false) }
   }, [store.loadData])
+
+  const handleCheckUpdate = useCallback(async (silent = false) => {
+    setUpdateState('checking')
+    setUpdateProgress(null)
+    try {
+      const update = await check()
+      updateRef.current = update
+      if (update) {
+        setUpdateVersion(update.version)
+        setUpdateState('available')
+        if (!silent) store.addToast(`Update ${update.version} is available`, 'success')
+      } else {
+        setUpdateVersion(null)
+        setUpdateState('current')
+        if (!silent) store.addToast('CC Sessions is up to date', 'success')
+      }
+    } catch (error) {
+      setUpdateState('error')
+      if (!silent) {
+        store.addToast(error instanceof Error ? error.message : 'Failed to check for updates')
+      }
+    }
+  }, [store.addToast])
+
+  const handleInstallUpdate = useCallback(async () => {
+    let update = updateRef.current
+    if (!update) {
+      setUpdateState('checking')
+      update = await check()
+      updateRef.current = update
+    }
+    if (!update) {
+      setUpdateState('current')
+      store.addToast('CC Sessions is up to date', 'success')
+      return
+    }
+
+    setSettingsMenuOpen(false)
+    setUpdateState('downloading')
+    setUpdateProgress(null)
+    let downloaded = 0
+    let total: number | null = null
+
+    try {
+      await update.downloadAndInstall((event: DownloadEvent) => {
+        if (event.event === 'Started') {
+          total = event.data.contentLength ?? null
+          downloaded = 0
+          setUpdateProgress(total ? 0 : null)
+        } else if (event.event === 'Progress') {
+          downloaded += event.data.chunkLength
+          if (total) setUpdateProgress(Math.min(100, Math.round((downloaded / total) * 100)))
+        } else if (event.event === 'Finished') {
+          setUpdateProgress(100)
+        }
+      })
+      setUpdateState('ready')
+      await relaunch()
+    } catch (error) {
+      setUpdateState('error')
+      store.addToast(error instanceof Error ? error.message : 'Failed to install update')
+    }
+  }, [store.addToast])
+
+  useEffect(() => {
+    if (import.meta.env.PROD) {
+      handleCheckUpdate(true)
+    }
+  }, [handleCheckUpdate])
 
   const toggleProjectMenu = useCallback(() => {
     const rect = projectBtnRef.current?.getBoundingClientRect()
@@ -279,6 +355,11 @@ export default function App() {
           settingsBtnRef={settingsBtnRef}
           onSync={handleSync}
           syncing={syncing}
+          onCheckUpdate={handleCheckUpdate}
+          onInstallUpdate={handleInstallUpdate}
+          updateState={updateState}
+          updateVersion={updateVersion}
+          updateProgress={updateProgress}
           sessions={store.sessions}
           view={store.view}
           setView={store.setView}

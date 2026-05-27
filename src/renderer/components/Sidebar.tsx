@@ -5,9 +5,11 @@ import type { View } from '../hooks/useStore'
 import type { SessionInfo } from '../../shared/types'
 import {
   LayoutList, Circle, Star, Archive,
-  Tag, Pencil, Trash, Plus, Settings, RefreshCw, Bookmark, ChevronDown,
+  Tag, Pencil, Trash, Plus, Settings, RefreshCw, Bookmark, ChevronDown, Download, CheckCircle2,
 } from 'lucide-react'
 import { StatsPanel } from './StatsPanel'
+
+export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'current' | 'error'
 
 interface SidebarProps {
   filterStatus: FilterView
@@ -29,6 +31,11 @@ interface SidebarProps {
   settingsBtnRef: RefObject<HTMLButtonElement | null>
   onSync: () => Promise<void>
   syncing: boolean
+  onCheckUpdate: () => Promise<void>
+  onInstallUpdate: () => Promise<void>
+  updateState: UpdateState
+  updateVersion: string | null
+  updateProgress: number | null
   sessions: SessionInfo[]
   view: View
   setView: (v: View) => void
@@ -49,6 +56,7 @@ export const Sidebar = memo(function Sidebar({
   statusCounts,
   sidebarWidth, sidebarCollapsed, isResizing, startResize,
   settingsMenuOpen, setSettingsMenuOpen, settingsBtnRef, onSync, syncing,
+  onCheckUpdate, onInstallUpdate, updateState, updateVersion, updateProgress,
   sessions,
   view, setView, savedCount,
 }: SidebarProps) {
@@ -249,6 +257,33 @@ export const Sidebar = memo(function Sidebar({
               >
                 <RefreshCw className={`w-3 h-3 ${syncing ? 'animate-spin' : ''}`} />
                 Sync Sessions
+              </button>
+              <button
+                onClick={() => {
+                  if (updateState === 'available') {
+                    onInstallUpdate()
+                  } else {
+                    onCheckUpdate()
+                  }
+                }}
+                disabled={updateState === 'checking' || updateState === 'downloading'}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-content-2 hover:bg-surface-3 transition-colors disabled:opacity-50"
+              >
+                {updateState === 'current' ? (
+                  <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                ) : updateState === 'checking' || updateState === 'downloading' ? (
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Download className="w-3 h-3" />
+                )}
+                <span>
+                  {updateState === 'checking' && 'Checking Updates'}
+                  {updateState === 'available' && `Install ${updateVersion ?? 'Update'}`}
+                  {updateState === 'downloading' && (updateProgress === null ? 'Downloading Update' : `Downloading ${updateProgress}%`)}
+                  {updateState === 'ready' && 'Restarting App'}
+                  {updateState === 'current' && 'Up To Date'}
+                  {(updateState === 'idle' || updateState === 'error') && 'Check for Updates'}
+                </span>
               </button>
             </div>,
             document.body
