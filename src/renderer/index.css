@@ -20,6 +20,7 @@
 }
 
 :root {
+  font-size: 18px;
   --scrollbar-thumb: #d4d4d8;
   --scrollbar-thumb-hover: #a1a1aa;
 }
@@ -114,7 +115,7 @@ body {
 .markdown-body pre code {
   background: transparent !important;
   padding: 0 !important;
-  font-size: 13px;
+  font-size: 16px;
   line-height: 1.6;
 }
 .markdown-body hr { margin: 1.5em 0; border-color: var(--color-edge); }
