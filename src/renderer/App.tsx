@@ -211,6 +211,11 @@ export default function App() {
     [store.savedMessages, store.selectedSavedId]
   )
 
+  const archivedSessionIds = useMemo(
+    () => store.sessions.filter(s => store.getGTD(s.sessionId).status === 'archived').map(s => s.sessionId),
+    [store.sessions, store.getGTD]
+  )
+
   const jumpToSession = useCallback((sessionId: string) => {
     store.setView('sessions')
     store.setSelectedSavedId(null)
@@ -380,6 +385,7 @@ export default function App() {
                 loadData={store.loadData}
                 filterStatus={store.filterStatus}
                 filteredCount={store.filteredSessions.length}
+                archivedSessionIds={archivedSessionIds}
               />
               {store.selectedProject && (
                 <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/30 bg-accent-subtle/30">

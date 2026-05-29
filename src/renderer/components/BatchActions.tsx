@@ -16,6 +16,7 @@ interface BatchActionsProps {
   loadData: () => Promise<void>
   filterStatus: FilterView
   filteredCount: number
+  archivedSessionIds: string[]
 }
 
 const FILTER_LABELS: Record<FilterView, string> = {
@@ -36,8 +37,10 @@ export function BatchActions({
   loadData,
   filterStatus,
   filteredCount,
+  archivedSessionIds,
 }: BatchActionsProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showDeleteArchivedConfirm, setShowDeleteArchivedConfirm] = useState(false)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const tagMenuRef = useRef<HTMLDivElement>(null)
   const tagBtnRef = useRef<HTMLButtonElement>(null)
@@ -45,6 +48,7 @@ export function BatchActions({
 
   const ids = Array.from(batchSelectedIds)
   const count = ids.length
+  const archivedCount = archivedSessionIds.length
 
   const gtds = count > 0 ? ids.map(id => getGTD(id)) : []
   const allArchived = gtds.length > 0 && gtds.every(g => g.status === 'archived')
@@ -65,6 +69,11 @@ export function BatchActions({
   const confirmDelete = async () => {
     setShowDeleteConfirm(false)
     await batchDeleteSessions(batchSelectedIds)
+  }
+
+  const confirmDeleteArchived = async () => {
+    setShowDeleteArchivedConfirm(false)
+    await batchDeleteSessions(new Set(archivedSessionIds))
   }
 
   const openTagMenu = () => {
@@ -116,9 +125,25 @@ export function BatchActions({
             </button>
           </>
         ) : (
-          <span className="text-[11px] text-content-3 font-medium absolute inset-x-0 flex items-center justify-center pointer-events-none">
-            {FILTER_LABELS[filterStatus]} <span className="text-content-4 tabular-nums ml-0.5">({filteredCount})</span>
-          </span>
+          <>
+            <span className="text-[11px] text-content-3 font-medium absolute inset-x-0 flex items-center justify-center pointer-events-none">
+              {FILTER_LABELS[filterStatus]} <span className="text-content-4 tabular-nums ml-0.5">({filteredCount})</span>
+            </span>
+            {filterStatus === 'archived' && archivedCount > 0 && (
+              <>
+                <div className="flex-1" />
+                <button
+                  onClick={() => setShowDeleteArchivedConfirm(true)}
+                  className="relative z-10 inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[11px] text-content-4 hover:bg-surface-3 hover:text-red-400 transition-colors"
+                  title="Delete all archived sessions"
+                  aria-label="Delete all archived sessions"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Delete all</span>
+                </button>
+              </>
+            )}
+          </>
         )}
       </div>
 
@@ -144,9 +169,19 @@ export function BatchActions({
 
       {showDeleteConfirm && (
         <DeleteConfirmDialog
-          count={count}
+          title={`Delete ${count} Session${count !== 1 ? 's' : ''}`}
+          message={<>Are you sure you want to delete <span className="text-content font-medium">{count} session{count !== 1 ? 's' : ''}</span>? This action cannot be undone.</>}
           onConfirm={confirmDelete}
           onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
+
+      {showDeleteArchivedConfirm && (
+        <DeleteConfirmDialog
+          title="Delete All Archived Sessions"
+          message={<>Are you sure you want to permanently delete all <span className="text-content font-medium">{archivedCount} archived session{archivedCount !== 1 ? 's' : ''}</span>? This action cannot be undone.</>}
+          onConfirm={confirmDeleteArchived}
+          onCancel={() => setShowDeleteArchivedConfirm(false)}
         />
       )}
     </>
@@ -183,8 +218,9 @@ function TagCreatorInput({ onSubmit }: { onSubmit: (tag: string) => void }) {
   )
 }
 
-function DeleteConfirmDialog({ count, onConfirm, onCancel }: {
-  count: number
+function DeleteConfirmDialog({ title, message, onConfirm, onCancel }: {
+  title: string
+  message: React.ReactNode
   onConfirm: () => void
   onCancel: () => void
 }) {
@@ -202,9 +238,9 @@ function DeleteConfirmDialog({ count, onConfirm, onCancel }: {
             <AlertTriangle className="w-5 h-5 text-red-400" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-content mb-1">Delete {count} Session{count !== 1 ? 's' : ''}</h3>
+            <h3 className="text-sm font-semibold text-content mb-1">{title}</h3>
             <p className="text-xs text-content-3 leading-relaxed">
-              Are you sure you want to delete <span className="text-content font-medium">{count} session{count !== 1 ? 's' : ''}</span>? This action cannot be undone.
+              {message}
             </p>
           </div>
         </div>
