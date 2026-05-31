@@ -1,17 +1,17 @@
 # CC Sessions
 
-A desktop app for browsing and managing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) session files. Built with Tauri v2 + React.
+A desktop app for browsing and managing [Claude Code](https://docs.anthropic.com/en/docs/claude-code) and Codex CLI session files. Built with Tauri v2 + React.
 
 ![macOS](https://img.shields.io/badge/platform-macOS-black)
 
 ## Features
 
-- **Session browser** — Scans `~/.claude/projects/` and lists all your Claude Code sessions with metadata (title, project, git branch, message count, timestamps)
+- **Session browser** — Scans `~/.claude/projects/` and `~/.codex/sessions/` and lists local coding-agent sessions with metadata (title, project, git branch, message count, timestamps)
 - **Conversation viewer** — Structured rendering of full conversations with Markdown support, syntax highlighting, collapsible tool calls (with status, duration, and result preview), thinking blocks, and system messages
 - **Full-text search** — Two-tier search: instant local metadata filter + debounced content search across all conversation text (user messages, assistant responses, tool input/output) with relevance scoring and snippet previews
 - **GTD workflow** — Organize sessions with status tracking (New / Archived), tags, notes, and starring
 - **Inline notes** — Edit session notes directly in the detail panel without switching contexts
-- **Session management** — Delete sessions or resume them directly in Terminal via `claude --resume`
+- **Session management** — Delete sessions or resume them directly in Terminal via the matching CLI (`claude --resume` or `codex resume`)
 - **App updates** — Check for signed GitHub release updates from the Settings menu, download them in-app, and relaunch into the new version
 - **Persistent cache** — Session metadata is cached to disk and incrementally updated, avoiding full JSONL re-parsing on every launch
 - **Dark mode** — Light / Dark / System theme support
@@ -21,7 +21,7 @@ A desktop app for browsing and managing [Claude Code](https://docs.anthropic.com
 - [Node.js](https://nodejs.org/) >= 18
 - [pnpm](https://pnpm.io/)
 - [Rust](https://www.rust-lang.org/tools/install) (stable toolchain)
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI (for session resume feature)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI and/or Codex CLI (for session resume features)
 
 ## Getting Started
 
@@ -96,7 +96,7 @@ src-tauri/src/
 
 **Backend** — Rust, Tauri v2, serde, tokio. The GTD store is held in memory via `tauri::State<Mutex<AppStore>>` and persisted to `$APPDATA/gtd-store.json` on every mutation. Session metadata is cached to `$APPDATA/session-cache.json` for fast startup.
 
-**Communication** — Frontend calls Rust through `invoke()` IPC. Filesystem access is scoped to `$HOME/.claude/**` (reads) and `$APPDATA/**` (writes) via Tauri capabilities.
+**Communication** — Frontend calls Rust through `invoke()` IPC. Filesystem access is scoped to `$HOME/.claude/projects/**`, `$HOME/.codex/sessions/**`, and `$APPDATA/**`.
 
 ## Keyboard Shortcuts
 

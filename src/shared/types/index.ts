@@ -1,5 +1,10 @@
+export type SessionProvider = 'claude' | 'codex'
+
 export interface SessionInfo {
   sessionId: string
+  rawSessionId: string
+  provider: SessionProvider
+  providerLabel: string
   projectPath: string
   projectName: string
   fullPath: string

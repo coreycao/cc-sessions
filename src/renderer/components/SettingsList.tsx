@@ -22,7 +22,7 @@ interface SettingsListProps {
 const ITEMS: { id: SettingsSection; icon: LucideIcon; label: string; description: string }[] = [
   { id: 'app', icon: Bell, label: 'App', description: 'Notifications and updates' },
   { id: 'appearance', icon: Brush, label: 'Appearance', description: 'Theme, type, layout' },
-  { id: 'data', icon: Database, label: 'Data Sources', description: 'Claude sessions and saved data' },
+  { id: 'data', icon: Database, label: 'Data Sources', description: 'Claude and Codex sessions' },
   { id: 'ai', icon: Bot, label: 'AI', description: 'Models, thinking, connections' },
   { id: 'permissions', icon: Shield, label: 'Permissions', description: 'Local access boundaries' },
   { id: 'tags', icon: Tags, label: 'Tags', description: 'Organize session tags' },

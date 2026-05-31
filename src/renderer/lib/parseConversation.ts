@@ -6,6 +6,7 @@ import type {
   ThinkingMessage,
   ToolUseMessage,
   ToolResultInfo,
+  SessionProvider,
 } from '../../shared/types'
 
 // ---- JSONL content block types ----
@@ -58,6 +59,12 @@ interface RawEntry {
     toolStats?: ToolResultInfo['toolStats']
   }
   isSidechain?: boolean
+}
+
+interface RawCodexEntry {
+  type: string
+  timestamp?: string
+  payload?: Record<string, unknown>
 }
 
 // ---- Type guards for content blocks ----
@@ -122,7 +129,12 @@ function buildToolResultInfo(entry: RawEntry): ToolResultInfo {
   }
 }
 
-export function parseConversation(jsonlContent: string): ConversationTurn[] {
+export function parseConversation(jsonlContent: string, provider: SessionProvider = 'claude'): ConversationTurn[] {
+  if (provider === 'codex') return parseCodexConversation(jsonlContent)
+  return parseClaudeConversation(jsonlContent)
+}
+
+function parseClaudeConversation(jsonlContent: string): ConversationTurn[] {
   if (!jsonlContent) return []
 
   const lines = jsonlContent.split('\n').filter(l => l.trim())
@@ -253,6 +265,158 @@ export function parseConversation(jsonlContent: string): ConversationTurn[] {
       continue
     }
   }
+
+  return turns
+}
+
+function extractCodexText(content: unknown, preferredType: 'input_text' | 'output_text'): string {
+  if (typeof content === 'string') return content
+  if (!Array.isArray(content)) return ''
+  return content
+    .filter((block): block is Record<string, unknown> => !!block && typeof block === 'object')
+    .filter(block => block.type === preferredType || block.type === 'text')
+    .map(block => typeof block.text === 'string' ? block.text : '')
+    .filter(Boolean)
+    .join('\n')
+}
+
+function parseCodexArguments(args: unknown): Record<string, unknown> {
+  if (args && typeof args === 'object' && !Array.isArray(args)) return args as Record<string, unknown>
+  if (typeof args !== 'string' || !args.trim()) return {}
+  try {
+    const parsed = JSON.parse(args)
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : { arguments: args }
+  } catch {
+    return { arguments: args }
+  }
+}
+
+function parseCodexConversation(jsonlContent: string): ConversationTurn[] {
+  if (!jsonlContent) return []
+
+  const entries: RawCodexEntry[] = []
+  for (const line of jsonlContent.split('\n').filter(l => l.trim())) {
+    try {
+      entries.push(JSON.parse(line))
+    } catch {}
+  }
+
+  const toolOutputs = new Map<string, RawCodexEntry>()
+  for (const entry of entries) {
+    const payload = entry.payload || {}
+    if (entry.type === 'response_item' && payload.type === 'function_call_output' && typeof payload.call_id === 'string') {
+      toolOutputs.set(payload.call_id, entry)
+    }
+  }
+
+  const turns: ConversationTurn[] = []
+  let currentAssistantTurn: AssistantTurn | null = null
+
+  const ensureAssistantTurn = (timestamp: string, id: string) => {
+    if (!currentAssistantTurn) {
+      currentAssistantTurn = { kind: 'assistant_turn', id, timestamp, messages: [] }
+      turns.push(currentAssistantTurn)
+    }
+    return currentAssistantTurn
+  }
+
+  entries.forEach((entry, index) => {
+    const payload = entry.payload || {}
+    const ts = entry.timestamp || ''
+
+    if (entry.type === 'session_meta') {
+      currentAssistantTurn = null
+      turns.push({
+        kind: 'system',
+        id: `codex-system-${index}`,
+        subtype: 'session',
+        content: typeof payload.cwd === 'string' ? payload.cwd : null,
+        timestamp: ts,
+      })
+      return
+    }
+
+    if (entry.type !== 'response_item') return
+
+    if (payload.type === 'message') {
+      const role = typeof payload.role === 'string' ? payload.role : ''
+      if (role === 'developer' || role === 'system') {
+        currentAssistantTurn = null
+        turns.push({
+          kind: 'system',
+          id: `codex-system-${index}`,
+          subtype: role,
+          content: extractCodexText(payload.content, 'input_text') || null,
+          timestamp: ts,
+        })
+        return
+      }
+
+      if (role === 'user') {
+        const text = extractCodexText(payload.content, 'input_text')
+        if (!text) return
+        currentAssistantTurn = null
+        const message: TextMessage = {
+          kind: 'text',
+          id: `codex-user-${index}`,
+          role: 'user',
+          content: text,
+          timestamp: ts,
+        }
+        turns.push({ kind: 'user_turn', id: message.id, timestamp: ts, message })
+        return
+      }
+
+      if (role === 'assistant') {
+        const text = extractCodexText(payload.content, 'output_text')
+        if (!text) return
+        const turn = ensureAssistantTurn(ts, `codex-assistant-${index}`)
+        turn.messages.push({
+          kind: 'text',
+          id: `codex-assistant-text-${index}`,
+          role: 'assistant',
+          content: text,
+          timestamp: ts,
+        })
+      }
+      return
+    }
+
+    if (payload.type === 'reasoning') {
+      const summary = Array.isArray(payload.summary)
+        ? payload.summary
+            .filter((block): block is Record<string, unknown> => !!block && typeof block === 'object')
+            .map(block => typeof block.text === 'string' ? block.text : '')
+            .filter(Boolean)
+            .join('\n')
+        : ''
+      if (!summary) return
+      const turn = ensureAssistantTurn(ts, `codex-assistant-${index}`)
+      turn.messages.push({
+        kind: 'thinking',
+        id: `codex-reasoning-${index}`,
+        content: summary,
+        timestamp: ts,
+      })
+      return
+    }
+
+    if (payload.type === 'function_call') {
+      const callId = typeof payload.call_id === 'string' ? payload.call_id : `codex-call-${index}`
+      const output = toolOutputs.get(callId)?.payload || {}
+      const outputText = typeof output.output === 'string' ? output.output : ''
+      const turn = ensureAssistantTurn(ts, `codex-assistant-${index}`)
+      turn.messages.push({
+        kind: 'tool_use',
+        id: `codex-tool-${callId}`,
+        toolCallId: callId,
+        toolName: typeof payload.name === 'string' ? payload.name : 'function_call',
+        toolInput: parseCodexArguments(payload.arguments),
+        timestamp: ts,
+        result: outputText ? { content: outputText, status: 'completed' } : undefined,
+      })
+    }
+  })
 
   return turns
 }

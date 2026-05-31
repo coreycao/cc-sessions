@@ -115,7 +115,7 @@ export function SettingsPanel({
             <SettingsGroup title="Session Library">
               <SettingRow
                 title="Sync sessions"
-                description="Rescan Claude Code session files and refresh local metadata."
+                description="Rescan Claude Code and Codex CLI session files and refresh local metadata."
                 control={
                   <button
                     onClick={onSync}
@@ -140,7 +140,7 @@ export function SettingsPanel({
           <PlaceholderSection
             icon={Info}
             title="AI settings are scoped to session data"
-            description="Model names and assistant output are read from Claude Code transcripts. Editable provider settings are not stored by this app yet."
+            description="Model names and assistant output are read from local session transcripts. Editable provider settings are not stored by this app yet."
           />
         )}
 
@@ -148,7 +148,7 @@ export function SettingsPanel({
           <SettingsContent title="Permissions">
             <SettingsGroup title="Local access">
               <InfoGrid items={[
-                ['Session reads', 'Claude session paths'],
+                ['Session reads', 'Claude and Codex session paths'],
                 ['App writes', 'App data directory'],
                 ['Shell access', 'Disabled'],
               ]} />

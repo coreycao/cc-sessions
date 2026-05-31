@@ -204,6 +204,81 @@ describe('parseConversation', () => {
     expect(turns[2]).toMatchObject({ kind: 'user_turn' })
     expect(turns[3]).toMatchObject({ kind: 'assistant_turn' })
   })
+
+  it('parses Codex event stream conversations with tool calls', () => {
+    const turns = parseConversation(jsonl([
+      {
+        type: 'session_meta',
+        timestamp: '2026-05-31T00:00:00Z',
+        payload: { id: 'codex-1', cwd: '/tmp/project', type: undefined },
+      },
+      {
+        type: 'response_item',
+        timestamp: '2026-05-31T00:00:01Z',
+        payload: {
+          type: 'message',
+          role: 'user',
+          content: [{ type: 'input_text', text: 'Inspect package scripts' }],
+        },
+      },
+      {
+        type: 'response_item',
+        timestamp: '2026-05-31T00:00:02Z',
+        payload: {
+          type: 'reasoning',
+          summary: [{ type: 'summary_text', text: 'Need to read package.json' }],
+        },
+      },
+      {
+        type: 'response_item',
+        timestamp: '2026-05-31T00:00:03Z',
+        payload: {
+          type: 'function_call',
+          call_id: 'call-1',
+          name: 'exec_command',
+          arguments: '{"cmd":"cat package.json"}',
+        },
+      },
+      {
+        type: 'response_item',
+        timestamp: '2026-05-31T00:00:04Z',
+        payload: {
+          type: 'function_call_output',
+          call_id: 'call-1',
+          output: 'package contents',
+        },
+      },
+      {
+        type: 'response_item',
+        timestamp: '2026-05-31T00:00:05Z',
+        payload: {
+          type: 'message',
+          role: 'assistant',
+          content: [{ type: 'output_text', text: 'The test script is pnpm test.' }],
+        },
+      },
+    ]), 'codex')
+
+    expect(turns).toHaveLength(3)
+    expect(turns[1]).toMatchObject({
+      kind: 'user_turn',
+      message: { content: 'Inspect package scripts' },
+    })
+    expect(turns[2]).toMatchObject({
+      kind: 'assistant_turn',
+      messages: [
+        { kind: 'thinking', content: 'Need to read package.json' },
+        {
+          kind: 'tool_use',
+          toolCallId: 'call-1',
+          toolName: 'exec_command',
+          toolInput: { cmd: 'cat package.json' },
+          result: { content: 'package contents', status: 'completed' },
+        },
+        { kind: 'text', content: 'The test script is pnpm test.' },
+      ],
+    })
+  })
 })
 
 describe('getToolInputSummary', () => {

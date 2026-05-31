@@ -515,6 +515,9 @@ mod tests {
         let path = unique_temp_path("session-cache.json");
         let session = SessionInfo {
             session_id: "session-1".to_string(),
+            raw_session_id: "session-1".to_string(),
+            provider: "claude".to_string(),
+            provider_label: "Claude Code".to_string(),
             project_path: "/tmp/project".to_string(),
             project_name: "project".to_string(),
             full_path: "/tmp/project/session.jsonl".to_string(),

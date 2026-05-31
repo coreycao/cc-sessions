@@ -31,17 +31,18 @@ export interface MessageActions {
 
 // ---- Turn-level renderer ----
 
-export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact, actions }: {
+export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact, actions, assistantLabel }: {
   turn: ConversationTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
   compact?: boolean
   actions?: MessageActions
+  assistantLabel?: string
 }) {
   switch (turn.kind) {
     case 'user_turn':
       return <UserMessageBubble message={turn.message} actions={actions} />
     case 'assistant_turn':
-      return <AssistantTurnBubble turn={turn} onExpand={onExpand} compact={compact} actions={actions} />
+      return <AssistantTurnBubble turn={turn} onExpand={onExpand} compact={compact} actions={actions} assistantLabel={assistantLabel || 'Claude'} />
     case 'system':
       return compact ? null : <SystemBanner message={turn} />
     default:
@@ -79,11 +80,12 @@ function UserMessageBubble({ message, actions }: { message: TextMessage; actions
 
 // ---- Assistant turn ----
 
-function AssistantTurnBubble({ turn, onExpand, compact, actions }: {
+function AssistantTurnBubble({ turn, onExpand, compact, actions, assistantLabel }: {
   turn: AssistantTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
   compact?: boolean
   actions?: MessageActions
+  assistantLabel: string
 }) {
   const { messages, timestamp } = turn
   if (messages.length === 0) return null
@@ -99,7 +101,7 @@ function AssistantTurnBubble({ turn, onExpand, compact, actions }: {
     <div className="flex flex-col items-start">
       <div className="max-w-[92%] w-full space-y-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-content-4">Claude</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-content-4">{assistantLabel}</span>
           {firstTs && <span className="text-[10px] text-content-5">{formatDate(firstTs)}</span>}
         </div>
         {visibleMessages.map(msg => {
@@ -199,7 +201,7 @@ function useMessageContextMenu(message: TextMessage, actions?: MessageActions) {
   }, [message.content])
 
   const handleExport = useCallback(() => {
-    const md = `# ${message.role === 'user' ? 'You' : 'Claude'}\n\n_${message.timestamp || ''}_\n\n${message.content}\n`
+    const md = `# ${message.role === 'user' ? 'You' : 'Assistant'}\n\n_${message.timestamp || ''}_\n\n${message.content}\n`
     invoke('export_markdown', { suggestedName: exportFilename(message), content: md })
       .catch(e => console.error('Export failed:', e))
   }, [message])
@@ -402,8 +404,9 @@ function SystemBanner({ message }: { message: SystemMessage }) {
 
 // ---- Fullscreen modal (updated for rich messages) ----
 
-export function FullscreenMessageModal({ message, onClose }: {
+export function FullscreenMessageModal({ message, assistantLabel = 'Claude', onClose }: {
   message: { role: string; text: string; timestamp: string }
+  assistantLabel?: string
   onClose: () => void
 }) {
   const isUser = message.role === 'user'
@@ -439,7 +442,7 @@ export function FullscreenMessageModal({ message, onClose }: {
       <div className="relative flex items-center justify-center px-6 py-3 border-b border-edge/50 shrink-0">
         <div className="flex items-center gap-3">
           <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${isUser ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'}`}>
-            {isUser ? 'You' : 'Claude'}
+            {isUser ? 'You' : assistantLabel}
           </span>
           {message.timestamp && (
             <span className="text-xs text-content-4">{formatDate(message.timestamp)}</span>

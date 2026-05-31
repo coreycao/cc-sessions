@@ -4,16 +4,17 @@ use std::process::Command;
 
 use tauri_plugin_dialog::DialogExt;
 
-use crate::helpers::projects_dir;
+use crate::helpers::session_roots;
 
 fn validate_session_path(file_path: &str) -> Result<PathBuf, String> {
     let canonical = fs::canonicalize(file_path).map_err(|e| format!("Invalid path: {}", e))?;
-    let allowed = projects_dir();
-    let allowed_canonical = allowed.canonicalize().unwrap_or_else(|_| allowed);
-    if !canonical.starts_with(&allowed_canonical) {
-        return Err("Path escapes allowed directory".to_string());
+    for allowed in session_roots() {
+        let allowed_canonical = allowed.canonicalize().unwrap_or(allowed);
+        if canonical.starts_with(&allowed_canonical) {
+            return Ok(canonical);
+        }
     }
-    Ok(canonical)
+    Err("Path escapes allowed session directories".to_string())
 }
 
 const MAX_SESSION_SIZE: u64 = 50 * 1024 * 1024; // 50 MB
@@ -44,12 +45,26 @@ fn escape_applescript(s: &str) -> String {
 }
 
 #[tauri::command]
-pub fn restore_session(cwd: String, session_id: String) -> Result<String, String> {
+pub fn restore_session(
+    provider: String,
+    cwd: String,
+    session_id: String,
+) -> Result<String, String> {
     let cwd_safe = escape_applescript(&cwd);
     let sid_safe = escape_applescript(&session_id);
+    let command = match provider.as_str() {
+        "codex" => format!(
+            "cd \\\"{}\\\" && codex resume \\\"{}\\\"",
+            cwd_safe, sid_safe
+        ),
+        _ => format!(
+            "cd \\\"{}\\\" && claude --resume \\\"{}\\\"",
+            cwd_safe, sid_safe
+        ),
+    };
     let script = format!(
-        "tell application \"Terminal\"\n\tdo script \"cd \\\"{}\\\" && claude --resume \\\"{}\\\"\"\n\tactivate\nend tell",
-        cwd_safe, sid_safe
+        "tell application \"Terminal\"\n\tdo script \"{}\"\n\tactivate\nend tell",
+        command
     );
     Command::new("osascript")
         .arg("-e")

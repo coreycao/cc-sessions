@@ -16,7 +16,9 @@ interface SavedMessageDetailProps {
 }
 
 export function SavedMessageDetail({ message, sessions, removeSavedMessage, setSelectedSavedId, onJumpToSession }: SavedMessageDetailProps) {
-  const sourceExists = sessions.some(s => s.sessionId === message.sessionId)
+  const sourceSession = sessions.find(s => s.sessionId === message.sessionId)
+  const sourceExists = !!sourceSession
+  const assistantLabel = sourceSession?.provider === 'codex' ? 'Codex' : 'Claude'
 
   const handleCopy = useCallback(() => {
     if (navigator.clipboard?.writeText) {
@@ -27,10 +29,10 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
   }, [message.content])
 
   const handleExport = useCallback(() => {
-    const md = `# ${message.role === 'user' ? 'You' : 'Claude'}\n\n_From: ${message.sessionTitle}_\n_${message.timestamp || ''}_\n\n${message.content}\n`
+    const md = `# ${message.role === 'user' ? 'You' : assistantLabel}\n\n_From: ${message.sessionTitle}_\n_${message.timestamp || ''}_\n\n${message.content}\n`
     invoke('export_markdown', { suggestedName: exportFilename(message), content: md })
       .catch(e => console.error('Export failed:', e))
-  }, [message])
+  }, [message, assistantLabel])
 
   const handleUnsave = useCallback(async () => {
     await removeSavedMessage(message.id)
@@ -51,7 +53,7 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
         <div className="flex-1 min-w-0 flex items-center gap-2" data-tauri-drag-region>
           <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />
           <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${isUser ? 'text-blue-400/80' : 'text-emerald-400/80'}`}>
-            {isUser ? 'You' : 'Claude'}
+            {isUser ? 'You' : assistantLabel}
           </span>
           {sourceExists ? (
             <button

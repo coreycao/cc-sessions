@@ -2,19 +2,22 @@ import { useState, useMemo, useEffect, startTransition } from 'react'
 import { parseConversation } from '../lib/parseConversation'
 import { TurnRenderer, FullscreenMessageModal } from './ConversationMessage'
 import type { MessageActions } from './ConversationMessage'
+import type { SessionProvider } from '../../shared/types'
 
 export { FullscreenMessageModal } from './ConversationMessage'
 export type { MessageActions } from './ConversationMessage'
 
-export function ConversationPreview({ content, sessionId, compact, actions }: {
+export function ConversationPreview({ content, sessionId, provider, assistantLabel, compact, actions }: {
   content: string
   sessionId: string
+  provider: SessionProvider
+  assistantLabel: string
   compact: boolean
   actions: MessageActions
 }) {
   const [expandedMsg, setExpandedMsg] = useState<{ role: string; text: string; timestamp: string } | null>(null)
 
-  const turns = useMemo(() => parseConversation(content), [content, sessionId])
+  const turns = useMemo(() => parseConversation(content, provider), [content, provider, sessionId])
   const visibleCount = useProgressiveMount(turns.length, sessionId)
 
   if (turns.length === 0) {
@@ -29,7 +32,7 @@ export function ConversationPreview({ content, sessionId, compact, actions }: {
       <div className="space-y-5 flex flex-col">
         {visibleTurns.map((turn, i) => (
           <div key={turn.id} className="turn-enter" style={{ animationDelay: `${Math.min(i, 12) * 8}ms` }}>
-            <TurnRenderer turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} />
+            <TurnRenderer turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} assistantLabel={assistantLabel} />
           </div>
         ))}
         {remaining > 0 && <LoadingIndicator remaining={remaining} total={turns.length} />}
@@ -37,6 +40,7 @@ export function ConversationPreview({ content, sessionId, compact, actions }: {
       {expandedMsg && (
         <FullscreenMessageModal
           message={expandedMsg}
+          assistantLabel={assistantLabel}
           onClose={() => setExpandedMsg(null)}
         />
       )}
@@ -44,8 +48,8 @@ export function ConversationPreview({ content, sessionId, compact, actions }: {
   )
 }
 
-export function PlainConversation({ content }: { content: string }) {
-  const turns = useMemo(() => parseConversation(content), [content])
+export function PlainConversation({ content, provider = 'claude' }: { content: string; provider?: SessionProvider }) {
+  const turns = useMemo(() => parseConversation(content, provider), [content, provider])
   if (turns.length === 0) {
     return <pre className="text-[11px] text-content-3 whitespace-pre-wrap break-all">{content}</pre>
   }

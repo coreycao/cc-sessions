@@ -2,10 +2,24 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+fn default_provider() -> String {
+    "claude".to_string()
+}
+
+fn default_provider_label() -> String {
+    "Claude Code".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionInfo {
     pub session_id: String,
+    #[serde(default)]
+    pub raw_session_id: String,
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    #[serde(default = "default_provider_label")]
+    pub provider_label: String,
     pub project_path: String,
     pub project_name: String,
     pub full_path: String,

@@ -6,7 +6,7 @@ use std::sync::atomic::Ordering;
 use tauri::{Emitter, Manager};
 
 use crate::gtd::{save_session_cache_to_file, session_cache_path, AppState};
-use crate::helpers::{extract_text, project_name_from_dir, projects_dir};
+use crate::helpers::{codex_sessions_dir, extract_text, project_name_from_dir, projects_dir};
 use crate::models::{ContentSearchResult, JsonlEntry, SessionCacheEntry, SessionInfo};
 
 pub(crate) struct ParsedSession {
@@ -186,9 +186,14 @@ pub(crate) fn parse_session_file(
         cwd.clone()
     };
 
+    let raw_session_id = session_id.clone();
+
     Some(ParsedSession {
         session: SessionInfo {
             session_id,
+            raw_session_id,
+            provider: "claude".to_string(),
+            provider_label: "Claude Code".to_string(),
             project_path: project_path.clone(),
             project_name: project_path,
             full_path: file_path.to_string_lossy().to_string(),
@@ -210,10 +215,243 @@ pub(crate) fn parse_session_file(
     })
 }
 
+fn codex_text_from_content(content: &serde_json::Value, preferred_type: &str) -> String {
+    match content {
+        serde_json::Value::String(s) => s.clone(),
+        serde_json::Value::Array(blocks) => blocks
+            .iter()
+            .filter_map(|block| {
+                let btype = block.get("type").and_then(|t| t.as_str()).unwrap_or("");
+                if btype == preferred_type || btype == "text" {
+                    block.get("text").and_then(|t| t.as_str()).map(String::from)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
+        _ => String::new(),
+    }
+}
+
+fn codex_session_id_from_file(file_path: &Path) -> String {
+    let stem = file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("")
+        .to_string();
+    if stem.starts_with("rollout-") && stem.len() >= 36 {
+        stem.chars()
+            .rev()
+            .take(36)
+            .collect::<String>()
+            .chars()
+            .rev()
+            .collect()
+    } else {
+        stem
+    }
+}
+
+pub(crate) fn parse_codex_session_file(file_path: &Path) -> Option<ParsedSession> {
+    let content = match fs::read_to_string(file_path) {
+        Ok(c) => c,
+        Err(e) => {
+            tracing::warn!("Failed to read {}: {e}", file_path.display());
+            return None;
+        }
+    };
+    let lines: Vec<&str> = content.lines().filter(|l| !l.trim().is_empty()).collect();
+    if lines.is_empty() {
+        return None;
+    }
+
+    let mut raw_session_id = String::new();
+    let mut first_prompt = String::new();
+    let mut message_count: usize = 0;
+    let mut created = String::new();
+    let mut modified = String::new();
+    let mut version = String::new();
+    let mut cwd = String::new();
+    let mut model = String::new();
+    let mut user_messages: Vec<String> = Vec::new();
+    let mut assistant_texts: Vec<String> = Vec::new();
+    let mut tool_inputs: Vec<String> = Vec::new();
+
+    for line in &lines {
+        let Ok(entry) = serde_json::from_str::<serde_json::Value>(line) else {
+            continue;
+        };
+
+        let timestamp = entry
+            .get("timestamp")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string();
+        if created.is_empty() && !timestamp.is_empty() {
+            created = timestamp.clone();
+        }
+        if !timestamp.is_empty() {
+            modified = timestamp;
+        }
+
+        let entry_type = entry.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        let payload = entry
+            .get("payload")
+            .and_then(|v| v.as_object())
+            .cloned()
+            .unwrap_or_default();
+
+        match entry_type {
+            "session_meta" => {
+                if let Some(id) = payload.get("id").and_then(|v| v.as_str()) {
+                    raw_session_id = id.to_string();
+                }
+                if let Some(v) = payload.get("cwd").and_then(|v| v.as_str()) {
+                    cwd = v.to_string();
+                }
+                if let Some(v) = payload.get("cli_version").and_then(|v| v.as_str()) {
+                    version = v.to_string();
+                }
+            }
+            "turn_context" => {
+                if let Some(v) = payload.get("cwd").and_then(|v| v.as_str()) {
+                    cwd = v.to_string();
+                }
+                if let Some(v) = payload.get("model").and_then(|v| v.as_str()) {
+                    model = v.to_string();
+                }
+            }
+            "response_item" => {
+                let payload_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                if payload_type == "message" {
+                    let role = payload.get("role").and_then(|v| v.as_str()).unwrap_or("");
+                    if role == "user" {
+                        let text = codex_text_from_content(
+                            payload.get("content").unwrap_or(&serde_json::Value::Null),
+                            "input_text",
+                        );
+                        if !text.is_empty() {
+                            message_count += 1;
+                            if first_prompt.is_empty() {
+                                first_prompt = text.chars().take(200).collect();
+                            }
+                            user_messages.push(text.chars().take(500).collect());
+                        }
+                    } else if role == "assistant" {
+                        let text = codex_text_from_content(
+                            payload.get("content").unwrap_or(&serde_json::Value::Null),
+                            "output_text",
+                        );
+                        if !text.is_empty() {
+                            message_count += 1;
+                            assistant_texts.push(text.chars().take(1000).collect());
+                        }
+                    }
+                } else if payload_type == "function_call" {
+                    if let Some(args) = payload.get("arguments").and_then(|v| v.as_str()) {
+                        if !args.is_empty() {
+                            tool_inputs.push(args.chars().take(500).collect());
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if raw_session_id.is_empty() {
+        raw_session_id = codex_session_id_from_file(file_path);
+    }
+
+    if created.is_empty() || modified.is_empty() {
+        if let Ok(meta) = fs::metadata(file_path) {
+            if created.is_empty() {
+                if let Ok(ct) = meta.created() {
+                    let dt: chrono::DateTime<chrono::Local> = ct.into();
+                    created = dt.to_rfc3339();
+                }
+            }
+            if modified.is_empty() {
+                if let Ok(mt) = meta.modified() {
+                    let dt: chrono::DateTime<chrono::Local> = mt.into();
+                    modified = dt.to_rfc3339();
+                }
+            }
+        }
+    }
+
+    let project_path = cwd.clone();
+    let project_name = if project_path.is_empty() {
+        "Codex".to_string()
+    } else {
+        project_path.clone()
+    };
+    let title = if first_prompt.len() >= 60 {
+        first_prompt.chars().take(60).collect()
+    } else if !first_prompt.is_empty() {
+        first_prompt.clone()
+    } else if !cwd.is_empty() {
+        std::path::Path::new(&cwd)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Codex Session")
+            .to_string()
+    } else {
+        raw_session_id.chars().take(8).collect()
+    };
+
+    Some(ParsedSession {
+        session: SessionInfo {
+            session_id: format!("codex:{raw_session_id}"),
+            raw_session_id,
+            provider: "codex".to_string(),
+            provider_label: "Codex CLI".to_string(),
+            project_path,
+            project_name,
+            full_path: file_path.to_string_lossy().to_string(),
+            title,
+            first_prompt,
+            message_count,
+            created,
+            modified,
+            git_branch: String::new(),
+            is_sidechain: false,
+            version,
+            cwd,
+            entrypoint: model,
+            user_messages,
+            assistant_summary: String::new(),
+        },
+        assistant_texts,
+        tool_inputs,
+    })
+}
+
+fn discover_codex_session_files(root: &Path) -> Vec<std::path::PathBuf> {
+    let mut files = Vec::new();
+    let mut stack = vec![root.to_path_buf()];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                files.push(path);
+            }
+        }
+    }
+    files
+}
+
 #[tauri::command]
 pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Vec<SessionInfo> {
     let pdir = projects_dir();
-    if !pdir.exists() {
+    let cdir = codex_sessions_dir();
+    if !pdir.exists() && !cdir.exists() {
         state.index_ready.store(true, Ordering::SeqCst);
         let _ = app.emit("search-index-ready", ());
         return vec![];
@@ -226,64 +464,98 @@ pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -
     let mut sessions: Vec<SessionInfo> = Vec::new();
     let mut seen_keys: HashSet<String> = HashSet::new();
 
-    let Ok(project_dirs) = fs::read_dir(&pdir) else {
-        return sessions;
-    };
+    if let Ok(project_dirs) = fs::read_dir(&pdir) {
+        for entry in project_dirs.flatten() {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            if dir_name.starts_with('.') {
+                continue;
+            }
 
-    for entry in project_dirs.flatten() {
-        let path = entry.path();
-        if !path.is_dir() {
-            continue;
-        }
-        let dir_name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n.to_string(),
-            None => continue,
-        };
-        if dir_name.starts_with('.') {
-            continue;
-        }
+            let Ok(files) = fs::read_dir(&path) else {
+                continue;
+            };
 
-        let Ok(files) = fs::read_dir(&path) else {
-            continue;
-        };
+            for file_entry in files.flatten() {
+                let fp = file_entry.path();
+                if fp.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                    let key = fp.to_string_lossy().to_string();
+                    seen_keys.insert(key.clone());
 
-        for file_entry in files.flatten() {
-            let fp = file_entry.path();
-            if fp.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                let key = fp.to_string_lossy().to_string();
-                seen_keys.insert(key.clone());
+                    let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
 
-                let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
+                    let cached = cache.entries.get(&key);
+                    let use_cache = cached.is_some()
+                        && mtime.is_some()
+                        && cached.unwrap().to_system_time() == mtime.unwrap();
 
-                let cached = cache.entries.get(&key);
-                let use_cache = cached.is_some()
-                    && mtime.is_some()
-                    && cached.unwrap().to_system_time() == mtime.unwrap();
-
-                if use_cache {
-                    sessions.push(cached.unwrap().session.clone());
-                } else if let Some(parsed) = parse_session_file(&fp, &dir_name) {
-                    index_additions.push(IndexChange {
-                        session_id: parsed.session.session_id.clone(),
-                        user_messages: parsed.session.user_messages.clone(),
-                        assistant_texts: parsed.assistant_texts.clone(),
-                        tool_inputs: parsed.tool_inputs.clone(),
-                    });
-                    if let Some(mt) = mtime {
-                        cache.entries.insert(
-                            key.clone(),
-                            SessionCacheEntry::from_session_and_mtime(
-                                parsed.session.clone(),
-                                mt,
-                                parsed.assistant_texts,
-                                parsed.tool_inputs,
-                            ),
-                        );
-                        dirty = true;
+                    if use_cache {
+                        sessions.push(cached.unwrap().session.clone());
+                    } else if let Some(parsed) = parse_session_file(&fp, &dir_name) {
+                        index_additions.push(IndexChange {
+                            session_id: parsed.session.session_id.clone(),
+                            user_messages: parsed.session.user_messages.clone(),
+                            assistant_texts: parsed.assistant_texts.clone(),
+                            tool_inputs: parsed.tool_inputs.clone(),
+                        });
+                        if let Some(mt) = mtime {
+                            cache.entries.insert(
+                                key.clone(),
+                                SessionCacheEntry::from_session_and_mtime(
+                                    parsed.session.clone(),
+                                    mt,
+                                    parsed.assistant_texts,
+                                    parsed.tool_inputs,
+                                ),
+                            );
+                            dirty = true;
+                        }
+                        sessions.push(parsed.session);
                     }
-                    sessions.push(parsed.session);
                 }
             }
+        }
+    }
+
+    for fp in discover_codex_session_files(&cdir) {
+        let key = fp.to_string_lossy().to_string();
+        seen_keys.insert(key.clone());
+
+        let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
+
+        let cached = cache.entries.get(&key);
+        let use_cache = cached.is_some()
+            && mtime.is_some()
+            && cached.unwrap().to_system_time() == mtime.unwrap();
+
+        if use_cache {
+            sessions.push(cached.unwrap().session.clone());
+        } else if let Some(parsed) = parse_codex_session_file(&fp) {
+            index_additions.push(IndexChange {
+                session_id: parsed.session.session_id.clone(),
+                user_messages: parsed.session.user_messages.clone(),
+                assistant_texts: parsed.assistant_texts.clone(),
+                tool_inputs: parsed.tool_inputs.clone(),
+            });
+            if let Some(mt) = mtime {
+                cache.entries.insert(
+                    key.clone(),
+                    SessionCacheEntry::from_session_and_mtime(
+                        parsed.session.clone(),
+                        mt,
+                        parsed.assistant_texts,
+                        parsed.tool_inputs,
+                    ),
+                );
+                dirty = true;
+            }
+            sessions.push(parsed.session);
         }
     }
 
@@ -492,6 +764,37 @@ mod tests {
         );
         let parsed = parse_session_file(&path, "test-project").unwrap();
         assert_eq!(parsed.session.title, "My Session Title");
+    }
+
+    #[test]
+    fn parse_codex_session_file_extracts_metadata_and_index_text() {
+        let dir = temp_session_dir();
+        let path = write_jsonl(
+            dir.path(),
+            "rollout-2026-05-31T12-00-00-codex-id.jsonl",
+            &[
+                r#"{"type":"session_meta","timestamp":"2026-05-31T00:00:00Z","payload":{"id":"019e-codex","cwd":"/tmp/project","cli_version":"0.135.0","source":"cli"}}"#,
+                r#"{"type":"turn_context","timestamp":"2026-05-31T00:00:01Z","payload":{"cwd":"/tmp/project","model":"gpt-5.5"}}"#,
+                r#"{"type":"response_item","timestamp":"2026-05-31T00:00:02Z","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Inspect package scripts"}]}}"#,
+                r#"{"type":"response_item","timestamp":"2026-05-31T00:00:03Z","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The test script is pnpm test."}]}}"#,
+                r#"{"type":"response_item","timestamp":"2026-05-31T00:00:04Z","payload":{"type":"function_call","call_id":"call-1","name":"exec_command","arguments":"{\"cmd\":\"cat package.json\"}"}}"#,
+            ],
+        );
+
+        let parsed = parse_codex_session_file(&path).unwrap();
+
+        assert_eq!(parsed.session.session_id, "codex:019e-codex");
+        assert_eq!(parsed.session.raw_session_id, "019e-codex");
+        assert_eq!(parsed.session.provider, "codex");
+        assert_eq!(parsed.session.project_path, "/tmp/project");
+        assert_eq!(parsed.session.version, "0.135.0");
+        assert_eq!(parsed.session.entrypoint, "gpt-5.5");
+        assert_eq!(parsed.session.first_prompt, "Inspect package scripts");
+        assert_eq!(
+            parsed.assistant_texts,
+            vec!["The test script is pnpm test."]
+        );
+        assert_eq!(parsed.tool_inputs, vec![r#"{"cmd":"cat package.json"}"#]);
     }
 
     #[test]

@@ -10,6 +10,7 @@ use notify::Watcher;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 
+use crate::helpers::session_roots;
 use gtd::{
     gtd_store_path, load_gtd_from_file, load_session_cache, search_index_dir, session_cache_path,
     AppState,
@@ -86,7 +87,7 @@ pub fn run() {
                 });
             }
 
-            // Watch ~/.claude/projects/ for session file changes
+            // Watch known session roots for session file changes.
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
                 let (tx, rx) = std::sync::mpsc::channel();
@@ -98,18 +99,18 @@ pub fn run() {
                     }
                 };
 
-                let home = match dirs::home_dir() {
-                    Some(h) => h,
-                    None => return,
-                };
-                let watch_path = home.join(".claude/projects");
-
-                if !watch_path.exists() {
-                    return;
+                let mut watched = false;
+                for watch_path in session_roots().into_iter().filter(|p| p.exists()) {
+                    match watcher.watch(&watch_path, notify::RecursiveMode::Recursive) {
+                        Ok(_) => watched = true,
+                        Err(e) => tracing::warn!(
+                            "Failed to watch sessions dir {}: {e}",
+                            watch_path.display()
+                        ),
+                    }
                 }
 
-                if let Err(e) = watcher.watch(&watch_path, notify::RecursiveMode::Recursive) {
-                    tracing::warn!("Failed to watch sessions dir: {e}");
+                if !watched {
                     return;
                 }
 

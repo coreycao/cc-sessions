@@ -57,7 +57,11 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
 
   const restoreSession = useCallback(async (session: SessionInfo) => {
     try {
-      await invoke('restore_session', { cwd: session.cwd || session.projectPath, sessionId: session.sessionId })
+      await invoke('restore_session', {
+        provider: session.provider,
+        cwd: session.cwd || session.projectPath,
+        sessionId: session.rawSessionId || session.sessionId,
+      })
     } catch (e) {
       console.error('Failed to restore session:', e)
       addToast('Failed to restore session')

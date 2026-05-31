@@ -43,14 +43,14 @@ describe('PlainConversation', () => {
 describe('ConversationPreview', () => {
   it('renders no-content message when content is empty', () => {
     const html = ReactDOMServer.renderToStaticMarkup(
-      <ConversationPreview content="" sessionId="s1" compact={false} actions={noOpActions} />
+      <ConversationPreview content="" sessionId="s1" provider="claude" assistantLabel="Claude" compact={false} actions={noOpActions} />
     )
     expect(html).toContain('No conversation content available')
   })
 
   it('renders conversation turns', () => {
     const html = ReactDOMServer.renderToStaticMarkup(
-      <ConversationPreview content={simpleJsonl} sessionId="s1" compact={false} actions={noOpActions} />
+      <ConversationPreview content={simpleJsonl} sessionId="s1" provider="claude" assistantLabel="Claude" compact={false} actions={noOpActions} />
     )
     expect(html).toContain('Hello')
     expect(html).toContain('Hi there')

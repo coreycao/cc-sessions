@@ -47,9 +47,10 @@ export const DetailPanel = memo(function DetailPanel({
   const [showOverflow, setShowOverflow] = useState(false)
   const overflowRef = useRef<HTMLButtonElement>(null)
   const conversationScrollRef = useRef<HTMLDivElement>(null)
+  const assistantLabel = selectedSession.provider === 'codex' ? 'Codex' : 'Claude'
 
   const exportFullSession = useCallback(() => {
-    const turns = parseConversation(sessionContent)
+    const turns = parseConversation(sessionContent, selectedSession.provider)
     const parts: string[] = [`# ${selectedSession.title}\n`]
     const meta: string[] = []
     meta.push(`_Date: ${new Date(selectedSession.created).toLocaleString()}_`)
@@ -62,14 +63,14 @@ export const DetailPanel = memo(function DetailPanel({
         parts.push(`## You\n\n${turn.message.content}\n`)
       } else if (turn.kind === 'assistant_turn') {
         for (const m of turn.messages) {
-          if (m.kind === 'text') parts.push(`## Claude\n\n${m.content}\n`)
+          if (m.kind === 'text') parts.push(`## ${assistantLabel}\n\n${m.content}\n`)
         }
       }
     }
     const name = selectedSession.title.replace(/[\/\\?%*:|"<>\s]+/g, '-').slice(0, 100)
     invoke('export_markdown', { suggestedName: `${name}.md`, content: parts.join('\n') })
       .catch(e => console.error('Export failed:', e))
-  }, [sessionContent, selectedSession, gtd.tags])
+  }, [sessionContent, selectedSession, gtd.tags, assistantLabel])
 
   const messageActions: MessageActions = useMemo(() => ({
     isSaved: (messageId: string) => isSaved(selectedSession.sessionId, messageId),
@@ -201,8 +202,15 @@ export const DetailPanel = memo(function DetailPanel({
 
       {/* Conversation */}
       <div ref={conversationScrollRef} className="flex-1 overflow-y-auto px-7 py-5 bg-surface">
-        <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
-          <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} actions={messageActions} />
+        <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} provider={selectedSession.provider} />}>
+          <ConversationPreview
+            content={sessionContent}
+            sessionId={selectedSession.sessionId}
+            provider={selectedSession.provider}
+            assistantLabel={assistantLabel}
+            compact={compact}
+            actions={messageActions}
+          />
         </InlineErrorBoundary>
       </div>
 

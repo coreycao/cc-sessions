@@ -82,7 +82,7 @@ export function SessionList({
             <>
               <FileText className="w-6 h-6 text-content-5" />
               <span>No sessions yet</span>
-              <span className="text-[11px] text-content-5">Sessions appear after using Claude Code</span>
+              <span className="text-[11px] text-content-5">Sessions appear after using Claude Code or Codex CLI</span>
             </>
           )}
         </div>

@@ -4,8 +4,20 @@ pub fn home_dir() -> PathBuf {
     dirs::home_dir().expect("Cannot determine home directory")
 }
 
-pub fn projects_dir() -> PathBuf {
+pub fn claude_projects_dir() -> PathBuf {
     home_dir().join(".claude").join("projects")
+}
+
+pub fn codex_sessions_dir() -> PathBuf {
+    home_dir().join(".codex").join("sessions")
+}
+
+pub fn session_roots() -> Vec<PathBuf> {
+    vec![claude_projects_dir(), codex_sessions_dir()]
+}
+
+pub fn projects_dir() -> PathBuf {
+    claude_projects_dir()
 }
 
 pub fn project_name_from_dir(dir_name: &str) -> String {
