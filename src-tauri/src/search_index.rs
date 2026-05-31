@@ -108,11 +108,7 @@ impl SearchIndex {
         self.reader.searcher().num_docs()
     }
 
-    pub fn search(
-        &self,
-        query: &str,
-        limit: usize,
-    ) -> Result<Vec<ContentSearchResult>, String> {
+    pub fn search(&self, query: &str, limit: usize) -> Result<Vec<ContentSearchResult>, String> {
         let searcher = self.reader.searcher();
 
         let mut parser = QueryParser::for_index(
@@ -127,9 +123,18 @@ impl SearchIndex {
         parser.set_field_boost(self.assistant_text_field, 1.0);
         parser.set_field_boost(self.tool_inputs_field, 0.5);
 
-        let parsed = parser
-            .parse_query(query)
-            .map_err(|e| format!("Query parse error: {}", e))?;
+        let parsed = match parser.parse_query(query) {
+            Ok(query) => query,
+            Err(_) => {
+                let plain = sanitize_plain_query(query);
+                if plain.is_empty() {
+                    return Ok(vec![]);
+                }
+                parser
+                    .parse_query(&plain)
+                    .map_err(|e| format!("Query parse error: {}", e))?
+            }
+        };
 
         let top_docs = searcher
             .search(&parsed, &TopDocs::with_limit(limit))
@@ -205,6 +210,22 @@ impl SearchIndex {
     }
 }
 
+fn sanitize_plain_query(query: &str) -> String {
+    query
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c.is_whitespace() {
+                c
+            } else {
+                ' '
+            }
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,6 +285,21 @@ mod tests {
 
         assert_eq!(index.session_count(), 0);
         assert!(index.search("delete", 10).unwrap().is_empty());
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn search_tolerates_query_syntax_characters() {
+        let dir = unique_temp_dir();
+        let mut index = SearchIndex::open_or_create(&dir).unwrap();
+
+        index.index_session("session-1", &["fix parser edge case".to_string()], &[], &[]);
+        index.commit_and_reload().unwrap();
+
+        let results = index.search("fix(parser):", 10).unwrap();
+
+        assert_eq!(results[0].session_id, "session-1");
 
         let _ = fs::remove_dir_all(dir);
     }

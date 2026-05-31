@@ -7,9 +7,13 @@ mod scanner;
 mod search_index;
 
 use notify::Watcher;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
 
-use gtd::{load_gtd_from_file, load_session_cache, gtd_store_path, session_cache_path, search_index_dir, AppState};
+use gtd::{
+    gtd_store_path, load_gtd_from_file, load_session_cache, search_index_dir, session_cache_path,
+    AppState,
+};
 use saved::{load_saved_messages_from_file, saved_messages_path};
 
 pub fn run() {
@@ -21,8 +25,6 @@ pub fn run() {
         .init();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -45,6 +47,7 @@ pub fn run() {
                 gtd_store: std::sync::Mutex::new(initial_store),
                 cache: std::sync::Mutex::new(initial_cache),
                 search_index: std::sync::RwLock::new(search_idx),
+                index_ready: AtomicBool::new(!needs_build),
                 saved_messages: std::sync::Mutex::new(initial_saved),
             });
 
@@ -76,6 +79,7 @@ pub fn run() {
                         }
                     }
 
+                    state.index_ready.store(true, Ordering::SeqCst);
                     if let Err(e) = handle.emit("search-index-ready", ()) {
                         tracing::warn!("Failed to emit search-index-ready: {e}");
                     }
@@ -115,17 +119,23 @@ pub fn run() {
                 while let Ok(res) = rx.recv() {
                     match res {
                         Ok(event) => {
-                            let relevant = matches!(event.kind,
+                            let relevant = matches!(
+                                event.kind,
                                 notify::EventKind::Create(_)
-                                | notify::EventKind::Modify(_)
-                                | notify::EventKind::Remove(_)
+                                    | notify::EventKind::Modify(_)
+                                    | notify::EventKind::Remove(_)
                             );
-                            if !relevant { continue; }
+                            if !relevant {
+                                continue;
+                            }
 
-                            let has_jsonl = event.paths.iter().any(|p| {
-                                p.extension().and_then(|e| e.to_str()) == Some("jsonl")
-                            });
-                            if !has_jsonl { continue; }
+                            let has_jsonl = event
+                                .paths
+                                .iter()
+                                .any(|p| p.extension().and_then(|e| e.to_str()) == Some("jsonl"));
+                            if !has_jsonl {
+                                continue;
+                            }
 
                             std::thread::sleep(debounce);
                             while rx.try_recv().is_ok() {}
@@ -144,8 +154,19 @@ pub fn run() {
             scanner::is_index_ready,
             gtd::load_gtd_store,
             gtd::save_gtd_store,
+            gtd::update_session_gtd,
+            gtd::add_session_tag,
+            gtd::remove_session_tag,
+            gtd::rename_tag,
+            gtd::delete_tag,
+            gtd::create_tag,
+            gtd::batch_update_gtd,
+            gtd::batch_add_tag,
+            gtd::batch_remove_tag,
             saved::load_saved_messages,
             saved::save_saved_messages,
+            saved::add_saved_message,
+            saved::remove_saved_message,
             commands::read_session_content,
             commands::delete_session,
             commands::restore_session,

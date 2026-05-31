@@ -13,21 +13,18 @@ export function useSavedMessages() {
       .catch(e => console.error('Failed to load saved messages:', e))
   }, [])
 
-  const persist = useCallback(async (next: SavedMessage[]) => {
-    setMessages(next)
-    await invoke('save_saved_messages', { data: { messages: next } })
-  }, [])
-
   const addSavedMessage = useCallback(async (msg: Omit<SavedMessage, 'id' | 'savedAt'>) => {
     const id = `${msg.sessionId}:${msg.messageId}`
     if (messagesRef.current.some(m => m.id === id)) return
     const full: SavedMessage = { ...msg, id, savedAt: new Date().toISOString() }
-    await persist([full, ...messagesRef.current])
-  }, [persist])
+    const store = await invoke<SavedMessagesStore>('add_saved_message', { message: full })
+    setMessages(store.messages || [])
+  }, [])
 
   const removeSavedMessage = useCallback(async (id: string) => {
-    await persist(messagesRef.current.filter(m => m.id !== id))
-  }, [persist])
+    const store = await invoke<SavedMessagesStore>('remove_saved_message', { id })
+    setMessages(store.messages || [])
+  }, [])
 
   const isSaved = useCallback((sessionId: string, messageId: string): boolean => {
     const id = `${sessionId}:${messageId}`

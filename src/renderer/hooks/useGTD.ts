@@ -29,8 +29,6 @@ export function useGTD() {
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTag, setNewTag] = useState('')
 
-  const gtdDataRef = useRef(gtdData)
-  gtdDataRef.current = gtdData
   const allTagsRef = useRef(allTags)
   allTagsRef.current = allTags
 
@@ -46,113 +44,67 @@ export function useGTD() {
     setAllTags(store.tags || [])
   }, [])
 
-  const persistGTD = useCallback(async (newGtdData: Record<string, GTDMetadata>, newTags?: string[]) => {
-    const tags = newTags || allTagsRef.current
-    setGtdData(newGtdData)
-    if (newTags) setAllTags(newTags)
-    await invoke('save_gtd_store', { data: { gtdData: newGtdData, tags } })
-  }, [])
+  const applyStore = useCallback((store: AppStore) => {
+    initFromStore(store)
+    return store
+  }, [initFromStore])
 
   const getGTD = useCallback((sessionId: string): GTDMetadata => gtdData[sessionId] || getDefaultGTD(sessionId), [gtdData])
 
   const updateSessionGTD = useCallback(async (sessionId: string, updates: Partial<GTDMetadata>) => {
-    const current = gtdDataRef.current[sessionId] || getDefaultGTD(sessionId)
-    const updated = { ...current, ...updates, updatedAt: new Date().toISOString() }
-    await persistGTD({ ...gtdDataRef.current, [sessionId]: updated })
-  }, [persistGTD])
+    const store = await invoke<AppStore>('update_session_gtd', { sessionId, updates })
+    applyStore(store)
+  }, [applyStore])
 
   const addTag = useCallback(async (sessionId: string, tag: string) => {
     const trimmed = tag.trim().toLowerCase()
     if (!trimmed) return
-    const gtd = gtdDataRef.current
-    const current = gtd[sessionId] || getDefaultGTD(sessionId)
-    if (current.tags.includes(trimmed)) return
-    const updated = { ...current, tags: [...current.tags, trimmed], updatedAt: new Date().toISOString() }
-    const tags = allTagsRef.current
-    const newTags = tags.includes(trimmed) ? tags : [...tags, trimmed]
-    await persistGTD({ ...gtd, [sessionId]: updated }, newTags)
+    const store = await invoke<AppStore>('add_session_tag', { sessionId, tag: trimmed })
+    applyStore(store)
     setShowTagInput(false)
     setNewTag('')
-  }, [persistGTD])
+  }, [applyStore])
 
   const removeTag = useCallback(async (sessionId: string, tag: string) => {
-    const gtd = gtdDataRef.current
-    const current = gtd[sessionId] || getDefaultGTD(sessionId)
-    await persistGTD({ ...gtd, [sessionId]: { ...current, tags: current.tags.filter(t => t !== tag), updatedAt: new Date().toISOString() } })
-  }, [persistGTD])
+    const store = await invoke<AppStore>('remove_session_tag', { sessionId, tag })
+    applyStore(store)
+  }, [applyStore])
 
   const renameTag = useCallback(async (oldTag: string, newTagName: string) => {
     const trimmed = newTagName.trim().toLowerCase()
     if (!trimmed || trimmed === oldTag) return
-    const gtd = gtdDataRef.current
-    const updatedGtdData = { ...gtd }
-    for (const sid of Object.keys(updatedGtdData)) {
-      const g = updatedGtdData[sid]
-      if (g.tags.includes(oldTag)) {
-        updatedGtdData[sid] = { ...g, tags: g.tags.map(t => t === oldTag ? trimmed : t), updatedAt: new Date().toISOString() }
-      }
-    }
-    const tags = allTagsRef.current
-    const updatedTags = tags.map(t => t === oldTag ? trimmed : t)
-    const finalTags = updatedTags.includes(trimmed) ? updatedTags : [...updatedTags, trimmed]
-    await persistGTD(updatedGtdData, finalTags)
-  }, [persistGTD])
+    const store = await invoke<AppStore>('rename_tag', { oldTag, newTag: trimmed })
+    applyStore(store)
+  }, [applyStore])
 
   const deleteTag = useCallback(async (tag: string) => {
-    const gtd = gtdDataRef.current
-    const updatedGtdData = { ...gtd }
-    for (const sid of Object.keys(updatedGtdData)) {
-      const g = updatedGtdData[sid]
-      if (g.tags.includes(tag)) {
-        updatedGtdData[sid] = { ...g, tags: g.tags.filter(t => t !== tag), updatedAt: new Date().toISOString() }
-      }
-    }
-    await persistGTD(updatedGtdData, allTagsRef.current.filter(t => t !== tag))
-  }, [persistGTD])
+    const store = await invoke<AppStore>('delete_tag', { tag })
+    applyStore(store)
+  }, [applyStore])
 
   const createTag = useCallback(async (tag: string) => {
     const trimmed = tag.trim().toLowerCase()
     if (!trimmed || allTagsRef.current.includes(trimmed)) return
-    await persistGTD(gtdDataRef.current, [...allTagsRef.current, trimmed])
-  }, [persistGTD])
+    const store = await invoke<AppStore>('create_tag', { tag: trimmed })
+    applyStore(store)
+  }, [applyStore])
 
   const batchUpdateGTD = useCallback(async (sessionIds: string[], updates: Partial<GTDMetadata>) => {
-    const gtd = { ...gtdDataRef.current }
-    const now = new Date().toISOString()
-    for (const sid of sessionIds) {
-      const current = gtd[sid] || getDefaultGTD(sid)
-      gtd[sid] = { ...current, ...updates, updatedAt: now }
-    }
-    await persistGTD(gtd)
-  }, [persistGTD])
+    const store = await invoke<AppStore>('batch_update_gtd', { sessionIds, updates })
+    applyStore(store)
+  }, [applyStore])
 
   const batchAddTag = useCallback(async (sessionIds: string[], tag: string) => {
     const trimmed = tag.trim().toLowerCase()
     if (!trimmed) return
-    const gtd = { ...gtdDataRef.current }
-    const now = new Date().toISOString()
-    for (const sid of sessionIds) {
-      const current = gtd[sid] || getDefaultGTD(sid)
-      if (!current.tags.includes(trimmed)) {
-        gtd[sid] = { ...current, tags: [...current.tags, trimmed], updatedAt: now }
-      }
-    }
-    const tags = allTagsRef.current
-    const newTags = tags.includes(trimmed) ? tags : [...tags, trimmed]
-    await persistGTD(gtd, newTags)
-  }, [persistGTD])
+    const store = await invoke<AppStore>('batch_add_tag', { sessionIds, tag: trimmed })
+    applyStore(store)
+  }, [applyStore])
 
   const batchRemoveTag = useCallback(async (sessionIds: string[], tag: string) => {
-    const gtd = { ...gtdDataRef.current }
-    const now = new Date().toISOString()
-    for (const sid of sessionIds) {
-      const current = gtd[sid] || getDefaultGTD(sid)
-      if (current.tags.includes(tag)) {
-        gtd[sid] = { ...current, tags: current.tags.filter(t => t !== tag), updatedAt: now }
-      }
-    }
-    await persistGTD(gtd)
-  }, [persistGTD])
+    const store = await invoke<AppStore>('batch_remove_tag', { sessionIds, tag })
+    applyStore(store)
+  }, [applyStore])
 
   return {
     gtdData,

@@ -3,8 +3,9 @@ use std::path::{Path, PathBuf};
 
 use tauri::Manager;
 
+use crate::gtd::atomic_write;
 use crate::gtd::AppState;
-use crate::models::SavedMessagesStore;
+use crate::models::{SavedMessage, SavedMessagesStore};
 
 pub fn saved_messages_path(app: &tauri::AppHandle) -> PathBuf {
     app.path()
@@ -25,7 +26,7 @@ pub fn save_saved_messages_to_file(path: &Path, store: &SavedMessagesStore) -> R
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
     }
     let json = serde_json::to_string_pretty(store).map_err(|e| e.to_string())?;
-    fs::write(path, json).map_err(|e| e.to_string())
+    atomic_write(path, json.as_bytes())
 }
 
 #[tauri::command]
@@ -45,4 +46,33 @@ pub fn save_saved_messages(
         *store = data;
     }
     Ok("success".into())
+}
+
+#[tauri::command]
+pub fn add_saved_message(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    message: SavedMessage,
+) -> Result<SavedMessagesStore, String> {
+    let mut store = state.saved_messages.lock().map_err(|e| e.to_string())?;
+    if !store.messages.iter().any(|m| m.id == message.id) {
+        store.messages.insert(0, message);
+        save_saved_messages_to_file(&saved_messages_path(&app), &store)?;
+    }
+    Ok(store.clone())
+}
+
+#[tauri::command]
+pub fn remove_saved_message(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    id: String,
+) -> Result<SavedMessagesStore, String> {
+    let mut store = state.saved_messages.lock().map_err(|e| e.to_string())?;
+    let before = store.messages.len();
+    store.messages.retain(|m| m.id != id);
+    if store.messages.len() != before {
+        save_saved_messages_to_file(&saved_messages_path(&app), &store)?;
+    }
+    Ok(store.clone())
 }

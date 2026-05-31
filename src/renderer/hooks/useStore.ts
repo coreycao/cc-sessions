@@ -6,7 +6,7 @@ import { useFilters } from './useFilters'
 import { useToast } from './useToast'
 import { useContentSearch } from './useContentSearch'
 import { useSavedMessages } from './useSavedMessages'
-import { invoke } from '@tauri-apps/api/core'
+import { useIndexReady } from './useIndexReady'
 
 export type View = 'sessions' | 'saved'
 
@@ -17,24 +17,15 @@ export function useStore() {
   const filters = useFilters(sessions.sessions, gtd.getGTD)
   const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
   const saved = useSavedMessages()
-  const [indexReady, setIndexReady] = useState(false)
+  const { indexReady, refreshIndexReady } = useIndexReady()
   const [view, setView] = useState<View>('sessions')
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
-
-  useEffect(() => {
-    let unlisten: (() => void) | undefined
-    listen('search-index-ready', () => setIndexReady(true)).then(fn => { unlisten = fn })
-    return () => { unlisten?.() }
-  }, [])
 
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
     if (store) gtd.initFromStore(store)
-    try {
-      const ready = await invoke<boolean>('is_index_ready')
-      if (ready) setIndexReady(true)
-    } catch { /* index check is non-critical */ }
-  }, [sessions.loadData, gtd.initFromStore])
+    await refreshIndexReady()
+  }, [sessions.loadData, gtd.initFromStore, refreshIndexReady])
 
   useEffect(() => { loadData() }, [loadData])
 

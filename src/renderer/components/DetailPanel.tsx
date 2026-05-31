@@ -63,7 +63,6 @@ export const DetailPanel = memo(function DetailPanel({
       } else if (turn.kind === 'assistant_turn') {
         for (const m of turn.messages) {
           if (m.kind === 'text') parts.push(`## Claude\n\n${m.content}\n`)
-          else if (m.kind === 'thinking') parts.push(`## Claude (thinking)\n\n${m.content}\n`)
         }
       }
     }

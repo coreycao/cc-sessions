@@ -21,9 +21,13 @@ const MAX_SESSION_SIZE: u64 = 50 * 1024 * 1024; // 50 MB
 #[tauri::command]
 pub fn read_session_content(file_path: String) -> Result<String, String> {
     let path = validate_session_path(&file_path)?;
-    let metadata = fs::metadata(&path).map_err(|e| format!("Cannot read metadata for {}: {e}", path.display()))?;
+    let metadata = fs::metadata(&path)
+        .map_err(|e| format!("Cannot read metadata for {}: {e}", path.display()))?;
     if metadata.len() > MAX_SESSION_SIZE {
-        return Err(format!("File too large ({} MB), maximum is 50 MB", metadata.len() / 1024 / 1024));
+        return Err(format!(
+            "File too large ({} MB), maximum is 50 MB",
+            metadata.len() / 1024 / 1024
+        ));
     }
     fs::read_to_string(&path).map_err(|e| format!("Failed to read {}: {e}", path.display()))
 }
@@ -36,8 +40,7 @@ pub fn delete_session(file_path: String) -> Result<String, String> {
 }
 
 fn escape_applescript(s: &str) -> String {
-    s.replace('\\', "\\\\")
-        .replace('"', "\\\"")
+    s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 #[tauri::command]
@@ -69,7 +72,9 @@ pub async fn export_markdown(
         .set_file_name(&suggested_name)
         .blocking_save_file();
 
-    let Some(path) = file_path else { return Ok(None) };
+    let Some(path) = file_path else {
+        return Ok(None);
+    };
 
     let path_str = path.to_string();
     let pb = std::path::PathBuf::from(&path_str);

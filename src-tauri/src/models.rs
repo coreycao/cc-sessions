@@ -94,7 +94,12 @@ pub struct SessionCacheEntry {
 }
 
 impl SessionCacheEntry {
-    pub fn from_session_and_mtime(session: SessionInfo, mtime: SystemTime, assistant_texts: Vec<String>, tool_inputs: Vec<String>) -> Self {
+    pub fn from_session_and_mtime(
+        session: SessionInfo,
+        mtime: SystemTime,
+        assistant_texts: Vec<String>,
+        tool_inputs: Vec<String>,
+    ) -> Self {
         Self {
             session,
             mtime_millis: mtime

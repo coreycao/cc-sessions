@@ -47,13 +47,26 @@ fn infer_existing_path(encoded: &str) -> Option<String> {
 
 pub fn extract_snippet(text: &str, query: &str, window: usize) -> String {
     let lower = text.to_lowercase();
-    if let Some(pos) = lower.find(query) {
-        let start = pos.saturating_sub(window / 2);
-        let end = (pos + query.len() + window / 2).min(text.len());
+    if let Some(byte_pos) = lower.find(query) {
+        let match_char = lower[..byte_pos].chars().count();
+        let query_chars = query.chars().count();
+        let total_chars = text.chars().count();
+        let start_char = match_char.saturating_sub(window / 2);
+        let end_char = (match_char + query_chars + window / 2).min(total_chars);
         let mut snippet = String::new();
-        if start > 0 { snippet.push_str("..."); }
-        snippet.push_str(&text[start..end]);
-        if end < text.len() { snippet.push_str("..."); }
+        if start_char > 0 {
+            snippet.push_str("...");
+        }
+        snippet.push_str(
+            &text
+                .chars()
+                .skip(start_char)
+                .take(end_char.saturating_sub(start_char))
+                .collect::<String>(),
+        );
+        if end_char < total_chars {
+            snippet.push_str("...");
+        }
         snippet
     } else {
         text.chars().take(window).collect()
@@ -137,6 +150,13 @@ mod tests {
     #[test]
     fn extract_snippet_with_empty_text() {
         assert_eq!(extract_snippet("", "query", 10), "");
+    }
+
+    #[test]
+    fn extract_snippet_handles_unicode_boundaries() {
+        let result = extract_snippet("前缀 搜索词 😀 后缀", "搜索词", 8);
+
+        assert!(result.contains("搜索词"));
     }
 
     #[test]
