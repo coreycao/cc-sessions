@@ -40,11 +40,11 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
   const isUser = message.role === 'user'
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 bg-surface">
-      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/50" data-tauri-drag-region>
+    <div className="flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
+      <div className="h-[42px] flex items-center px-5 gap-3 border-b border-edge/50 bg-surface" data-tauri-drag-region>
         <button
           onClick={() => setSelectedSavedId(null)}
-          className="p-1 rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
+          className="p-1 rounded-lg hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
@@ -56,7 +56,7 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
           {sourceExists ? (
             <button
               onClick={() => onJumpToSession(message.sessionId)}
-              className="text-sm text-content truncate hover:text-blue-400 transition-colors inline-flex items-center gap-1 min-w-0"
+              className="text-[14px] font-semibold text-content truncate hover:text-accent transition-colors inline-flex items-center gap-1 min-w-0"
               title="Open source session"
             >
               <span className="truncate">{message.sessionTitle}</span>
@@ -70,34 +70,34 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
         </div>
         <button
           onClick={handleCopy}
-          className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+          className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
           title="Copy"
         >
           <Copy className="w-4 h-4" />
         </button>
         <button
           onClick={handleExport}
-          className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+          className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
           title="Export as Markdown"
         >
           <FileDown className="w-4 h-4" />
         </button>
         <button
           onClick={handleUnsave}
-          className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors"
+          className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors"
           title="Unsave"
         >
           <BookmarkMinus className="w-4 h-4" />
         </button>
       </div>
 
-      <div className="px-4 py-2 border-b border-edge/50 flex items-center gap-4 text-[11px] text-content-4">
+      <div className="px-5 py-2.5 border-b border-edge/50 bg-surface-2/35 flex items-center gap-4 text-[11px] text-content-4">
         <span>Saved {formatDate(message.savedAt)}</span>
         {message.timestamp && <span>Original {formatDate(message.timestamp)}</span>}
         <span className="ml-auto">{message.content.length.toLocaleString()} chars</span>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="flex-1 overflow-y-auto px-7 py-5">
         {isUser ? (
           <div className="text-sm text-content leading-relaxed whitespace-pre-wrap font-mono">
             {message.content}

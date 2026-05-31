@@ -103,10 +103,10 @@ export function BatchActions({
 
   return (
     <>
-      <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/30 bg-surface-2/60">
+      <div className="relative flex-shrink-0 h-[34px] flex items-center gap-2 px-4 border-b border-edge/50 bg-surface">
         {count > 0 ? (
           <>
-            <span className="text-[11px] text-accent font-medium tabular-nums">{count} selected</span>
+            <span className="text-[12px] text-accent font-medium tabular-nums">{count} selected</span>
             <div className="flex-1" />
             <button onClick={handleArchive} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors" title={allArchived ? 'Unarchive' : 'Archive'}>
               {allArchived ? <Circle className="w-3.5 h-3.5" /> : <Archive className="w-3.5 h-3.5" />}
@@ -126,7 +126,7 @@ export function BatchActions({
           </>
         ) : (
           <>
-            <span className="text-[11px] text-content-3 font-medium absolute inset-x-0 flex items-center justify-center pointer-events-none">
+            <span className="text-[13px] text-content font-semibold absolute inset-x-0 flex items-center justify-center pointer-events-none">
               {FILTER_LABELS[filterStatus]} <span className="text-content-4 tabular-nums ml-0.5">({filteredCount})</span>
             </span>
             {filterStatus === 'archived' && archivedCount > 0 && (
@@ -150,7 +150,7 @@ export function BatchActions({
       {showTagMenu && createPortal(
         <div
           ref={tagMenuRef}
-          className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[160px] max-h-[240px] overflow-y-auto"
+          className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[160px] max-h-[240px] overflow-y-auto"
           style={{ top: tagMenuPos.top, left: tagMenuPos.left }}
         >
           {allTags.length > 0 && allTags.map(tag => (

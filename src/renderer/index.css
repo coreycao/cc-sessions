@@ -4,25 +4,25 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --color-surface: #fafafa;
-  --color-surface-2: #f4f4f6;
-  --color-surface-3: #e8e8ed;
-  --color-content: #18181b;
-  --color-content-2: #52525b;
-  --color-content-3: #71717a;
-  --color-content-4: #a1a1aa;
-  --color-content-5: #d4d4d8;
-  --color-edge: #e4e4e8;
-  --color-edge-2: #f0f0f4;
-  --color-accent: #2563eb;
-  --color-accent-hover: #1d4ed8;
-  --color-accent-subtle: #eff6ff;
+  --color-surface: #fbfbfc;
+  --color-surface-2: #f1f1f3;
+  --color-surface-3: #e6e6e9;
+  --color-content: #25262b;
+  --color-content-2: #3f4148;
+  --color-content-3: #6f727a;
+  --color-content-4: #a3a6ad;
+  --color-content-5: #d4d6db;
+  --color-edge: #dedfe4;
+  --color-edge-2: #ececf0;
+  --color-accent: #5b7fea;
+  --color-accent-hover: #476bd8;
+  --color-accent-subtle: #eef2ff;
 }
 
 :root {
-  font-size: 18px;
-  --scrollbar-thumb: #d4d4d8;
-  --scrollbar-thumb-hover: #a1a1aa;
+  font-size: 16px;
+  --scrollbar-thumb: #d0d2d8;
+  --scrollbar-thumb-hover: #a8abb4;
 }
 
 .dark {
@@ -44,7 +44,11 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "PingFang SC", "Segoe UI", sans-serif;
+  font-feature-settings: "kern";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 ::-webkit-scrollbar {
@@ -96,17 +100,20 @@ body {
 }
 
 /* Markdown body styles */
-.markdown-body h1 { font-size: 1.5em; font-weight: 700; margin: 1.2em 0 0.6em; padding-bottom: 0.3em; border-bottom: 1px solid var(--color-edge); }
-.markdown-body h2 { font-size: 1.3em; font-weight: 600; margin: 1em 0 0.5em; padding-bottom: 0.2em; border-bottom: 1px solid var(--color-edge-2); }
-.markdown-body h3 { font-size: 1.15em; font-weight: 600; margin: 0.8em 0 0.4em; }
+.markdown-body {
+  line-height: 1.68;
+}
+.markdown-body h1 { font-size: 1.42em; font-weight: 700; margin: 1.1em 0 0.55em; padding-bottom: 0.3em; border-bottom: 1px solid var(--color-edge); }
+.markdown-body h2 { font-size: 1.22em; font-weight: 650; margin: 0.95em 0 0.45em; padding-bottom: 0.2em; border-bottom: 1px solid var(--color-edge-2); }
+.markdown-body h3 { font-size: 1.08em; font-weight: 650; margin: 0.75em 0 0.35em; }
 .markdown-body h4 { font-size: 1em; font-weight: 600; margin: 0.6em 0 0.3em; }
-.markdown-body p { margin: 0.6em 0; }
+.markdown-body p { margin: 0.48em 0; }
 .markdown-body ul, .markdown-body ol { margin: 0.5em 0; padding-left: 1.8em; }
 .markdown-body li { margin: 0.25em 0; }
 .markdown-body li > ul, .markdown-body li > ol { margin: 0.15em 0; }
 .markdown-body pre {
-  margin: 0.8em 0;
-  padding: 1em;
+  margin: 0.7em 0;
+  padding: 0.85em;
   border-radius: 8px;
   background: var(--color-surface-2);
   border: 1px solid var(--color-edge);
@@ -115,7 +122,7 @@ body {
 .markdown-body pre code {
   background: transparent !important;
   padding: 0 !important;
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1.6;
 }
 .markdown-body hr { margin: 1.5em 0; border-color: var(--color-edge); }

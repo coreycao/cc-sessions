@@ -58,17 +58,17 @@ function UserMessageBubble({ message, actions }: { message: TextMessage; actions
   return (
     <div className="flex flex-col items-end">
       <div
-        className="relative group max-w-[80%] rounded-lg px-3 py-2 bg-blue-500/15 border border-blue-500/20"
+        className="relative group max-w-[78%] rounded-xl px-3.5 py-2.5 bg-accent-subtle/80 border border-accent/20 shadow-sm"
         onContextMenu={ctx.handleContextMenu}
       >
         <div className="flex items-center gap-2 mb-1 justify-end">
           {saved && <Bookmark className="w-3 h-3 text-amber-400 fill-amber-400" />}
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-blue-400/80">You</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/80">You</span>
           {message.timestamp && (
             <span className="text-[10px] text-content-5">{formatDate(message.timestamp)}</span>
           )}
         </div>
-        <div className="text-xs text-content-2 whitespace-pre-wrap leading-relaxed break-words font-mono">
+        <div className="text-[13px] text-content-2 whitespace-pre-wrap leading-relaxed break-words font-mono">
           {isLong ? message.content.slice(0, 800) + '...' : message.content}
         </div>
       </div>
@@ -97,9 +97,9 @@ function AssistantTurnBubble({ turn, onExpand, compact, actions }: {
 
   return (
     <div className="flex flex-col items-start">
-      <div className="max-w-[85%] w-full space-y-2">
+      <div className="max-w-[92%] w-full space-y-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/80">Claude</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-content-4">Claude</span>
           {firstTs && <span className="text-[10px] text-content-5">{formatDate(firstTs)}</span>}
         </div>
         {visibleMessages.map(msg => {
@@ -124,7 +124,7 @@ function AssistantTurnBubble({ turn, onExpand, compact, actions }: {
 function ThinkingSection({ message }: { message: ThinkingMessage }) {
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-md border border-edge/30 bg-surface-2/30 overflow-hidden">
+    <div className="rounded-lg border border-edge/50 bg-surface-2/45 overflow-hidden">
       <button
         onClick={() => setOpen(v => !v)}
         className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-content-4 hover:text-content-3 transition-colors"
@@ -154,13 +154,13 @@ function AssistantTextBlock({ message, onExpand, actions }: {
   const saved = actions?.isSaved(message.id) ?? false
   return (
     <div
-      className="relative group rounded-lg bg-surface-2 border border-edge/60 px-3 py-2"
+      className="relative group rounded-xl bg-surface border border-edge/80 px-4 py-3 shadow-sm"
       onContextMenu={ctx.handleContextMenu}
     >
       {saved && (
         <Bookmark className="absolute top-1.5 right-2 w-3 h-3 text-amber-400 fill-amber-400" />
       )}
-      <div className="text-xs text-content-2 leading-relaxed break-words">
+      <div className="text-[13px] text-content-2 leading-relaxed break-words">
         <MarkdownContent content={isLong ? message.content.slice(0, 800) + '\n\n...' : message.content} />
       </div>
       {isLong && (
@@ -242,7 +242,7 @@ function sanitizeFilename(name: string): string {
 
 const MarkdownContent = memo(function MarkdownContent({ content }: { content: string }) {
   return (
-    <article className="markdown-body text-xs">
+    <article className="markdown-body text-[13px]">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
@@ -253,7 +253,7 @@ const MarkdownContent = memo(function MarkdownContent({ content }: { content: st
           code: ({ className, children, ...props }) => {
             const isInline = !className
             if (isInline) {
-              return <code className="px-1 py-0.5 rounded bg-surface-3 text-[11px] font-mono text-content-2" {...props}>{children}</code>
+              return <code className="px-1 py-0.5 rounded-md bg-surface-2 border border-edge/70 text-[12px] font-mono text-content-2" {...props}>{children}</code>
             }
             return <code className={`${className || ''} text-[11px]`} {...props}>{children}</code>
           },
@@ -310,7 +310,7 @@ function ToolCallCard({ message }: { message: ToolUseMessage }) {
     : null
 
   return (
-    <div className="rounded-md border border-edge/40 bg-surface-2/50 overflow-hidden">
+    <div className="rounded-lg border border-edge/60 bg-surface-2/50 overflow-hidden">
       {/* Header */}
       <button
         onClick={() => setOpen(v => !v)}
@@ -340,7 +340,7 @@ function ToolCallCard({ message }: { message: ToolUseMessage }) {
           {/* Tool input */}
           <div className="px-2.5 py-2">
             <div className="text-[9px] uppercase tracking-wider text-content-5 mb-1">Input</div>
-            <pre className="text-[11px] text-content-3 font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto bg-surface-3/30 rounded px-2 py-1.5">
+            <pre className="text-[11px] text-content-3 font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto bg-surface rounded-lg border border-edge/50 px-2 py-1.5">
               {JSON.stringify(message.toolInput, null, 2)}
             </pre>
           </div>
@@ -357,7 +357,7 @@ function ToolCallCard({ message }: { message: ToolUseMessage }) {
                 {result.totalTokens != null && <span className="text-[9px] text-content-5">{result.totalTokens.toLocaleString()} tokens</span>}
               </div>
               {result.content && (
-                <pre className="text-[11px] text-content-3 font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto bg-surface-3/30 rounded px-2 py-1.5">
+                <pre className="text-[11px] text-content-3 font-mono whitespace-pre-wrap break-words max-h-40 overflow-y-auto bg-surface rounded-lg border border-edge/50 px-2 py-1.5">
                   {result.content.length > 2000 ? result.content.slice(0, 2000) + '\n...' : result.content}
                 </pre>
               )}
@@ -385,7 +385,7 @@ function SystemBanner({ message }: { message: SystemMessage }) {
       : message.subtype || 'System'
 
   return (
-    <div className="flex items-start gap-2 px-3 py-1.5 rounded-md bg-surface-2/30 border border-edge/20">
+    <div className="flex items-start gap-2 px-3 py-1.5 rounded-lg bg-surface-2/45 border border-edge/40">
       <span className="text-content-5 mt-0.5 flex-shrink-0">{icon}</span>
       <div className="min-w-0 flex-1">
         <span className="text-[10px] font-medium uppercase tracking-wider text-content-5">{label}</span>

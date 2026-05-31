@@ -111,13 +111,13 @@ export const Sidebar = memo(function Sidebar({
 
   return (
     <div
-      className={`relative flex-shrink-0 flex flex-col bg-surface overflow-hidden ${sidebarCollapsed ? 'w-0 border-r-0' : 'border-r border-edge/40'} ${isResizing ? '' : 'transition-[width,border-color] duration-200 ease-in-out'}`}
+      className={`relative flex-shrink-0 flex flex-col bg-surface overflow-hidden ${sidebarCollapsed ? 'w-0 border-0 shadow-none' : 'rounded-xl border border-edge/70 shadow-sm'} ${isResizing ? '' : 'transition-[width,border-color] duration-200 ease-in-out'}`}
       style={!sidebarCollapsed ? { width: sidebarWidth } : undefined}
     >
       <div className="flex flex-col h-full overflow-y-auto overflow-x-hidden" style={{ width: sidebarWidth }}>
         {/* Filters */}
-        <div className="px-2 py-1.5 border-b border-edge/30">
-          <div className="space-y-0.5">
+        <div className="px-2.5 py-2 border-b border-edge/50">
+          <div className="space-y-1">
             {FILTER_ITEMS.flatMap(({ key, icon: Icon, label }, i) => {
               const items = [
                 <FilterButton
@@ -136,10 +136,10 @@ export const Sidebar = memo(function Sidebar({
         </div>
 
         {/* Tags */}
-        <div className="px-2 py-1.5 border-b border-edge/30">
+        <div className="px-2.5 py-2 border-b border-edge/50">
           <button
             onClick={() => setTagsCollapsed(v => !v)}
-            className="flex items-center justify-between mb-1 px-2 w-full group"
+            className="flex items-center justify-between mb-1.5 px-2 w-full group"
           >
             <span className="text-[10px] font-medium uppercase tracking-wider text-content-4">Tags</span>
             <span className="flex items-center gap-0.5">
@@ -203,7 +203,7 @@ export const Sidebar = memo(function Sidebar({
         </div>
         {ctxMenu && createPortal(
           <div
-            className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[120px]"
+            className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[120px]"
             style={{ top: ctxMenu.y, left: ctxMenu.x }}
             onClick={e => e.stopPropagation()}
           >
@@ -224,7 +224,7 @@ export const Sidebar = memo(function Sidebar({
         )}
 
         {/* Saved */}
-        <div className="px-2 py-1.5 border-b border-edge/30">
+        <div className="px-2.5 py-2 border-b border-edge/50">
           <FilterButton
             active={view === 'saved'}
             onClick={() => setView('saved')}
@@ -236,18 +236,18 @@ export const Sidebar = memo(function Sidebar({
 
         <div className="flex-1" />
         <StatsPanel sessions={sessions} />
-        <div className="px-2 py-1.5 border-t border-edge/30">
+        <div className="px-2.5 py-2 border-t border-edge/50">
           <button
             ref={settingsBtnRef}
             onClick={() => setSettingsMenuOpen(v => !v)}
-            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-content-3 hover:bg-surface-2 hover:text-content-2 transition-colors"
+            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-[12px] text-content-3 hover:bg-surface-2 hover:text-content-2 transition-colors"
           >
             <Settings className="w-3.5 h-3.5" />
             <span>Settings</span>
           </button>
           {settingsMenuOpen && createPortal(
             <div
-              className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[160px]"
+              className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[160px]"
               style={{ bottom: window.innerHeight - (settingsBtnRef.current?.getBoundingClientRect().top || 0) + 4, left: settingsBtnRef.current?.getBoundingClientRect().left || 0 }}
             >
               <button
@@ -293,7 +293,7 @@ export const Sidebar = memo(function Sidebar({
       {!sidebarCollapsed && (
         <div
           onMouseDown={startResize}
-          className="absolute top-0 bottom-0 right-0 w-1.5 cursor-col-resize hover:bg-blue-500/20 z-10"
+          className="absolute top-2 bottom-2 right-0 w-1.5 cursor-col-resize rounded-full hover:bg-accent/20 z-10"
         />
       )}
     </div>
@@ -327,7 +327,7 @@ function FilterButton({ active, onClick, onContextMenu, icon, label, count, tool
     <button
       onClick={onClick}
       onContextMenu={onContextMenu}
-      className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-xs transition-colors ${active ? 'bg-accent-subtle text-accent font-medium' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+      className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[13px] transition-colors ${active ? 'bg-surface-3/80 text-content font-medium shadow-[inset_0_0_0_1px_rgba(0,0,0,0.025)]' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
     >
       <span className="flex-shrink-0">{icon}</span>
       <span className="truncate">{label}</span>

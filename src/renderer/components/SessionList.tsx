@@ -3,8 +3,8 @@ import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared
 import { formatDate, relativeProjectName, STATUS_CONFIG, buildGroupedRows, DATE_GROUP_LABELS } from '../lib/utils'
 import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
 
-const ITEM_HEIGHT = 80
-const HEADER_HEIGHT = 36
+const ITEM_HEIGHT = 76
+const HEADER_HEIGHT = 34
 const OVERSCAN = 5
 
 interface SessionListProps {
@@ -70,7 +70,7 @@ export function SessionList({
 
   if (filteredSessions.length === 0) {
     return (
-      <div className="flex-1 min-h-0 border-r border-edge/40 flex flex-col bg-surface" role="list" aria-label="Session list">
+      <div className="flex-1 min-h-0 flex flex-col bg-surface" role="list" aria-label="Session list">
         <div className="flex-1 flex flex-col items-center justify-center text-content-4 text-xs gap-2">
           {hasFilters ? (
             <>
@@ -115,7 +115,7 @@ export function SessionList({
   const visibleRows = groupedRows.slice(visibleStart, visibleEnd + 1)
 
   return (
-    <div className="flex-1 min-h-0 border-r border-edge/40 flex flex-col bg-surface" role="list" aria-label="Session list">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface" role="list" aria-label="Session list">
       <div ref={scrollRef} className="flex-1 overflow-y-auto" onScroll={handleScroll}>
         <div style={{ height: totalHeight, position: 'relative' }}>
           <div style={{ position: 'absolute', top: positions[visibleStart]!, left: 0, right: 0 }}>
@@ -124,7 +124,7 @@ export function SessionList({
                 return (
                   <div
                     key={row.id}
-                    className="flex items-center px-3 bg-surface-2/80 text-[11px] font-semibold text-content-3 uppercase tracking-wider"
+                    className="flex items-center px-4 bg-surface text-[12px] font-semibold text-content-4"
                     style={{ height: HEADER_HEIGHT }}
                   >
                     {DATE_GROUP_LABELS[row.group]}
@@ -157,10 +157,10 @@ export function SessionList({
                       lastClickedIndex.current = actualIndex
                     }
                   }}
-                  className={`group w-full text-left px-3 border-b border-edge-2/50 transition-colors ${isSelected ? 'bg-accent-subtle shadow-[inset_2px_0_0_0_var(--color-accent)]' : 'hover:bg-surface-2/60'} ${isBatchSelected ? 'bg-accent-subtle ring-2 ring-accent/40 ring-inset' : ''}`}
+                  className={`group w-full text-left px-4 border-b border-edge-2/70 transition-colors ${isSelected ? 'bg-surface-2 shadow-[inset_3px_0_0_0_var(--color-accent)]' : 'hover:bg-surface-2/70'} ${isBatchSelected ? 'bg-accent-subtle ring-2 ring-accent/35 ring-inset' : ''}`}
                   style={{ height: ITEM_HEIGHT }}
                 >
-                  <div className="flex items-start gap-2 py-2.5">
+                  <div className="flex items-start gap-2.5 py-2.5">
                     {hasBatchSelection && (
                       <span
                         className="mt-1 flex-shrink-0"
@@ -176,15 +176,15 @@ export function SessionList({
                         }
                       </span>
                     )}
-                    <span className={`w-2.5 h-2.5 rounded-full mt-[5px] flex-shrink-0 ring-1 ring-white/80 dark:ring-surface/80 ${statusConfig.dotColor}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full mt-[5px] flex-shrink-0 ring-2 ring-white dark:ring-surface ${statusConfig.dotColor}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">
                         {gtd.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />}
-                        <span className={`text-xs font-medium truncate ${isSelected ? 'text-content' : 'text-content-2'}`}>
+                        <span className={`text-[13px] font-medium truncate ${isSelected ? 'text-content' : 'text-content-2'}`}>
                           {session.title}
                         </span>
                       </div>
-                      <div className="text-[11px] text-content-4 mt-0.5 truncate">
+                      <div className="text-[11px] text-content-4 mt-1 truncate">
                         {relativeProjectName(session.projectName)}
                       </div>
                       {contentResults.has(session.sessionId) && (
@@ -192,7 +192,7 @@ export function SessionList({
                           {contentResults.get(session.sessionId)!.snippet}
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mt-1">
+                      <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-[10px] text-content-4 flex items-center gap-0.5">
                           <MessageSquare className="w-2.5 h-2.5" />{session.messageCount}
                         </span>

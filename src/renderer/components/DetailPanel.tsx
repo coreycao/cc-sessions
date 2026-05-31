@@ -95,20 +95,20 @@ export const DetailPanel = memo(function DetailPanel({
   }, [])
 
   return (
-    <div className="relative flex-1 flex flex-col min-w-0 bg-surface">
+    <div className="relative flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
       {/* Header toolbar */}
-      <div className="h-[38px] flex items-center px-4 gap-3 border-b border-edge/30" data-tauri-drag-region>
+      <div className="h-[42px] flex items-center px-5 gap-3 border-b border-edge/50 bg-surface" data-tauri-drag-region>
         <button
           onClick={() => setSelectedSessionId(null)}
-          className="p-1 rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
+          className="p-1 rounded-lg hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
         >
           <X className="w-4 h-4" />
         </button>
-        <h2 className="text-sm font-medium text-content truncate flex-1" data-tauri-drag-region>{selectedSession.title}</h2>
+        <h2 className="text-[14px] font-semibold text-content truncate flex-1 text-center" data-tauri-drag-region>{selectedSession.title}</h2>
         <ActionTip label={gtd.status === 'archived' ? 'Unarchive' : 'Archive'}>
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}
-            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
+            className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
           >
             {gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
           </button>
@@ -116,7 +116,7 @@ export const DetailPanel = memo(function DetailPanel({
         <ActionTip label="Star">
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
-            className={`p-1 rounded-md hover:bg-surface-3 transition-colors ${gtd.starred ? 'text-amber-400' : 'text-content-4 hover:text-content-2'}`}
+            className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.starred ? 'text-amber-400' : 'text-content-4 hover:text-content-2'}`}
           >
             <Star className={`w-4 h-4 ${gtd.starred ? 'fill-amber-400' : ''}`} />
           </button>
@@ -124,7 +124,7 @@ export const DetailPanel = memo(function DetailPanel({
         <ActionTip label="Resume in Terminal">
           <button
             onClick={() => restoreSession(selectedSession)}
-            className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+            className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -134,7 +134,7 @@ export const DetailPanel = memo(function DetailPanel({
             <button
               ref={overflowRef}
               onClick={() => setShowOverflow(v => !v)}
-              className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+              className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
             >
               <MoreHorizontal className="w-4 h-4" />
             </button>
@@ -153,12 +153,12 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Metadata */}
-      <div className="px-4 py-3 bg-surface-2/30 space-y-3">
+      <div className="px-5 py-3 bg-surface-2/35 border-b border-edge/40 space-y-3">
         <div className="flex items-center gap-3">
           <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Tags</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             {gtd.tags.map(tag => (
-              <span key={tag} className="group flex items-center gap-1 text-[11px] bg-surface-3/80 text-content-2 pl-2 pr-1.5 py-0.5 rounded-md hover:bg-surface-3">
+              <span key={tag} className="group flex items-center gap-1 text-[12px] bg-surface text-content-2 border border-edge/70 pl-2 pr-1.5 py-0.5 rounded-lg hover:bg-surface-3">
                 {tag}
                 <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
                 <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
@@ -200,14 +200,14 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Conversation */}
-      <div ref={conversationScrollRef} className="flex-1 overflow-y-auto p-4">
+      <div ref={conversationScrollRef} className="flex-1 overflow-y-auto px-7 py-5 bg-surface">
         <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} />}>
           <ConversationPreview content={sessionContent} sessionId={selectedSession.sessionId} compact={compact} actions={messageActions} />
         </InlineErrorBoundary>
       </div>
 
       {/* Scroll controls */}
-      <div className="absolute bottom-4 right-4 z-20 flex flex-col overflow-hidden rounded-md border border-edge bg-surface-2/95 shadow-lg backdrop-blur">
+      <div className="absolute bottom-4 right-4 z-20 flex flex-col overflow-hidden rounded-lg border border-edge bg-surface/95 shadow-lg backdrop-blur">
         <ActionTip label="Scroll to top">
           <button
             onClick={() => scrollConversation('top')}

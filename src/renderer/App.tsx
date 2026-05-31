@@ -238,13 +238,13 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-    <div className="flex flex-col h-screen overflow-hidden bg-surface">
+    <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
       {/* Unified title bar */}
-      <header className="h-[38px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/70" data-tauri-drag-region>
+      <header className="h-[44px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/95" data-tauri-drag-region>
         <div className="w-[72px] flex-shrink-0" />
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
+          className="h-7 w-7 inline-flex items-center justify-center rounded-lg hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
           title="Toggle sidebar (⌘B)"
           aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
           aria-expanded={!sidebarCollapsed}
@@ -254,7 +254,7 @@ export default function App() {
         <button
           ref={projectBtnRef}
           onClick={toggleProjectMenu}
-          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-md px-2 border transition-colors ${store.selectedProject ? 'text-accent bg-accent-subtle/60 border-accent/25 hover:bg-accent-subtle' : 'text-content-3 bg-surface-2 border-edge/60 hover:bg-surface-3 hover:text-content-2'}`}
+          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-lg px-2 border shadow-sm transition-colors ${store.selectedProject ? 'text-accent bg-accent-subtle/70 border-accent/25 hover:bg-accent-subtle' : 'text-content-3 bg-surface border-edge/70 hover:bg-surface-3 hover:text-content-2'}`}
           title={currentProjectTitle}
           aria-label={`Filter by project: ${currentProjectTitle}`}
         >
@@ -265,12 +265,12 @@ export default function App() {
         {projectMenuOpen && createPortal(
           <div
             ref={projectMenuRef}
-            className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[200px] max-h-[320px] overflow-y-auto"
+            className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[200px] max-h-[320px] overflow-y-auto"
             style={projectMenuPosition}
           >
             <button
               onClick={() => { store.setSelectedProject(null); setProjectMenuOpen(false) }}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
+              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
             >
               <FolderOpen className="w-3.5 h-3.5" />
               All Projects
@@ -280,7 +280,7 @@ export default function App() {
               <button
                 key={p.name}
                 onClick={() => { store.setSelectedProject(store.selectedProject === p.name ? null : p.name); setProjectMenuOpen(false) }}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
                 <FolderOpen className="w-3.5 h-3.5" />
                 <span className="truncate flex-1 text-left">{p.name}</span>
@@ -301,7 +301,7 @@ export default function App() {
                 value={store.searchQuery}
                 onChange={e => store.setSearchQuery(e.target.value)}
                 aria-label="Search sessions"
-                className="w-full bg-surface-2/80 border border-edge rounded-md pl-8 pr-8 py-1.5 text-xs text-content placeholder-content-4 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent/20 transition-colors"
+                className="w-full bg-surface border border-edge/80 rounded-lg pl-8 pr-8 py-1.5 text-[12px] text-content placeholder-content-4 shadow-sm focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/15 transition-colors"
               />
               {store.isSearching ? (
                 <LoaderCircle className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-content-4 animate-spin" />
@@ -323,7 +323,7 @@ export default function App() {
         <div className="flex-1" />
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light')}
-          className="p-1.5 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors mr-2"
+          className="p-1.5 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors mr-2"
           title={`Theme: ${theme}`}
         >
           {theme === 'light' ? <Sun className="w-3.5 h-3.5" /> : theme === 'dark' ? <Moon className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
@@ -339,7 +339,7 @@ export default function App() {
       )}
 
       {/* Content area */}
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-hidden relative bg-surface-2 p-2 gap-2">
         <Sidebar
           filterStatus={store.filterStatus}
           setFilterStatus={store.setFilterStatus}
@@ -371,7 +371,7 @@ export default function App() {
           savedCount={store.savedMessages.length}
         />
 
-        <div className="flex flex-col w-[320px] flex-shrink-0 overflow-hidden">
+        <div className="flex flex-col w-[340px] flex-shrink-0 overflow-hidden rounded-xl border border-edge/70 bg-surface shadow-sm">
           {store.view === 'sessions' ? (
             <>
               <BatchActions
@@ -388,7 +388,7 @@ export default function App() {
                 archivedSessionIds={archivedSessionIds}
               />
               {store.selectedProject && (
-                <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/30 bg-accent-subtle/30">
+                <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/50 bg-accent-subtle/40">
                   <FolderOpen className="w-3 h-3 text-accent" />
                   <span className="text-[11px] text-content-2 truncate flex-1">{currentProjectName}</span>
                   <span className="text-[10px] text-content-4 tabular-nums">{store.filteredSessions.length}</span>

@@ -26,7 +26,7 @@ export function ConversationPreview({ content, sessionId, compact, actions }: {
 
   return (
     <>
-      <div className="space-y-4 flex flex-col">
+      <div className="space-y-5 flex flex-col">
         {visibleTurns.map((turn, i) => (
           <div key={turn.id} className="turn-enter" style={{ animationDelay: `${Math.min(i, 12) * 8}ms` }}>
             <TurnRenderer turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} />
