@@ -8,7 +8,7 @@ import { useContentSearch } from './useContentSearch'
 import { useSavedMessages } from './useSavedMessages'
 import { useIndexReady } from './useIndexReady'
 
-export type View = 'sessions' | 'saved'
+export type View = 'sessions' | 'saved' | 'settings'
 
 export function useStore() {
   const { toasts, addToast, removeToast } = useToast()

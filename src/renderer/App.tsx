@@ -2,20 +2,18 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import type { SessionInfo, AppStore } from '../shared/types'
 import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
-import type { UpdateState } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
 import { DetailPanel } from './components/DetailPanel'
 import { BatchActions } from './components/BatchActions'
 import { SavedMessagesList } from './components/SavedMessagesList'
 import { SavedMessageDetail } from './components/SavedMessageDetail'
+import { SettingsList, type SettingsSection } from './components/SettingsList'
+import { SettingsPanel, type Theme, type UpdateState } from './components/SettingsPanel'
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
-
-type Theme = 'light' | 'dark' | 'system'
 
 function projectDisplayName(projectPath: string | null): string {
   if (!projectPath) return 'All Projects'
@@ -29,7 +27,7 @@ export default function App() {
   const [sidebarWidth, setSidebarWidth] = useState(224)
   const [isResizing, setIsResizing] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
-  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false)
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('app')
   const [syncing, setSyncing] = useState(false)
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
@@ -38,13 +36,11 @@ export default function App() {
   const searchRef = useRef<HTMLInputElement>(null)
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
-  const settingsBtnRef = useRef<HTMLButtonElement>(null)
   const updateRef = useRef<Update | null>(null)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system')
 
   const handleSync = useCallback(async () => {
     setSyncing(true)
-    setSettingsMenuOpen(false)
     try { await store.loadData() } finally { setSyncing(false) }
   }, [store.loadData])
 
@@ -84,7 +80,6 @@ export default function App() {
       return
     }
 
-    setSettingsMenuOpen(false)
     setUpdateState('downloading')
     setUpdateProgress(null)
     let downloaded = 0
@@ -126,20 +121,17 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!projectMenuOpen && !settingsMenuOpen) return
+    if (!projectMenuOpen) return
     const handler = (e: PointerEvent) => {
       const target = e.target as Node
       if (projectMenuOpen && projectBtnRef.current && !projectBtnRef.current.contains(target)
         && projectMenuRef.current && !projectMenuRef.current.contains(target)) {
         setProjectMenuOpen(false)
       }
-      if (settingsMenuOpen && settingsBtnRef.current && !settingsBtnRef.current.contains(target)) {
-        setSettingsMenuOpen(false)
-      }
     }
     document.addEventListener('pointerdown', handler, true)
     return () => document.removeEventListener('pointerdown', handler, true)
-  }, [projectMenuOpen, settingsMenuOpen])
+  }, [projectMenuOpen])
 
   useEffect(() => {
     const root = document.documentElement
@@ -355,16 +347,6 @@ export default function App() {
           sidebarCollapsed={sidebarCollapsed}
           isResizing={isResizing}
           startResize={startResize}
-          settingsMenuOpen={settingsMenuOpen}
-          setSettingsMenuOpen={setSettingsMenuOpen}
-          settingsBtnRef={settingsBtnRef}
-          onSync={handleSync}
-          syncing={syncing}
-          onCheckUpdate={handleCheckUpdate}
-          onInstallUpdate={handleInstallUpdate}
-          updateState={updateState}
-          updateVersion={updateVersion}
-          updateProgress={updateProgress}
           sessions={store.sessions}
           view={store.view}
           setView={store.setView}
@@ -414,10 +396,10 @@ export default function App() {
                 lastClickedIndex={store.lastClickedIndex}
               />
             </>
-          ) : (
+          ) : store.view === 'saved' ? (
             <>
-              <div className="relative flex-shrink-0 h-[30px] flex items-center gap-2 px-3 border-b border-edge/30 bg-surface-2/60">
-                <span className="text-[11px] text-content-3 font-medium absolute inset-x-0 flex items-center justify-center pointer-events-none">
+              <div className="relative flex-shrink-0 h-[42px] flex items-center gap-2 px-3 border-b border-edge/50 bg-surface">
+                <span className="text-[13px] text-content font-semibold absolute inset-x-0 flex items-center justify-center pointer-events-none">
                   Saved <span className="text-content-4 tabular-nums ml-0.5">({store.savedMessages.length})</span>
                 </span>
               </div>
@@ -427,6 +409,8 @@ export default function App() {
                 setSelectedSavedId={store.setSelectedSavedId}
               />
             </>
+          ) : (
+            <SettingsList selected={settingsSection} onSelect={setSettingsSection} />
           )}
         </div>
 
@@ -460,7 +444,7 @@ export default function App() {
               </div>
             </div>
           )
-        ) : (
+        ) : store.view === 'saved' ? (
           selectedSavedMessage ? (
             <SavedMessageDetail
               message={selectedSavedMessage}
@@ -477,6 +461,23 @@ export default function App() {
               </div>
             </div>
           )
+        ) : (
+          <SettingsPanel
+            section={settingsSection}
+            theme={theme}
+            setTheme={setTheme}
+            sessions={store.sessions}
+            tags={store.allTags}
+            savedCount={store.savedMessages.length}
+            indexReady={store.indexReady}
+            syncing={syncing}
+            onSync={handleSync}
+            updateState={updateState}
+            updateVersion={updateVersion}
+            updateProgress={updateProgress}
+            onCheckUpdate={handleCheckUpdate}
+            onInstallUpdate={handleInstallUpdate}
+          />
         )}
       </div>
       <ToastContainer toasts={store.toasts} removeToast={store.removeToast} />
