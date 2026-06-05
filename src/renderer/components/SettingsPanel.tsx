@@ -38,6 +38,8 @@ export function SettingsPanel({
 
   const updateLabel = getUpdateLabel(updateState, updateVersion, updateProgress)
   const updateBusy = updateState === 'checking' || updateState === 'downloading'
+  const claudeCount = sessions.filter(s => s.provider === 'claude').length
+  const codexCount = sessions.filter(s => s.provider === 'codex').length
 
   return (
     <div className="flex flex-1 min-w-0 flex-col rounded-xl border border-edge/70 bg-surface shadow-sm overflow-hidden">
@@ -129,6 +131,8 @@ export function SettingsPanel({
               />
               <InfoGrid items={[
                 ['Sessions', sessions.length.toLocaleString()],
+                ['Claude Code', claudeCount.toLocaleString()],
+                ['Codex CLI', codexCount.toLocaleString()],
                 ['Saved messages', savedCount.toLocaleString()],
                 ['Tags', tags.length.toLocaleString()],
               ]} />

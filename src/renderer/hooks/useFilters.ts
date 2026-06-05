@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
-import type { SessionInfo, GTDMetadata, SessionStatus, Project } from '../../shared/types'
+import type { SessionInfo, GTDMetadata, SessionStatus, Project, SessionProvider } from '../../shared/types'
 
 export type FilterView = 'all' | 'new' | 'archived' | 'starred'
+export type ProviderFilter = 'all' | SessionProvider
 
 export function useFilters(
   sessions: SessionInfo[],
@@ -11,9 +12,11 @@ export function useFilters(
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStatus, setFilterStatus] = useState<FilterView>('new')
   const [filterTag, setFilterTag] = useState<string | null>(null)
+  const [providerFilter, setProviderFilter] = useState<ProviderFilter>('all')
 
   const filteredSessions = useMemo(() => {
     let result = sessions
+    if (providerFilter !== 'all') result = result.filter(s => s.provider === providerFilter)
     if (selectedProject) result = result.filter(s => s.projectName === selectedProject)
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
@@ -32,7 +35,7 @@ export function useFilters(
       result = result.filter(s => getGTD(s.sessionId).tags.includes(filterTag!))
     }
     return result
-  }, [sessions, selectedProject, searchQuery, filterStatus, filterTag, getGTD])
+  }, [sessions, providerFilter, selectedProject, searchQuery, filterStatus, filterTag, getGTD])
 
   const projects = useMemo((): Project[] => {
     const map = new Map<string, { count: number; lastMod: string }>()
@@ -70,6 +73,14 @@ export function useFilters(
     return counts
   }, [sessions, getGTD])
 
+  const providerCounts = useMemo(() => {
+    const counts: Record<ProviderFilter, number> = { all: sessions.length, claude: 0, codex: 0 }
+    for (const s of sessions) {
+      counts[s.provider] = (counts[s.provider] || 0) + 1
+    }
+    return counts
+  }, [sessions])
+
   return {
     selectedProject,
     setSelectedProject,
@@ -79,9 +90,12 @@ export function useFilters(
     setFilterStatus,
     filterTag,
     setFilterTag,
+    providerFilter,
+    setProviderFilter,
     filteredSessions,
     projects,
     statusCounts,
     tagCounts,
+    providerCounts,
   }
 }

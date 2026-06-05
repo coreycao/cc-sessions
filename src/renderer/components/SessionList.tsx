@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
 import { formatDate, relativeProjectName, STATUS_CONFIG, buildGroupedRows, DATE_GROUP_LABELS } from '../lib/utils'
 import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
+import { ProviderLogo } from './ProviderLogo'
 
 const ITEM_HEIGHT = 76
 const HEADER_HEIGHT = 34
@@ -176,6 +177,7 @@ export function SessionList({
                         }
                       </span>
                     )}
+                    <ProviderLogo provider={session.provider} size="md" className="mt-[1px] flex-shrink-0" />
                     <span className={`w-2.5 h-2.5 rounded-full mt-[5px] flex-shrink-0 ring-2 ring-white dark:ring-surface ${statusConfig.dotColor}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">

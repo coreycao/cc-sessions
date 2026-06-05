@@ -13,6 +13,7 @@ import {
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
   RotateCcw, MoreHorizontal, ChevronUp, ChevronDown,
 } from 'lucide-react'
+import { ProviderLogo } from './ProviderLogo'
 
 interface DetailPanelProps {
   selectedSession: SessionInfo
@@ -105,7 +106,10 @@ export const DetailPanel = memo(function DetailPanel({
         >
           <X className="w-4 h-4" />
         </button>
-        <h2 className="text-[14px] font-semibold text-content truncate flex-1 text-center" data-tauri-drag-region>{selectedSession.title}</h2>
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-2" data-tauri-drag-region>
+          <ProviderLogo provider={selectedSession.provider} size="md" />
+          <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
+        </div>
         <ActionTip label={gtd.status === 'archived' ? 'Unarchive' : 'Archive'}>
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}

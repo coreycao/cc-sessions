@@ -368,6 +368,9 @@ export default function App() {
                 filterStatus={store.filterStatus}
                 filteredCount={store.filteredSessions.length}
                 archivedSessionIds={archivedSessionIds}
+                providerFilter={store.providerFilter}
+                setProviderFilter={store.setProviderFilter}
+                providerCounts={store.providerCounts}
               />
               {store.selectedProject && (
                 <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/50 bg-accent-subtle/40">
