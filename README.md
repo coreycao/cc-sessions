@@ -68,6 +68,8 @@ pnpm release 1.0.1
 
 This updates `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock`, runs the test suite, commits `Release v1.0.1`, creates the `v1.0.1` tag, and pushes the branch and tag. The tag triggers GitHub Actions to build the release and upload `latest.json`.
 
+Release notes are read from `docs/releases/vX.Y.Z.md` and copied into the GitHub draft release. See `docs/release.md` for the full branching and release checklist.
+
 Useful variants:
 
 ```bash

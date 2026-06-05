@@ -55,6 +55,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Test
+        run: pnpm test
+
+      - name: Load release notes
+        id: release-notes
+        shell: bash
+        run: |
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
+          NOTES_FILE="docs/releases/${TAG}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            {
+              echo "body<<EOF"
+              cat "$NOTES_FILE"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "body<<EOF"
+              echo "Release notes were not found at ${NOTES_FILE}."
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build and upload app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -64,7 +87,7 @@ jobs:
         with:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
           releaseName: CC Sessions ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
-          releaseBody: See the generated release assets below.
+          releaseBody: ${{ steps.release-notes.outputs.body }}
           releaseDraft: true
           prerelease: false
           uploadUpdaterJson: true

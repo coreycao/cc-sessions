@@ -1,0 +1,19 @@
+# Changelog
+
+All notable changes to CC Sessions are documented here.
+
+## [1.0.0] - 2026-06-05
+
+### Added
+
+- Browse Claude Code and Codex CLI sessions from a native Tauri desktop app.
+- View full conversations with Markdown rendering, syntax highlighting, collapsible tool calls, and session metadata.
+- Search session metadata and indexed conversation content.
+- Organize sessions with GTD status, tags, notes, starring, saved messages, and archived-session bulk actions.
+- Resume supported sessions through the matching CLI.
+- Check for signed GitHub release updates from the app and install them in place.
+- Build and test with GitHub Actions, including signed release artifacts and updater metadata.
+
+### Notes
+
+- This is the first public release. Future versions can update from this build through the in-app updater.
