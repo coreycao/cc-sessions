@@ -41,6 +41,7 @@ pnpm tauri dev
 | `pnpm tauri dev` | Start full Tauri dev mode (Rust + frontend with HMR) |
 | `pnpm build` | Build frontend for production |
 | `pnpm tauri build` | Build native app bundle (.dmg on macOS) |
+| `pnpm release <version>` | Sync app versions, test, commit, tag, and push a release |
 
 ## Release Updates
 
@@ -58,6 +59,22 @@ Set these GitHub repository secrets before publishing update-enabled releases:
 | `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | Private key password, or empty for the generated passwordless key |
 
 The checked-in updater public key lives in `src-tauri/tauri.conf.json`. Keep private keys out of git.
+
+Once the secret exists, use the release script for normal releases:
+
+```bash
+pnpm release 1.0.1
+```
+
+This updates `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, and `src-tauri/Cargo.lock`, runs the test suite, commits `Release v1.0.1`, creates the `v1.0.1` tag, and pushes the branch and tag. The tag triggers GitHub Actions to build the release and upload `latest.json`.
+
+Useful variants:
+
+```bash
+pnpm release 1.0.1 --setup-secret  # Upload .tauri-keys/updater.key first
+pnpm release 1.0.1 --no-push       # Prepare the commit and tag locally
+pnpm release 1.0.1 --dry-run       # Preview the workflow
+```
 
 ## Architecture
 
