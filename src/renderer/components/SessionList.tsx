@@ -1,8 +1,10 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
-import { formatDate, relativeProjectName, STATUS_CONFIG, buildGroupedRows, DATE_GROUP_LABELS } from '../lib/utils'
+import { formatDate, relativeProjectName, buildGroupedRows, DATE_GROUP_LABELS } from '../lib/utils'
 import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
+
+type FilterView = 'all' | 'new' | 'archived' | 'starred'
 
 const ITEM_HEIGHT = 76
 const HEADER_HEIGHT = 34
@@ -19,6 +21,7 @@ interface SessionListProps {
   toggleBatchSelect: (sessionId: string) => void
   batchSelectRange: (fromIndex: number, toIndex: number, filteredSessions: SessionInfo[]) => void
   lastClickedIndex: React.MutableRefObject<number | null>
+  filterStatus: FilterView
 }
 
 export function SessionList({
@@ -32,6 +35,7 @@ export function SessionList({
   toggleBatchSelect,
   batchSelectRange,
   lastClickedIndex,
+  filterStatus,
 }: SessionListProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
@@ -135,7 +139,8 @@ export function SessionList({
 
               const session = row.session
               const gtd = getGTD(session.sessionId)
-              const statusConfig = STATUS_CONFIG[gtd.status] || STATUS_CONFIG['new']
+              const isArchived = gtd.status === 'archived'
+              const dimArchived = isArchived && filterStatus !== 'archived'
               const isSelected = selectedSessionId === session.sessionId
               const isBatchSelected = batchSelectedIds.has(session.sessionId)
               const actualIndex = sessionIndexMap.get(session.sessionId) ?? -1
@@ -178,15 +183,14 @@ export function SessionList({
                       </span>
                     )}
                     <ProviderLogo provider={session.provider} size="md" className="mt-[1px] flex-shrink-0" />
-                    <span className={`w-2.5 h-2.5 rounded-full mt-[5px] flex-shrink-0 ring-2 ring-white dark:ring-surface ${statusConfig.dotColor}`} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1">
                         {gtd.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />}
-                        <span className={`text-[13px] font-medium truncate ${isSelected ? 'text-content' : 'text-content-2'}`}>
+                        <span className={`text-[13px] font-medium truncate ${dimArchived ? 'text-content-4' : isSelected ? 'text-content' : 'text-content-2'}`}>
                           {session.title}
                         </span>
                       </div>
-                      <div className="text-[11px] text-content-4 mt-1 truncate">
+                      <div className={`text-[11px] mt-1 truncate ${dimArchived ? 'text-content-5' : 'text-content-4'}`}>
                         {relativeProjectName(session.projectName)}
                       </div>
                       {contentResults.has(session.sessionId) && (
@@ -199,6 +203,11 @@ export function SessionList({
                           <MessageSquare className="w-2.5 h-2.5" />{session.messageCount}
                         </span>
                         <span className="text-[10px] text-content-4">{formatDate(session.modified)}</span>
+                        {dimArchived && (
+                          <span className="rounded border border-edge/70 bg-surface-2 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-content-5">
+                            Archived
+                          </span>
+                        )}
                         {session.gitBranch && session.gitBranch !== 'HEAD' && (
                           <span className="text-[10px] text-content-4 flex items-center gap-0.5">
                             <GitBranch className="w-2.5 h-2.5" />{session.gitBranch}

@@ -203,11 +203,6 @@ export default function App() {
     [store.savedMessages, store.selectedSavedId]
   )
 
-  const archivedSessionIds = useMemo(
-    () => store.sessions.filter(s => store.getGTD(s.sessionId).status === 'archived').map(s => s.sessionId),
-    [store.sessions, store.getGTD]
-  )
-
   const jumpToSession = useCallback((sessionId: string) => {
     store.setView('sessions')
     store.setSelectedSavedId(null)
@@ -367,7 +362,6 @@ export default function App() {
                 loadData={store.loadData}
                 filterStatus={store.filterStatus}
                 filteredCount={store.filteredSessions.length}
-                archivedSessionIds={archivedSessionIds}
                 providerFilter={store.providerFilter}
                 setProviderFilter={store.setProviderFilter}
                 providerCounts={store.providerCounts}
@@ -397,6 +391,7 @@ export default function App() {
                 toggleBatchSelect={store.toggleBatchSelect}
                 batchSelectRange={store.batchSelectRange}
                 lastClickedIndex={store.lastClickedIndex}
+                filterStatus={store.filterStatus}
               />
             </>
           ) : store.view === 'saved' ? (

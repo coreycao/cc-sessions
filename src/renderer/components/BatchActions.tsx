@@ -18,7 +18,6 @@ interface BatchActionsProps {
   loadData: () => Promise<void>
   filterStatus: FilterView
   filteredCount: number
-  archivedSessionIds: string[]
   providerFilter: ProviderFilter
   setProviderFilter: (filter: ProviderFilter) => void
   providerCounts: Record<ProviderFilter, number>
@@ -42,13 +41,11 @@ export function BatchActions({
   loadData,
   filterStatus,
   filteredCount,
-  archivedSessionIds,
   providerFilter,
   setProviderFilter,
   providerCounts,
 }: BatchActionsProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showDeleteArchivedConfirm, setShowDeleteArchivedConfirm] = useState(false)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const [showProviderMenu, setShowProviderMenu] = useState(false)
   const tagMenuRef = useRef<HTMLDivElement>(null)
@@ -60,7 +57,6 @@ export function BatchActions({
 
   const ids = Array.from(batchSelectedIds)
   const count = ids.length
-  const archivedCount = archivedSessionIds.length
 
   const gtds = count > 0 ? ids.map(id => getGTD(id)) : []
   const allArchived = gtds.length > 0 && gtds.every(g => g.status === 'archived')
@@ -81,11 +77,6 @@ export function BatchActions({
   const confirmDelete = async () => {
     setShowDeleteConfirm(false)
     await batchDeleteSessions(batchSelectedIds)
-  }
-
-  const confirmDeleteArchived = async () => {
-    setShowDeleteArchivedConfirm(false)
-    await batchDeleteSessions(new Set(archivedSessionIds))
   }
 
   const openTagMenu = () => {
@@ -174,27 +165,13 @@ export function BatchActions({
             <button
               ref={providerBtnRef}
               onClick={openProviderMenu}
-              className={`relative z-10 inline-flex h-6 items-center gap-1 rounded-md border px-1.5 text-[11px] transition-colors ${providerFilter === 'all' ? 'border-edge/70 bg-surface text-content-4 hover:bg-surface-3 hover:text-content-2' : 'border-accent/25 bg-accent-subtle/70 text-accent hover:bg-accent-subtle'}`}
+              className={`relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border transition-colors ${providerFilter === 'all' ? 'border-edge/70 bg-surface text-content-4 hover:bg-surface-3 hover:text-content-2' : 'border-accent/25 bg-accent-subtle/70 text-accent hover:bg-accent-subtle'}`}
               title={`Filter source: ${providerLabel}`}
               aria-label={`Filter source: ${providerLabel}`}
               aria-expanded={showProviderMenu}
             >
-              {providerFilter === 'all' ? <Filter className="h-3 w-3" /> : <ProviderLogo provider={providerFilter} />}
-              <span className="max-w-[58px] truncate">{providerFilter === 'all' ? 'Source' : providerLabel}</span>
+              <Filter className="h-3.5 w-3.5" />
             </button>
-            {filterStatus === 'archived' && archivedCount > 0 && (
-              <>
-                <button
-                  onClick={() => setShowDeleteArchivedConfirm(true)}
-                  className="relative z-10 inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[11px] text-content-4 hover:bg-surface-3 hover:text-red-400 transition-colors"
-                  title="Delete all archived sessions"
-                  aria-label="Delete all archived sessions"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                  <span>Delete all</span>
-                </button>
-              </>
-            )}
           </>
         )}
       </div>
@@ -258,14 +235,6 @@ export function BatchActions({
         />
       )}
 
-      {showDeleteArchivedConfirm && (
-        <DeleteConfirmDialog
-          title="Delete All Archived Sessions"
-          message={<>Are you sure you want to permanently delete all <span className="text-content font-medium">{archivedCount} archived session{archivedCount !== 1 ? 's' : ''}</span>? This action cannot be undone.</>}
-          onConfirm={confirmDeleteArchived}
-          onCancel={() => setShowDeleteArchivedConfirm(false)}
-        />
-      )}
     </>
   )
 }

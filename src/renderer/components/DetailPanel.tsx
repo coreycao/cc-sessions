@@ -106,7 +106,7 @@ export const DetailPanel = memo(function DetailPanel({
         >
           <X className="w-4 h-4" />
         </button>
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-2" data-tauri-drag-region>
+        <div className="flex min-w-0 flex-1 items-center justify-start gap-2" data-tauri-drag-region>
           <ProviderLogo provider={selectedSession.provider} size="md" />
           <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
         </div>
