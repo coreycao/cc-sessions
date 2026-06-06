@@ -18,7 +18,9 @@ export function formatDate(dateStr: string): string {
   if (diffHours < 24) return `${diffHours}h ago`
   if (diffDays < 7) return `${diffDays}d ago`
 
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined })
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  const formatted = `${months[date.getMonth()]} ${date.getDate()}`
+  return date.getFullYear() === now.getFullYear() ? formatted : `${formatted}, ${date.getFullYear()}`
 }
 
 export function relativeProjectName(name: string): string {
