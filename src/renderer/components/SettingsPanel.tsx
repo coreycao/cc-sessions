@@ -5,6 +5,7 @@ import {
   RefreshCw, Search, Sun, Tag, type LucideIcon,
 } from 'lucide-react'
 import type { SessionInfo } from '../../shared/types'
+import type { UpdaterMockMode } from '../lib/updater'
 import type { SettingsSection } from './SettingsList'
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -25,13 +26,16 @@ interface SettingsPanelProps {
   updateVersion: string | null
   updateProgress: number | null
   updateError: string | null
+  updaterMockMode: UpdaterMockMode | null
+  setUpdaterMockMode: (mode: UpdaterMockMode) => void
   onCheckUpdate: () => Promise<void>
   onInstallUpdate: () => Promise<void>
 }
 
 export function SettingsPanel({
   section, theme, setTheme, sessions, tags, savedCount, indexReady, syncing,
-  appVersion, onSync, updateState, updateVersion, updateProgress, updateError, onCheckUpdate, onInstallUpdate,
+  appVersion, onSync, updateState, updateVersion, updateProgress, updateError,
+  updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate,
 }: SettingsPanelProps) {
   const [desktopNotifications, setDesktopNotifications] = useState(true)
   const [keepAwake, setKeepAwake] = useState(false)
@@ -92,6 +96,26 @@ export function SettingsPanel({
                   </button>
                 }
               />
+              {updaterMockMode !== null && (
+                <SettingRow
+                  title="Dev updater mock"
+                  description="Choose a local updater response for testing update UI states."
+                  control={
+                    <select
+                      value={updaterMockMode}
+                      onChange={event => setUpdaterMockMode(event.target.value as UpdaterMockMode)}
+                      className="h-8 rounded-lg border border-edge bg-surface px-2 text-[12px] font-medium text-content-2 shadow-sm outline-none hover:bg-surface-2"
+                    >
+                      <option value="available">Update available</option>
+                      <option value="current">Up to date</option>
+                      <option value="timeout">Check timeout</option>
+                      <option value="error">Check failed</option>
+                      <option value="download-error">Download failed</option>
+                      <option value="real">Real updater</option>
+                    </select>
+                  }
+                />
+              )}
             </SettingsGroup>
           </SettingsContent>
         )}

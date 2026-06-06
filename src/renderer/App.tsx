@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { getVersion } from '@tauri-apps/api/app'
-import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown } from 'lucide-react'
 import { useStore } from './hooks/useStore'
@@ -15,22 +14,15 @@ import { SettingsList, type SettingsSection } from './components/SettingsList'
 import { SettingsPanel, type Theme, type UpdateState } from './components/SettingsPanel'
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
-
-const UPDATE_CHECK_TIMEOUT_MS = 20_000
+import {
+  checkForUpdate, getInitialUpdaterMockMode, installUpdate, saveUpdaterMockMode,
+  type AppUpdate, type UpdaterMockMode,
+} from './lib/updater'
 
 function projectDisplayName(projectPath: string | null): string {
   if (!projectPath) return 'All Projects'
   const segments = projectPath.split('/').filter(Boolean)
   return segments.at(-1) || projectPath
-}
-
-function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => {
-      window.setTimeout(() => reject(new Error(message)), timeoutMs)
-    }),
-  ])
 }
 
 export default function App() {
@@ -46,13 +38,24 @@ export default function App() {
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
   const [updateError, setUpdateError] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState('dev')
+  const [updaterMockMode, setUpdaterMockModeState] = useState<UpdaterMockMode | null>(() => getInitialUpdaterMockMode())
   const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
   const searchRef = useRef<HTMLInputElement>(null)
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
-  const updateRef = useRef<Update | null>(null)
+  const updateRef = useRef<AppUpdate | null>(null)
   const updateCheckSeq = useRef(0)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system')
+
+  const setUpdaterMockMode = useCallback((mode: UpdaterMockMode) => {
+    saveUpdaterMockMode(mode)
+    setUpdaterMockModeState(mode)
+    updateRef.current = null
+    setUpdateState('idle')
+    setUpdateVersion(null)
+    setUpdateProgress(null)
+    setUpdateError(null)
+  }, [])
 
   const handleSync = useCallback(async () => {
     setSyncing(true)
@@ -65,11 +68,7 @@ export default function App() {
     setUpdateError(null)
     setUpdateProgress(null)
     try {
-      const update = await withTimeout(
-        check(),
-        UPDATE_CHECK_TIMEOUT_MS,
-        'Update check timed out. Check your network connection and try again.'
-      )
+      const update = await checkForUpdate(updaterMockMode)
       if (seq !== updateCheckSeq.current) return
       updateRef.current = update
       if (update) {
@@ -91,18 +90,14 @@ export default function App() {
         store.addToast(message)
       }
     }
-  }, [store.addToast])
+  }, [store.addToast, updaterMockMode])
 
   const handleInstallUpdate = useCallback(async () => {
     let update = updateRef.current
     if (!update) {
       setUpdateState('checking')
       setUpdateError(null)
-      update = await withTimeout(
-        check(),
-        UPDATE_CHECK_TIMEOUT_MS,
-        'Update check timed out. Check your network connection and try again.'
-      )
+      update = await checkForUpdate(updaterMockMode)
       updateRef.current = update
     }
     if (!update) {
@@ -118,7 +113,7 @@ export default function App() {
     let total: number | null = null
 
     try {
-      await update.downloadAndInstall((event: DownloadEvent) => {
+      const result = await installUpdate(update, event => {
         if (event.event === 'Started') {
           total = event.data.contentLength ?? null
           downloaded = 0
@@ -131,14 +126,19 @@ export default function App() {
         }
       })
       setUpdateState('ready')
-      await relaunch()
+      if (result.shouldRelaunch) {
+        await relaunch()
+      } else {
+        store.addToast(`Mock update ${update.version} installed`, 'success')
+        setUpdateState('current')
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to install update'
       setUpdateState('error')
       setUpdateError(message)
       store.addToast(message)
     }
-  }, [store.addToast])
+  }, [store.addToast, updaterMockMode])
 
   useEffect(() => {
     if (import.meta.env.PROD) {
@@ -515,6 +515,8 @@ export default function App() {
             updateVersion={updateVersion}
             updateProgress={updateProgress}
             updateError={updateError}
+            updaterMockMode={updaterMockMode}
+            setUpdaterMockMode={setUpdaterMockMode}
             onCheckUpdate={handleCheckUpdate}
             onInstallUpdate={handleInstallUpdate}
           />

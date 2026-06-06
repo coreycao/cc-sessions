@@ -13,6 +13,7 @@ All notable changes to CC Sessions are documented here.
 - Limited release packaging to macOS Intel and Apple Silicon while Linux and Windows support remains under adaptation.
 - Display the runtime app version in settings instead of a hard-coded version label.
 - Added timeout handling and inline status text for update checks so the UI returns to a retryable state when GitHub release metadata cannot be reached.
+- Added a dev-only updater mock selector for testing available, current, timeout, check-failure, and download-failure update states without publishing release builds.
 
 ### Notes
 
