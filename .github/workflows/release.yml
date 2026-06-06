@@ -55,8 +55,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Test
-        run: pnpm test
+      - name: Frontend tests
+        timeout-minutes: 10
+        run: pnpm test:frontend
+
+      - name: Rust tests
+        timeout-minutes: 15
+        run: pnpm test:rust
 
       - name: Load release notes
         id: release-notes
