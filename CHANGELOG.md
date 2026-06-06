@@ -2,6 +2,19 @@
 
 All notable changes to CC Sessions are documented here.
 
+## [1.0.1] - 2026-06-06
+
+### Fixed
+
+- Enabled Tauri updater artifact generation so release builds include signed updater metadata.
+- Stabilized CI by avoiding platform-dependent date formatting in frontend tests.
+- Stabilized Rust persistence tests by making temporary test paths unique within each test process.
+- Simplified the release workflow to rely on Tauri's native updater metadata generation.
+
+### Notes
+
+- This release is intended to validate in-app updates from v1.0.0 to v1.0.1.
+
 ## [1.0.0] - 2026-06-05
 
 ### Added
