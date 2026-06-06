@@ -12,6 +12,7 @@ All notable changes to CC Sessions are documented here.
 - Simplified the release workflow to rely on Tauri's native updater metadata generation.
 - Limited release packaging to macOS Intel and Apple Silicon while Linux and Windows support remains under adaptation.
 - Display the runtime app version in settings instead of a hard-coded version label.
+- Added timeout handling and inline status text for update checks so the UI returns to a retryable state when GitHub release metadata cannot be reached.
 
 ### Notes
 
@@ -27,6 +28,7 @@ All notable changes to CC Sessions are documented here.
 - Organize sessions with GTD status, tags, notes, starring, saved messages, and archived-session bulk actions.
 - Resume supported sessions through the matching CLI.
 - Check for signed GitHub release updates from the app and install them in place.
+- Show visible update-check status and retry guidance when release metadata is slow or unreachable.
 - Build and test with GitHub Actions, including signed release artifacts and updater metadata.
 
 ### Notes

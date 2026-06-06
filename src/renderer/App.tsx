@@ -16,10 +16,21 @@ import { SettingsPanel, type Theme, type UpdateState } from './components/Settin
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
+const UPDATE_CHECK_TIMEOUT_MS = 20_000
+
 function projectDisplayName(projectPath: string | null): string {
   if (!projectPath) return 'All Projects'
   const segments = projectPath.split('/').filter(Boolean)
   return segments.at(-1) || projectPath
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(message)), timeoutMs)
+    }),
+  ])
 }
 
 export default function App() {
@@ -33,12 +44,14 @@ export default function App() {
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
+  const [updateError, setUpdateError] = useState<string | null>(null)
   const [appVersion, setAppVersion] = useState('dev')
   const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
   const searchRef = useRef<HTMLInputElement>(null)
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
   const updateRef = useRef<Update | null>(null)
+  const updateCheckSeq = useRef(0)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system')
 
   const handleSync = useCallback(async () => {
@@ -47,10 +60,17 @@ export default function App() {
   }, [store.loadData])
 
   const handleCheckUpdate = useCallback(async (silent = false) => {
+    const seq = ++updateCheckSeq.current
     setUpdateState('checking')
+    setUpdateError(null)
     setUpdateProgress(null)
     try {
-      const update = await check()
+      const update = await withTimeout(
+        check(),
+        UPDATE_CHECK_TIMEOUT_MS,
+        'Update check timed out. Check your network connection and try again.'
+      )
+      if (seq !== updateCheckSeq.current) return
       updateRef.current = update
       if (update) {
         setUpdateVersion(update.version)
@@ -62,9 +82,13 @@ export default function App() {
         if (!silent) store.addToast('CC Sessions is up to date', 'success')
       }
     } catch (error) {
+      if (seq !== updateCheckSeq.current) return
+      const message = error instanceof Error ? error.message : 'Failed to check for updates'
       setUpdateState('error')
+      setUpdateVersion(null)
+      setUpdateError(message)
       if (!silent) {
-        store.addToast(error instanceof Error ? error.message : 'Failed to check for updates')
+        store.addToast(message)
       }
     }
   }, [store.addToast])
@@ -73,7 +97,12 @@ export default function App() {
     let update = updateRef.current
     if (!update) {
       setUpdateState('checking')
-      update = await check()
+      setUpdateError(null)
+      update = await withTimeout(
+        check(),
+        UPDATE_CHECK_TIMEOUT_MS,
+        'Update check timed out. Check your network connection and try again.'
+      )
       updateRef.current = update
     }
     if (!update) {
@@ -83,6 +112,7 @@ export default function App() {
     }
 
     setUpdateState('downloading')
+    setUpdateError(null)
     setUpdateProgress(null)
     let downloaded = 0
     let total: number | null = null
@@ -103,8 +133,10 @@ export default function App() {
       setUpdateState('ready')
       await relaunch()
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to install update'
       setUpdateState('error')
-      store.addToast(error instanceof Error ? error.message : 'Failed to install update')
+      setUpdateError(message)
+      store.addToast(message)
     }
   }, [store.addToast])
 
@@ -482,6 +514,7 @@ export default function App() {
             updateState={updateState}
             updateVersion={updateVersion}
             updateProgress={updateProgress}
+            updateError={updateError}
             onCheckUpdate={handleCheckUpdate}
             onInstallUpdate={handleInstallUpdate}
           />

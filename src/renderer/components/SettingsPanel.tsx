@@ -24,13 +24,14 @@ interface SettingsPanelProps {
   updateState: UpdateState
   updateVersion: string | null
   updateProgress: number | null
+  updateError: string | null
   onCheckUpdate: () => Promise<void>
   onInstallUpdate: () => Promise<void>
 }
 
 export function SettingsPanel({
   section, theme, setTheme, sessions, tags, savedCount, indexReady, syncing,
-  appVersion, onSync, updateState, updateVersion, updateProgress, onCheckUpdate, onInstallUpdate,
+  appVersion, onSync, updateState, updateVersion, updateProgress, updateError, onCheckUpdate, onInstallUpdate,
 }: SettingsPanelProps) {
   const [desktopNotifications, setDesktopNotifications] = useState(true)
   const [keepAwake, setKeepAwake] = useState(false)
@@ -38,6 +39,7 @@ export function SettingsPanel({
   const [backgroundIndexing, setBackgroundIndexing] = useState(true)
 
   const updateLabel = getUpdateLabel(updateState, updateVersion, updateProgress)
+  const updateDescription = getUpdateDescription(updateState, updateVersion, updateError)
   const updateBusy = updateState === 'checking' || updateState === 'downloading'
   const claudeCount = sessions.filter(s => s.provider === 'claude').length
   const codexCount = sessions.filter(s => s.provider === 'codex').length
@@ -78,7 +80,7 @@ export function SettingsPanel({
               />
               <SettingRow
                 title="Check for updates"
-                description={updateState === 'current' ? 'You are running the latest available version.' : 'Use the built-in updater to download signed releases.'}
+                description={updateDescription}
                 control={
                   <button
                     onClick={updateState === 'available' ? onInstallUpdate : onCheckUpdate}
@@ -346,5 +348,16 @@ function getUpdateLabel(state: UpdateState, version: string | null, progress: nu
   if (state === 'downloading') return progress == null ? 'Downloading' : `${progress}%`
   if (state === 'ready') return 'Restarting'
   if (state === 'current') return 'Up to date'
+  if (state === 'error') return 'Try again'
   return 'Check now'
+}
+
+function getUpdateDescription(state: UpdateState, version: string | null, error: string | null): string {
+  if (state === 'checking') return 'Checking GitHub Releases for a signed update.'
+  if (state === 'available') return `Version ${version ?? 'update'} is available and ready to install.`
+  if (state === 'downloading') return 'Downloading and installing the signed update.'
+  if (state === 'ready') return 'The update is installed and the app is restarting.'
+  if (state === 'current') return 'You are running the latest available version.'
+  if (state === 'error') return error ?? 'The update check failed. Try again.'
+  return 'Use the built-in updater to download signed releases.'
 }
