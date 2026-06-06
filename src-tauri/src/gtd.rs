@@ -431,12 +431,17 @@ mod tests {
     use super::*;
     use crate::models::{GtdMetadata, SessionCacheEntry, SessionInfo};
     use std::collections::HashMap;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::time::{Duration, UNIX_EPOCH};
 
+    static NEXT_TEMP_ID: AtomicUsize = AtomicUsize::new(0);
+
     fn unique_temp_path(file_name: &str) -> PathBuf {
+        let id = NEXT_TEMP_ID.fetch_add(1, Ordering::Relaxed);
         let unique = format!(
-            "cc-sessions-test-{}-{}",
+            "cc-sessions-test-{}-{}-{}",
             std::process::id(),
+            id,
             std::time::SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
