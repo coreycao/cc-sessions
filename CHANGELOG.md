@@ -10,6 +10,8 @@ All notable changes to CC Sessions are documented here.
 - Stabilized CI by avoiding platform-dependent date formatting in frontend tests.
 - Stabilized Rust persistence tests by making temporary test paths unique within each test process.
 - Simplified the release workflow to rely on Tauri's native updater metadata generation.
+- Limited release packaging to macOS Intel and Apple Silicon while Linux and Windows support remains under adaptation.
+- Display the runtime app version in settings instead of a hard-coded version label.
 
 ### Notes
 
@@ -29,4 +31,4 @@ All notable changes to CC Sessions are documented here.
 
 ### Notes
 
-- This is the first public release. Future versions can update from this build through the in-app updater.
+- This is the first public macOS release. Future versions can update from this build through the in-app updater.

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { getVersion } from '@tauri-apps/api/app'
 import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown } from 'lucide-react'
@@ -32,6 +33,7 @@ export default function App() {
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
+  const [appVersion, setAppVersion] = useState('dev')
   const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
   const searchRef = useRef<HTMLInputElement>(null)
   const projectBtnRef = useRef<HTMLButtonElement>(null)
@@ -111,6 +113,12 @@ export default function App() {
       handleCheckUpdate(true)
     }
   }, [handleCheckUpdate])
+
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => setAppVersion('dev'))
+  }, [])
 
   const toggleProjectMenu = useCallback(() => {
     const rect = projectBtnRef.current?.getBoundingClientRect()
@@ -469,6 +477,7 @@ export default function App() {
             savedCount={store.savedMessages.length}
             indexReady={store.indexReady}
             syncing={syncing}
+            appVersion={appVersion}
             onSync={handleSync}
             updateState={updateState}
             updateVersion={updateVersion}

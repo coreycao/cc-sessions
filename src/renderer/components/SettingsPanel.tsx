@@ -19,6 +19,7 @@ interface SettingsPanelProps {
   savedCount: number
   indexReady: boolean
   syncing: boolean
+  appVersion: string
   onSync: () => Promise<void>
   updateState: UpdateState
   updateVersion: string | null
@@ -29,7 +30,7 @@ interface SettingsPanelProps {
 
 export function SettingsPanel({
   section, theme, setTheme, sessions, tags, savedCount, indexReady, syncing,
-  onSync, updateState, updateVersion, updateProgress, onCheckUpdate, onInstallUpdate,
+  appVersion, onSync, updateState, updateVersion, updateProgress, onCheckUpdate, onInstallUpdate,
 }: SettingsPanelProps) {
   const [desktopNotifications, setDesktopNotifications] = useState(true)
   const [keepAwake, setKeepAwake] = useState(false)
@@ -73,7 +74,7 @@ export function SettingsPanel({
               <SettingRow
                 title="Version"
                 description="CC Sessions desktop application"
-                control={<span className="text-[13px] text-content-4">1.0.0</span>}
+                control={<span className="text-[13px] text-content-4">{appVersion}</span>}
               />
               <SettingRow
                 title="Check for updates"

@@ -16,22 +16,22 @@ permissions:
 
 jobs:
   build:
-    name: Build ${{ matrix.platform }}
-    runs-on: ${{ matrix.platform }}
+    name: Build ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-22.04, windows-latest]
+        include:
+          - label: macOS Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - label: macOS Apple Silicon
+            runner: macos-latest
+            target: aarch64-apple-darwin
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -46,6 +46,8 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
       - name: Cache Rust
         uses: Swatinem/rust-cache@v2
@@ -96,7 +98,7 @@ jobs:
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
-          updaterJsonPreferNsis: true
+          args: --target ${{ matrix.target }}
 
       - name: Upload updater signatures
         shell: bash
@@ -106,4 +108,4 @@ jobs:
         run: |
           while IFS= read -r -d '' sig; do
             gh release upload "$TAG_NAME" "$sig" --repo "$GITHUB_REPOSITORY" --clobber
-          done < <(find src-tauri/target/release/bundle -name '*.sig' -print0)
+          done < <(find src-tauri/target -path '*/release/bundle/*' -name '*.sig' -print0)
