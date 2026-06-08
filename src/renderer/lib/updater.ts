@@ -9,7 +9,8 @@ export const DEV_UPDATER_MOCK_KEY = 'cc-sessions:update-mock'
 const DEFAULT_DEV_MOCK_MODE: UpdaterMockMode = 'available'
 const DEV_MOCK_VERSION = '1.0.1'
 
-export const UPDATE_CHECK_TIMEOUT_MS = import.meta.env.DEV ? 1_500 : 20_000
+export const UPDATE_CHECK_TIMEOUT_MS = import.meta.env.DEV ? 1_500 : 10_000
+export const UPDATE_CHECK_TIMEOUT_MESSAGE = 'Update check timed out. Check your network connection or proxy settings and try again.'
 
 export function getInitialUpdaterMockMode(): UpdaterMockMode | null {
   if (!import.meta.env.DEV) return null
@@ -37,7 +38,7 @@ export async function checkForUpdate(
   return withTimeout(
     checkForUpdateWithoutTimeout(mode),
     timeoutMs,
-    'Update check timed out. Check your network connection and try again.'
+    UPDATE_CHECK_TIMEOUT_MESSAGE
   )
 }
 

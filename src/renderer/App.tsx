@@ -16,6 +16,7 @@ import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import {
   checkForUpdate, getInitialUpdaterMockMode, installUpdate, saveUpdaterMockMode,
+  UPDATE_CHECK_TIMEOUT_MESSAGE, UPDATE_CHECK_TIMEOUT_MS,
   type AppUpdate, type UpdaterMockMode,
 } from './lib/updater'
 
@@ -44,7 +45,15 @@ export default function App() {
   const projectMenuRef = useRef<HTMLDivElement>(null)
   const updateRef = useRef<AppUpdate | null>(null)
   const updateCheckSeq = useRef(0)
+  const updateCheckTimeoutRef = useRef<number | null>(null)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system')
+
+  const clearUpdateCheckTimeout = useCallback(() => {
+    if (updateCheckTimeoutRef.current !== null) {
+      window.clearTimeout(updateCheckTimeoutRef.current)
+      updateCheckTimeoutRef.current = null
+    }
+  }, [])
 
   const setUpdaterMockMode = useCallback((mode: UpdaterMockMode) => {
     saveUpdaterMockMode(mode)
@@ -58,12 +67,26 @@ export default function App() {
 
   const handleCheckUpdate = useCallback(async (silent = false) => {
     const seq = ++updateCheckSeq.current
+    clearUpdateCheckTimeout()
     setUpdateState('checking')
     setUpdateError(null)
     setUpdateProgress(null)
+    updateCheckTimeoutRef.current = window.setTimeout(() => {
+      if (seq !== updateCheckSeq.current) return
+      updateCheckSeq.current += 1
+      updateCheckTimeoutRef.current = null
+      updateRef.current = null
+      setUpdateState('error')
+      setUpdateVersion(null)
+      setUpdateProgress(null)
+      setUpdateError(UPDATE_CHECK_TIMEOUT_MESSAGE)
+      if (!silent) store.addToast(UPDATE_CHECK_TIMEOUT_MESSAGE)
+    }, UPDATE_CHECK_TIMEOUT_MS + 500)
+
     try {
       const update = await checkForUpdate(updaterMockMode)
       if (seq !== updateCheckSeq.current) return
+      clearUpdateCheckTimeout()
       updateRef.current = update
       if (update) {
         setUpdateVersion(update.version)
@@ -76,6 +99,7 @@ export default function App() {
       }
     } catch (error) {
       if (seq !== updateCheckSeq.current) return
+      clearUpdateCheckTimeout()
       const message = error instanceof Error ? error.message : 'Failed to check for updates'
       setUpdateState('error')
       setUpdateVersion(null)
@@ -84,7 +108,7 @@ export default function App() {
         store.addToast(message)
       }
     }
-  }, [store.addToast, updaterMockMode])
+  }, [clearUpdateCheckTimeout, store.addToast, updaterMockMode])
 
   const handleInstallUpdate = useCallback(async () => {
     let update = updateRef.current
@@ -139,6 +163,8 @@ export default function App() {
       handleCheckUpdate(true)
     }
   }, [handleCheckUpdate])
+
+  useEffect(() => clearUpdateCheckTimeout, [clearUpdateCheckTimeout])
 
   useEffect(() => {
     getVersion()

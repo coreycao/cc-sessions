@@ -25,6 +25,8 @@ pub fn run() {
         )
         .init();
 
+    configure_system_proxy_env();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -175,4 +177,76 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(target_os = "macos")]
+fn configure_system_proxy_env() {
+    if std::env::var_os("HTTPS_PROXY").is_some() || std::env::var_os("https_proxy").is_some() {
+        return;
+    }
+
+    let output = match std::process::Command::new("scutil").arg("--proxy").output() {
+        Ok(output) if output.status.success() => output,
+        Ok(output) => {
+            tracing::warn!("scutil --proxy failed with status {}", output.status);
+            return;
+        }
+        Err(error) => {
+            tracing::warn!("Failed to read macOS proxy settings: {error}");
+            return;
+        }
+    };
+
+    let text = String::from_utf8_lossy(&output.stdout);
+    if let Some(proxy) = parse_scutil_proxy(&text) {
+        std::env::set_var("HTTPS_PROXY", &proxy);
+        std::env::set_var("https_proxy", &proxy);
+        std::env::set_var("HTTP_PROXY", &proxy);
+        std::env::set_var("http_proxy", &proxy);
+        tracing::info!("Configured updater proxy from macOS system settings");
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn configure_system_proxy_env() {}
+
+#[cfg(target_os = "macos")]
+fn parse_scutil_proxy(text: &str) -> Option<String> {
+    let enabled = proxy_value(text, "HTTPSEnable").or_else(|| proxy_value(text, "HTTPEnable"))?;
+    if enabled != "1" {
+        return None;
+    }
+
+    let host = proxy_value(text, "HTTPSProxy").or_else(|| proxy_value(text, "HTTPProxy"))?;
+    let port = proxy_value(text, "HTTPSPort").or_else(|| proxy_value(text, "HTTPPort"))?;
+    Some(format!("http://{host}:{port}"))
+}
+
+#[cfg(target_os = "macos")]
+fn proxy_value(text: &str, key: &str) -> Option<String> {
+    text.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        (name.trim() == key).then(|| value.trim().to_string())
+    })
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    use super::parse_scutil_proxy;
+
+    #[test]
+    fn parses_macos_https_proxy() {
+        let proxy = parse_scutil_proxy(
+            r#"<dictionary> {
+  HTTPEnable : 1
+  HTTPPort : 7890
+  HTTPProxy : 127.0.0.1
+  HTTPSEnable : 1
+  HTTPSPort : 7890
+  HTTPSProxy : 127.0.0.1
+}"#,
+        );
+
+        assert_eq!(proxy.as_deref(), Some("http://127.0.0.1:7890"));
+    }
 }
