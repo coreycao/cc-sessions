@@ -44,6 +44,7 @@ export default function App() {
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
   const updateRef = useRef<AppUpdate | null>(null)
+  const updateReadyShouldRelaunchRef = useRef(false)
   const updateCheckSeq = useRef(0)
   const updateCheckTimeoutRef = useRef<number | null>(null)
   const [theme, setTheme] = useState<Theme>(() => (localStorage.getItem('theme') as Theme) || 'system')
@@ -59,6 +60,7 @@ export default function App() {
     saveUpdaterMockMode(mode)
     setUpdaterMockModeState(mode)
     updateRef.current = null
+    updateReadyShouldRelaunchRef.current = false
     setUpdateState('idle')
     setUpdateVersion(null)
     setUpdateProgress(null)
@@ -71,11 +73,13 @@ export default function App() {
     setUpdateState('checking')
     setUpdateError(null)
     setUpdateProgress(null)
+    updateReadyShouldRelaunchRef.current = false
     updateCheckTimeoutRef.current = window.setTimeout(() => {
       if (seq !== updateCheckSeq.current) return
       updateCheckSeq.current += 1
       updateCheckTimeoutRef.current = null
       updateRef.current = null
+      updateReadyShouldRelaunchRef.current = false
       setUpdateState('error')
       setUpdateVersion(null)
       setUpdateProgress(null)
@@ -88,6 +92,7 @@ export default function App() {
       if (seq !== updateCheckSeq.current) return
       clearUpdateCheckTimeout()
       updateRef.current = update
+      updateReadyShouldRelaunchRef.current = false
       if (update) {
         setUpdateVersion(update.version)
         setUpdateState('available')
@@ -115,6 +120,7 @@ export default function App() {
     if (!update) {
       setUpdateState('checking')
       setUpdateError(null)
+      updateReadyShouldRelaunchRef.current = false
       update = await checkForUpdate(updaterMockMode)
       updateRef.current = update
     }
@@ -144,12 +150,8 @@ export default function App() {
         }
       })
       setUpdateState('ready')
-      if (result.shouldRelaunch) {
-        await relaunch()
-      } else {
-        store.addToast(`Mock update ${update.version} installed`, 'success')
-        setUpdateState('current')
-      }
+      updateReadyShouldRelaunchRef.current = result.shouldRelaunch
+      store.addToast(`Update ${update.version} is ready. Restart to finish installing.`, 'success')
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to install update'
       setUpdateState('error')
@@ -157,6 +159,21 @@ export default function App() {
       store.addToast(message)
     }
   }, [store.addToast, updaterMockMode])
+
+  const handleRestartUpdate = useCallback(async () => {
+    if (updateState !== 'ready') return
+
+    if (updateReadyShouldRelaunchRef.current) {
+      await relaunch()
+      return
+    }
+
+    const version = updateRef.current?.version
+    store.addToast(`Mock update ${version ?? 'update'} completed`, 'success')
+    setUpdateState('current')
+    updateReadyShouldRelaunchRef.current = false
+    updateRef.current = null
+  }, [store.addToast, updateState])
 
   useEffect(() => {
     if (import.meta.env.PROD) {
@@ -533,6 +550,7 @@ export default function App() {
             setUpdaterMockMode={setUpdaterMockMode}
             onCheckUpdate={handleCheckUpdate}
             onInstallUpdate={handleInstallUpdate}
+            onRestartUpdate={handleRestartUpdate}
           />
         )}
       </div>

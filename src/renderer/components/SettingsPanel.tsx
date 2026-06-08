@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import {
-  CheckCircle2, Download, LoaderCircle, Monitor, Moon, MoreHorizontal,
+  CheckCircle2, Download, LoaderCircle, Monitor, Moon, MoreHorizontal, RefreshCw,
   Sun, type LucideIcon,
 } from 'lucide-react'
 import type { UpdaterMockMode } from '../lib/updater'
@@ -22,15 +22,21 @@ interface SettingsPanelProps {
   setUpdaterMockMode: (mode: UpdaterMockMode) => void
   onCheckUpdate: () => Promise<void>
   onInstallUpdate: () => Promise<void>
+  onRestartUpdate: () => Promise<void>
 }
 
 export function SettingsPanel({
   section, theme, setTheme, appVersion, updateState, updateVersion, updateProgress, updateError,
-  updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate,
+  updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
 }: SettingsPanelProps) {
   const updateLabel = getUpdateLabel(updateState, updateVersion, updateProgress)
   const updateDescription = getUpdateDescription(updateState, updateVersion, updateError)
   const updateBusy = updateState === 'checking' || updateState === 'downloading'
+  const onUpdateAction = updateState === 'available'
+    ? onInstallUpdate
+    : updateState === 'ready'
+      ? onRestartUpdate
+      : onCheckUpdate
 
   return (
     <div className="flex flex-1 min-w-0 flex-col rounded-xl border border-edge/70 bg-surface shadow-sm overflow-hidden">
@@ -55,11 +61,11 @@ export function SettingsPanel({
                 description={updateDescription}
                 control={
                   <button
-                    onClick={updateState === 'available' ? onInstallUpdate : onCheckUpdate}
+                    onClick={onUpdateAction}
                     disabled={updateBusy}
                     className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
                   >
-                    {updateState === 'current' ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : updateBusy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
+                    {getUpdateIcon(updateState)}
                     {updateLabel}
                   </button>
                 }
@@ -165,9 +171,9 @@ function ThemePicker({ value, onChange }: { value: Theme; onChange: (theme: Them
 
 function getUpdateLabel(state: UpdateState, version: string | null, progress: number | null): string {
   if (state === 'checking') return 'Checking'
-  if (state === 'available') return `Install ${version ?? 'update'}`
+  if (state === 'available') return `Download ${version ?? 'update'}`
   if (state === 'downloading') return progress == null ? 'Downloading' : `${progress}%`
-  if (state === 'ready') return 'Restarting'
+  if (state === 'ready') return 'Restart to update'
   if (state === 'current') return 'Up to date'
   if (state === 'error') return 'Try again'
   return 'Check now'
@@ -175,10 +181,17 @@ function getUpdateLabel(state: UpdateState, version: string | null, progress: nu
 
 function getUpdateDescription(state: UpdateState, version: string | null, error: string | null): string {
   if (state === 'checking') return 'Checking GitHub Releases for a signed update.'
-  if (state === 'available') return `Version ${version ?? 'update'} is available and ready to install.`
-  if (state === 'downloading') return 'Downloading and installing the signed update.'
-  if (state === 'ready') return 'The update is installed and the app is restarting.'
+  if (state === 'available') return `Version ${version ?? 'update'} is available. Download it now and restart later.`
+  if (state === 'downloading') return 'Downloading and preparing the signed update. The app will not restart yet.'
+  if (state === 'ready') return `Version ${version ?? 'update'} is ready. Restart CC Sessions when you are ready.`
   if (state === 'current') return 'You are running the latest available version.'
   if (state === 'error') return error ?? 'The update check failed. Try again.'
   return 'Use the built-in updater to download signed releases.'
+}
+
+function getUpdateIcon(state: UpdateState) {
+  if (state === 'current') return <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+  if (state === 'checking' || state === 'downloading') return <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+  if (state === 'ready') return <RefreshCw className="h-3.5 w-3.5" />
+  return <Download className="h-3.5 w-3.5" />
 }
