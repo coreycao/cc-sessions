@@ -25,9 +25,6 @@ jobs:
           - label: macOS Intel
             runner: macos-15-intel
             target: x86_64-apple-darwin
-          - label: macOS Apple Silicon
-            runner: macos-latest
-            target: aarch64-apple-darwin
 
     steps:
       - name: Checkout
@@ -95,7 +92,7 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
           releaseName: CC Sessions ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
           releaseBody: ${{ steps.release-notes.outputs.body }}
-          releaseDraft: true
+          releaseDraft: false
           prerelease: false
           includeUpdaterJson: true
           args: --target ${{ matrix.target }}
