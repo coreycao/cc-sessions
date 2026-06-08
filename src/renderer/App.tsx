@@ -32,7 +32,6 @@ export default function App() {
   const [isResizing, setIsResizing] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('app')
-  const [syncing, setSyncing] = useState(false)
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
@@ -56,11 +55,6 @@ export default function App() {
     setUpdateProgress(null)
     setUpdateError(null)
   }, [])
-
-  const handleSync = useCallback(async () => {
-    setSyncing(true)
-    try { await store.loadData() } finally { setSyncing(false) }
-  }, [store.loadData])
 
   const handleCheckUpdate = useCallback(async (silent = false) => {
     const seq = ++updateCheckSeq.current
@@ -504,13 +498,7 @@ export default function App() {
             section={settingsSection}
             theme={theme}
             setTheme={setTheme}
-            sessions={store.sessions}
-            tags={store.allTags}
-            savedCount={store.savedMessages.length}
-            indexReady={store.indexReady}
-            syncing={syncing}
             appVersion={appVersion}
-            onSync={handleSync}
             updateState={updateState}
             updateVersion={updateVersion}
             updateProgress={updateProgress}

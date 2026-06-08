@@ -1,18 +1,8 @@
-import {
-  Bell, Bot, Brush, Keyboard, Network,
-  Shield, Tags, Database, Zap, type LucideIcon,
-} from 'lucide-react'
+import { Bell, Brush, type LucideIcon } from 'lucide-react'
 
 export type SettingsSection =
   | 'app'
   | 'appearance'
-  | 'data'
-  | 'ai'
-  | 'permissions'
-  | 'tags'
-  | 'shortcuts'
-  | 'network'
-  | 'automation'
 
 interface SettingsListProps {
   selected: SettingsSection
@@ -20,15 +10,8 @@ interface SettingsListProps {
 }
 
 const ITEMS: { id: SettingsSection; icon: LucideIcon; label: string; description: string }[] = [
-  { id: 'app', icon: Bell, label: 'App', description: 'Notifications and updates' },
-  { id: 'appearance', icon: Brush, label: 'Appearance', description: 'Theme, type, layout' },
-  { id: 'data', icon: Database, label: 'Data Sources', description: 'Claude and Codex sessions' },
-  { id: 'ai', icon: Bot, label: 'AI', description: 'Models, thinking, connections' },
-  { id: 'permissions', icon: Shield, label: 'Permissions', description: 'Local access boundaries' },
-  { id: 'tags', icon: Tags, label: 'Tags', description: 'Organize session tags' },
-  { id: 'shortcuts', icon: Keyboard, label: 'Shortcuts', description: 'Keyboard commands' },
-  { id: 'network', icon: Network, label: 'Network', description: 'Proxy and update access' },
-  { id: 'automation', icon: Zap, label: 'Automation', description: 'Indexing and background work' },
+  { id: 'app', icon: Bell, label: 'App', description: 'Version and updates' },
+  { id: 'appearance', icon: Brush, label: 'Appearance', description: 'Theme' },
 ]
 
 export function SettingsList({ selected, onSelect }: SettingsListProps) {
