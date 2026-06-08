@@ -60,6 +60,8 @@ UPDATER_E2E_NEW_VERSION=1.0.1
 UPDATER_E2E_TARGET=x86_64-apple-darwin
 ```
 
+Use `UPDATER_E2E_TARGET=aarch64-apple-darwin` on an Apple Silicon Mac to prepare and test native arm64 updater metadata.
+
 To only build and prepare the local artifacts without opening the app or starting the local server:
 
 ```bash

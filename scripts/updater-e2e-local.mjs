@@ -17,6 +17,7 @@ const oldVersion = process.env.UPDATER_E2E_OLD_VERSION || '1.0.0'
 const newVersion = process.env.UPDATER_E2E_NEW_VERSION || '1.0.1'
 const prepareOnly = process.argv.includes('--prepare-only')
 const servePrepared = process.argv.includes('--serve-prepared')
+const platformKeys = updaterPlatformKeys(target)
 
 function usage() {
   console.log(`Usage: pnpm updater:e2e:local [options]
@@ -39,6 +40,7 @@ Environment:
   UPDATER_E2E_OLD_VERSION               Old app version, default ${oldVersion}
   UPDATER_E2E_NEW_VERSION               Update version, default ${newVersion}
   UPDATER_E2E_TARGET                    Build target, default ${target}
+                                       Supported: x86_64-apple-darwin, aarch64-apple-darwin
 `)
 }
 
@@ -76,6 +78,12 @@ function signingEnv() {
     fail('missing .tauri-keys/updater.key; generate one with `pnpm tauri signer generate --ci --write-keys .tauri-keys/updater.key`')
   }
   return { TAURI_SIGNING_PRIVATE_KEY: readFileSync(keyPath, 'utf8') }
+}
+
+function updaterPlatformKeys(buildTarget) {
+  if (buildTarget === 'x86_64-apple-darwin') return ['darwin-x86_64', 'darwin-x86_64-app']
+  if (buildTarget === 'aarch64-apple-darwin') return ['darwin-aarch64', 'darwin-aarch64-app']
+  fail(`unsupported local updater E2E target: ${buildTarget}`)
 }
 
 function configPath(version) {
@@ -146,16 +154,12 @@ function prepareServerArtifacts() {
     version: newVersion,
     notes: 'Local updater E2E build.',
     pub_date: new Date().toISOString(),
-    platforms: {
-      'darwin-x86_64': {
+    platforms: Object.fromEntries(
+      platformKeys.map(platform => [platform, {
         signature: readFileSync(signature, 'utf8').trim(),
         url: `http://${host}:${port}/${encodeURIComponent(tarName)}`,
-      },
-      'darwin-x86_64-app': {
-        signature: readFileSync(signature, 'utf8').trim(),
-        url: `http://${host}:${port}/${encodeURIComponent(tarName)}`,
-      },
-    },
+      }])
+    ),
   }
   writeFileSync(join(serverDir, 'latest.json'), `${JSON.stringify(latest, null, 2)}\n`)
 }

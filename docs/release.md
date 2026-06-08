@@ -13,7 +13,7 @@ Do not keep long-lived `release/*` branches for ordinary releases. Use tags and 
 
 - `dev/local`: run with `pnpm tauri dev`; updater checks are not part of local development.
 - `local updater E2E`: run `pnpm updater:e2e:local` to test a signed local update without publishing GitHub Releases. See `docs/updater-testing.md`.
-- `release`: built by GitHub Actions from `vX.Y.Z` tags; publishes macOS installable assets and `latest.json` for the updater.
+- `release`: built by GitHub Actions from `vX.Y.Z` tags; publishes macOS Intel and Apple Silicon installable assets and `latest.json` for the updater.
 
 There is currently no separate staging updater channel.
 
