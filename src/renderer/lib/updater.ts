@@ -50,7 +50,7 @@ export async function installUpdate(update: AppUpdate, onEvent: (event: Download
 async function checkForUpdateWithoutTimeout(mode: UpdaterMockMode | null): Promise<AppUpdate | null> {
   if (!import.meta.env.DEV || mode === null || mode === 'real') {
     const update = await check()
-    return update ? { ...update, shouldRelaunchAfterInstall: true } : null
+    return update ? createRealUpdate(update) : null
   }
 
   if (mode === 'current') return null
@@ -58,6 +58,14 @@ async function checkForUpdateWithoutTimeout(mode: UpdaterMockMode | null): Promi
   if (mode === 'timeout') return new Promise(() => {})
 
   return createMockUpdate(mode)
+}
+
+function createRealUpdate(update: Update): AppUpdate {
+  return {
+    version: update.version,
+    downloadAndInstall: update.downloadAndInstall.bind(update),
+    shouldRelaunchAfterInstall: true,
+  }
 }
 
 function createMockUpdate(mode: 'available' | 'download-error'): AppUpdate {

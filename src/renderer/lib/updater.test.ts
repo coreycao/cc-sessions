@@ -40,6 +40,19 @@ describe('checkForUpdate', () => {
     await expect(checkForUpdate('real')).resolves.toBeNull()
     expect(check).toHaveBeenCalledOnce()
   })
+
+  it('preserves real updater install methods from the prototype', async () => {
+    class RealUpdate {
+      version = '1.0.2'
+      async downloadAndInstall() {}
+    }
+
+    vi.mocked(check).mockResolvedValue(new RealUpdate() as never)
+    const update = await checkForUpdate('real')
+
+    expect(update?.version).toBe('1.0.2')
+    expect(update?.downloadAndInstall).toEqual(expect.any(Function))
+  })
 })
 
 describe('installUpdate', () => {
