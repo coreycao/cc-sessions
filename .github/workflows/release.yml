@@ -100,13 +100,3 @@ jobs:
           prerelease: false
           includeUpdaterJson: true
           args: --target ${{ matrix.target }}
-
-      - name: Upload updater signatures
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}
-        run: |
-          while IFS= read -r -d '' sig; do
-            gh release upload "$TAG_NAME" "$sig" --repo "$GITHUB_REPOSITORY" --clobber
-          done < <(find src-tauri/target -path '*/release/bundle/*' -name '*.sig' -print0)
