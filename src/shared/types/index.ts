@@ -38,6 +38,7 @@ export interface Project {
   path: string
   sessionCount: number
   lastModified: string
+  providers: SessionProvider[]
 }
 
 export interface AppStore {

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import type { SessionInfo, GTDMetadata, SessionStatus, Project, SessionProvider } from '../../shared/types'
+import type { SessionInfo, GTDMetadata, Project, SessionProvider } from '../../shared/types'
 
 export type FilterView = 'all' | 'new' | 'archived' | 'starred'
 export type ProviderFilter = 'all' | SessionProvider
@@ -37,21 +37,7 @@ export function useFilters(
     return result
   }, [sessions, providerFilter, selectedProject, searchQuery, filterStatus, filterTag, getGTD])
 
-  const projects = useMemo((): Project[] => {
-    const map = new Map<string, { count: number; lastMod: string }>()
-    for (const s of sessions) {
-      const existing = map.get(s.projectName)
-      if (existing) {
-        existing.count++
-        if (new Date(s.modified) > new Date(existing.lastMod)) existing.lastMod = s.modified
-      } else {
-        map.set(s.projectName, { count: 1, lastMod: s.modified })
-      }
-    }
-    return Array.from(map.entries())
-      .map(([name, data]) => ({ name, path: name, sessionCount: data.count, lastModified: data.lastMod }))
-      .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
-  }, [sessions])
+  const projects = useMemo(() => collectProjects(sessions), [sessions])
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = { all: sessions.length, starred: 0, new: 0, archived: 0 }
@@ -98,4 +84,32 @@ export function useFilters(
     tagCounts,
     providerCounts,
   }
+}
+
+export function collectProjects(sessions: SessionInfo[]): Project[] {
+  const map = new Map<string, { count: number; lastMod: string; providers: Set<SessionProvider> }>()
+  for (const session of sessions) {
+    const existing = map.get(session.projectName)
+    if (existing) {
+      existing.count++
+      existing.providers.add(session.provider)
+      if (new Date(session.modified) > new Date(existing.lastMod)) existing.lastMod = session.modified
+    } else {
+      map.set(session.projectName, {
+        count: 1,
+        lastMod: session.modified,
+        providers: new Set([session.provider]),
+      })
+    }
+  }
+
+  return Array.from(map.entries())
+    .map(([name, data]) => ({
+      name,
+      path: name,
+      sessionCount: data.count,
+      lastModified: data.lastMod,
+      providers: Array.from(data.providers).sort(),
+    }))
+    .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime())
 }

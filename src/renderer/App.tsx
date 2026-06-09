@@ -14,6 +14,7 @@ import { SettingsList, type SettingsSection } from './components/SettingsList'
 import { SettingsPanel, type Theme, type UpdateState } from './components/SettingsPanel'
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { ProviderLogo } from './components/ProviderLogo'
 import {
   checkForUpdate, getInitialUpdaterMockMode, installUpdate, saveUpdaterMockMode,
   UPDATE_CHECK_TIMEOUT_MESSAGE, UPDATE_CHECK_TIMEOUT_MS,
@@ -24,6 +25,27 @@ function projectDisplayName(projectPath: string | null): string {
   if (!projectPath) return 'All Projects'
   const segments = projectPath.split('/').filter(Boolean)
   return segments.at(-1) || projectPath
+}
+
+function projectSourceLabel(providers: Array<'claude' | 'codex'>): string {
+  if (providers.length === 0) return 'Unknown'
+  if (providers.length > 1) return 'Mixed'
+  return providers[0] === 'codex' ? 'Codex' : 'Claude'
+}
+
+function projectSourceBadgeClass(label: string): string {
+  if (label === 'Claude') return 'border-orange-300/45 bg-orange-50 text-[#d97757] dark:border-orange-400/20 dark:bg-orange-950/20'
+  if (label === 'Codex') return 'border-zinc-300/70 bg-zinc-50 text-zinc-950 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-50'
+  return 'border-accent/20 bg-accent-subtle/70 text-accent'
+}
+
+function ProjectSourceBadge({ provider }: { provider: 'claude' | 'codex' }) {
+  const label = provider === 'codex' ? 'Codex' : 'Claude'
+  return (
+    <span className={`inline-flex h-5 items-center rounded-full border px-1.5 text-[10px] font-medium leading-none ${projectSourceBadgeClass(label)}`}>
+      {label}
+    </span>
+  )
 }
 
 export default function App() {
@@ -274,6 +296,8 @@ export default function App() {
 
   const currentProjectName = projectDisplayName(store.selectedProject)
   const currentProjectTitle = store.selectedProject || 'All Projects'
+  const currentProject = store.projects.find(project => project.name === store.selectedProject) || null
+  const currentProjectSource = currentProject ? projectSourceLabel(currentProject.providers) : null
 
   const selectedSavedMessage = useMemo(
     () => store.savedMessages.find(m => m.id === store.selectedSavedId) || null,
@@ -318,18 +342,28 @@ export default function App() {
         <button
           ref={projectBtnRef}
           onClick={toggleProjectMenu}
-          className={`ml-1 h-7 max-w-[240px] inline-flex items-center gap-1.5 rounded-lg px-2 border shadow-sm transition-colors ${store.selectedProject ? 'text-accent bg-accent-subtle/70 border-accent/25 hover:bg-accent-subtle' : 'text-content-3 bg-surface border-edge/70 hover:bg-surface-3 hover:text-content-2'}`}
-          title={currentProjectTitle}
+          className={`ml-1 h-7 max-w-[260px] inline-flex items-center gap-1.5 rounded-lg px-2 border shadow-sm transition-colors ${store.selectedProject ? 'text-accent bg-accent-subtle/70 border-accent/25 hover:bg-accent-subtle' : 'text-content-3 bg-surface border-edge/70 hover:bg-surface-3 hover:text-content-2'}`}
+          title={currentProject ? `${currentProjectTitle} · ${currentProjectSource}` : currentProjectTitle}
           aria-label={`Filter by project: ${currentProjectTitle}`}
         >
-          <FolderOpen className="w-3.5 h-3.5" />
-          <span className="max-w-[190px] truncate text-xs font-medium" title={currentProjectTitle}>{currentProjectName}</span>
+          {currentProjectSource && currentProjectSource !== 'Mixed'
+            ? (
+              <ProviderLogo provider={currentProjectSource === 'Codex' ? 'codex' : 'claude'} size="sm" />
+            )
+            : <FolderOpen className="w-3.5 h-3.5" />
+          }
+          <span className="max-w-[136px] truncate text-xs font-medium" title={currentProjectTitle}>{currentProjectName}</span>
+          {currentProjectSource && (
+            <span className={`inline-flex h-5 items-center rounded-full border px-1.5 text-[10px] font-medium leading-none ${projectSourceBadgeClass(currentProjectSource)}`}>
+              {currentProjectSource}
+            </span>
+          )}
           <ChevronDown className="w-3 h-3 opacity-40" />
         </button>
         {projectMenuOpen && createPortal(
           <div
             ref={projectMenuRef}
-            className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[200px] max-h-[320px] overflow-y-auto"
+            className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[280px] max-w-[340px] max-h-[320px] overflow-y-auto"
             style={projectMenuPosition}
           >
             <button
@@ -337,7 +371,8 @@ export default function App() {
               className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
             >
               <FolderOpen className="w-3.5 h-3.5" />
-              All Projects
+              <span className="flex-1 truncate text-left">All Projects</span>
+              <span className="text-content-4 tabular-nums">{store.sessions.length}</span>
             </button>
             <div className="my-1 border-t border-edge/40" />
             {store.projects.map(p => (
@@ -346,9 +381,21 @@ export default function App() {
                 onClick={() => { store.setSelectedProject(store.selectedProject === p.name ? null : p.name); setProjectMenuOpen(false) }}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
-                <FolderOpen className="w-3.5 h-3.5" />
+              <FolderOpen className="w-3.5 h-3.5" />
                 <span className="truncate flex-1 text-left">{p.name}</span>
-                <span className="text-content-4 tabular-nums">{p.sessionCount}</span>
+                <div className="flex items-center gap-1">
+                  {p.providers.length > 0 && (
+                    p.providers.length === 1 ? (
+                      <ProjectSourceBadge provider={p.providers[0]} />
+                    ) : (
+                      <>
+                        <ProjectSourceBadge provider="claude" />
+                        <ProjectSourceBadge provider="codex" />
+                      </>
+                    )
+                  )}
+                  <span className="ml-0.5 text-content-4 tabular-nums">{p.sessionCount}</span>
+                </div>
               </button>
             ))}
           </div>,
@@ -447,6 +494,11 @@ export default function App() {
                 <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/50 bg-accent-subtle/40">
                   <FolderOpen className="w-3 h-3 text-accent" />
                   <span className="text-[11px] text-content-2 truncate flex-1">{currentProjectName}</span>
+                  {currentProjectSource && (
+                    <span className={`inline-flex h-4 items-center rounded-full border px-1.5 text-[9px] font-medium leading-none ${projectSourceBadgeClass(currentProjectSource)}`}>
+                      {currentProjectSource}
+                    </span>
+                  )}
                   <span className="text-[10px] text-content-4 tabular-nums">{store.filteredSessions.length}</span>
                   <button
                     onClick={() => store.setSelectedProject(null)}
