@@ -1,8 +1,11 @@
+import { useMemo } from 'react'
 import type { ReactNode } from 'react'
 import {
-  CheckCircle2, Download, LoaderCircle, Monitor, Moon, MoreHorizontal, RefreshCw,
+  CheckCircle2, Download, KeyRound, LoaderCircle, Monitor, Moon, MoreHorizontal, Plus, RefreshCw, Trash2,
   Sun, type LucideIcon,
 } from 'lucide-react'
+import type { AiProfile, AiSettings } from '../../shared/types'
+import { createEmptyAiProfile } from '../hooks/useAiSettings'
 import type { UpdaterMockMode } from '../lib/updater'
 import type { SettingsSection } from './SettingsList'
 
@@ -23,11 +26,18 @@ interface SettingsPanelProps {
   onCheckUpdate: () => Promise<void>
   onInstallUpdate: () => Promise<void>
   onRestartUpdate: () => Promise<void>
+  aiSettings: AiSettings
+  setAiSettings: (settings: AiSettings) => void
+  aiSettingsSaving: boolean
+  testingProfileId: string | null
+  onSaveAiSettings: (settings: AiSettings) => Promise<AiSettings>
+  onTestAiProfile: (profile: AiProfile) => Promise<void>
 }
 
 export function SettingsPanel({
   section, theme, setTheme, appVersion, updateState, updateVersion, updateProgress, updateError,
   updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
+  aiSettings, setAiSettings, aiSettingsSaving, testingProfileId, onSaveAiSettings, onTestAiProfile,
 }: SettingsPanelProps) {
   const updateLabel = getUpdateLabel(updateState, updateVersion, updateProgress)
   const updateDescription = getUpdateDescription(updateState, updateVersion, updateError)
@@ -94,6 +104,17 @@ export function SettingsPanel({
           </SettingsContent>
         )}
 
+        {section === 'ai' && (
+          <AiSettingsContent
+            settings={aiSettings}
+            setSettings={setAiSettings}
+            saving={aiSettingsSaving}
+            testingProfileId={testingProfileId}
+            onSave={onSaveAiSettings}
+            onTest={onTestAiProfile}
+          />
+        )}
+
         {section === 'appearance' && (
           <SettingsContent title="Appearance">
             <SettingsGroup title="Theme">
@@ -112,6 +133,7 @@ export function SettingsPanel({
 
 const SECTION_TITLES: Record<SettingsSection, string> = {
   app: 'App',
+  ai: 'AI',
   appearance: 'Appearance',
 }
 
@@ -144,6 +166,179 @@ function SettingRow({ title, description, control }: { title: string; descriptio
       </div>
       {control && <div className="flex-shrink-0">{control}</div>}
     </div>
+  )
+}
+
+function AiSettingsContent({
+  settings, setSettings, saving, testingProfileId, onSave, onTest,
+}: {
+  settings: AiSettings
+  setSettings: (settings: AiSettings) => void
+  saving: boolean
+  testingProfileId: string | null
+  onSave: (settings: AiSettings) => Promise<AiSettings>
+  onTest: (profile: AiProfile) => Promise<void>
+}) {
+  const activeId = settings.activeProfileId ?? settings.profiles[0]?.id ?? null
+  const activeProfile = useMemo(
+    () => settings.profiles.find(profile => profile.id === activeId) ?? settings.profiles[0] ?? null,
+    [activeId, settings.profiles]
+  )
+
+  const updateProfile = (id: string, updates: Partial<AiProfile>) => {
+    setSettings({
+      ...settings,
+      profiles: settings.profiles.map(profile => profile.id === id ? { ...profile, ...updates } : profile),
+    })
+  }
+
+  const addProfile = () => {
+    const profile = createEmptyAiProfile()
+    setSettings({
+      activeProfileId: profile.id,
+      profiles: [...settings.profiles, profile],
+    })
+  }
+
+  const removeProfile = (id: string) => {
+    const nextProfiles = settings.profiles.filter(profile => profile.id !== id)
+    setSettings({
+      activeProfileId: settings.activeProfileId === id ? nextProfiles[0]?.id ?? null : settings.activeProfileId,
+      profiles: nextProfiles,
+    })
+  }
+
+  return (
+    <SettingsContent title="AI">
+      <SettingsGroup title="LLM API">
+        <SettingRow
+          title="Active API"
+          description={activeProfile ? `${activeProfile.name} · ${activeProfile.model}` : 'Add an OpenAI-compatible API before reviewing sessions.'}
+          control={
+            <button
+              onClick={addProfile}
+              className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add API
+            </button>
+          }
+        />
+        {settings.profiles.length > 0 && (
+          <SettingRow
+            title="Use for review"
+            description="Session reviews use this profile by default."
+            control={
+              <select
+                value={activeId ?? ''}
+                onChange={event => setSettings({ ...settings, activeProfileId: event.target.value || null })}
+                className="h-8 min-w-[180px] rounded-lg border border-edge bg-surface px-2 text-[12px] font-medium text-content-2 shadow-sm outline-none hover:bg-surface-2"
+              >
+                {settings.profiles.map(profile => (
+                  <option key={profile.id} value={profile.id}>{profile.name || 'Untitled API'}</option>
+                ))}
+              </select>
+            }
+          />
+        )}
+      </SettingsGroup>
+
+      {settings.profiles.map(profile => {
+        const testing = testingProfileId === profile.id
+        return (
+          <section key={profile.id} className="rounded-xl border border-edge bg-surface shadow-sm">
+            <div className="flex min-h-[52px] items-center gap-3 border-b border-edge-2 px-4 py-3">
+              <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-subtle text-accent">
+                <KeyRound className="h-4 w-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="text-[13px] font-semibold text-content">{profile.name || 'Untitled API'}</div>
+                <div className="truncate text-[11px] text-content-4">{profile.baseUrl || 'No base URL'}</div>
+              </div>
+              <button
+                onClick={() => removeProfile(profile.id)}
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-content-4 hover:bg-surface-3 hover:text-red-400"
+                aria-label="Remove AI API"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 p-4 md:grid-cols-2">
+              <LabeledInput
+                label="Name"
+                value={profile.name}
+                onChange={value => updateProfile(profile.id, { name: value })}
+                placeholder="Work OpenAI"
+              />
+              <LabeledInput
+                label="Model"
+                value={profile.model}
+                onChange={value => updateProfile(profile.id, { model: value })}
+                placeholder="gpt-4o-mini"
+              />
+              <LabeledInput
+                label="Base URL"
+                value={profile.baseUrl}
+                onChange={value => updateProfile(profile.id, { baseUrl: value })}
+                placeholder="https://api.openai.com/v1"
+                className="md:col-span-2"
+              />
+              <LabeledInput
+                label="API Key"
+                value={profile.apiKey}
+                onChange={value => updateProfile(profile.id, { apiKey: value })}
+                placeholder="sk-..."
+                type="password"
+                className="md:col-span-2"
+              />
+            </div>
+            <div className="flex items-center justify-end gap-2 border-t border-edge-2 px-4 py-3">
+              <button
+                onClick={() => onTest(profile)}
+                disabled={testing || saving}
+                className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+              >
+                {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+                Test
+              </button>
+              <button
+                onClick={() => onSave(settings)}
+                disabled={saving || testing}
+                className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
+              >
+                {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+                Save
+              </button>
+            </div>
+          </section>
+        )
+      })}
+    </SettingsContent>
+  )
+}
+
+function LabeledInput({
+  label, value, onChange, placeholder, type = 'text', className = '',
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  placeholder: string
+  type?: 'text' | 'password'
+  className?: string
+}) {
+  return (
+    <label className={`block min-w-0 ${className}`}>
+      <span className="mb-1 block text-[11px] font-medium text-content-4">{label}</span>
+      <input
+        type={type}
+        value={value}
+        onChange={event => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="h-9 w-full rounded-lg border border-edge bg-surface-2 px-3 text-[12px] text-content outline-none placeholder:text-content-5 focus:border-accent focus:ring-2 focus:ring-accent/15"
+      />
+    </label>
   )
 }
 

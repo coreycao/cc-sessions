@@ -61,6 +61,19 @@ export interface SavedMessagesStore {
   messages: SavedMessage[]
 }
 
+export interface AiProfile {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  model: string
+}
+
+export interface AiSettings {
+  activeProfileId: string | null
+  profiles: AiProfile[]
+}
+
 // ---- Conversation Rendering Types ----
 
 export interface TextMessage {

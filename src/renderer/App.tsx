@@ -509,6 +509,7 @@ export default function App() {
               isSaved={store.isSaved}
               addSavedMessage={store.addSavedMessage}
               removeSavedMessage={store.removeSavedMessage}
+              activeAiProfile={store.activeAiProfile}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
@@ -551,6 +552,12 @@ export default function App() {
             onCheckUpdate={handleCheckUpdate}
             onInstallUpdate={handleInstallUpdate}
             onRestartUpdate={handleRestartUpdate}
+            aiSettings={store.aiSettings}
+            setAiSettings={store.setAiSettings}
+            aiSettingsSaving={store.aiSettingsSaving}
+            testingProfileId={store.testingProfileId}
+            onSaveAiSettings={store.saveAiSettings}
+            onTestAiProfile={store.testAiProfile}
           />
         )}
       </div>

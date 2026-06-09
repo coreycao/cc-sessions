@@ -7,6 +7,7 @@ import { useToast } from './useToast'
 import { useContentSearch } from './useContentSearch'
 import { useSavedMessages } from './useSavedMessages'
 import { useIndexReady } from './useIndexReady'
+import { useAiSettings } from './useAiSettings'
 
 export type View = 'sessions' | 'saved' | 'settings'
 
@@ -18,6 +19,7 @@ export function useStore() {
   const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
   const saved = useSavedMessages()
   const { indexReady, refreshIndexReady } = useIndexReady()
+  const ai = useAiSettings(addToast)
   const [view, setView] = useState<View>('sessions')
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
 
@@ -132,5 +134,13 @@ export function useStore() {
     isSaved: saved.isSaved,
     selectedSavedId,
     setSelectedSavedId,
+    aiSettings: ai.aiSettings,
+    setAiSettings: ai.setAiSettings,
+    activeAiProfile: ai.activeAiProfile,
+    aiSettingsLoading: ai.aiSettingsLoading,
+    aiSettingsSaving: ai.aiSettingsSaving,
+    testingProfileId: ai.testingProfileId,
+    saveAiSettings: ai.saveAiSettings,
+    testAiProfile: ai.testAiProfile,
   }
 }

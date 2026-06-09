@@ -1,6 +1,11 @@
 import { useState, useCallback, useRef, useMemo, useEffect, memo } from 'react'
+import { createPortal } from 'react-dom'
 import { invoke } from '@tauri-apps/api/core'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeHighlight from 'rehype-highlight'
 import type { SessionInfo, GTDMetadata, SavedMessage } from '../../shared/types'
+import type { AiProfile } from '../../shared/types'
 import { parseConversation } from '../lib/parseConversation'
 import type { MessageActions } from './ConversationMessage'
 import { InlineErrorBoundary } from './ErrorBoundary'
@@ -11,7 +16,7 @@ import {
 import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
-  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown,
+  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle,
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 
@@ -33,6 +38,7 @@ interface DetailPanelProps {
   isSaved: (sessionId: string, messageId: string) => boolean
   addSavedMessage: (msg: Omit<SavedMessage, 'id' | 'savedAt'>) => Promise<void>
   removeSavedMessage: (id: string) => Promise<void>
+  activeAiProfile: AiProfile | null
 }
 
 export const DetailPanel = memo(function DetailPanel({
@@ -41,11 +47,16 @@ export const DetailPanel = memo(function DetailPanel({
   deleteSession, restoreSession, setSelectedSessionId,
   showTagInput, setShowTagInput, newTag, setNewTag,
   isSaved, addSavedMessage, removeSavedMessage,
+  activeAiProfile,
 }: DetailPanelProps) {
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [compact, setCompact] = useState(false)
   const [showOverflow, setShowOverflow] = useState(false)
+  const [reviewOpen, setReviewOpen] = useState(false)
+  const [reviewLoading, setReviewLoading] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
+  const [reviewText, setReviewText] = useState('')
   const overflowRef = useRef<HTMLButtonElement>(null)
   const conversationScrollRef = useRef<HTMLDivElement>(null)
   const assistantLabel = selectedSession.provider === 'codex' ? 'Codex' : 'Claude'
@@ -96,6 +107,27 @@ export const DetailPanel = memo(function DetailPanel({
     })
   }, [])
 
+  const reviewSession = useCallback(async () => {
+    setReviewOpen(true)
+    setReviewLoading(true)
+    setReviewError(null)
+    setReviewText('')
+
+    try {
+      const transcript = buildReviewTranscript(sessionContent, selectedSession.provider)
+      const result = await invoke<string>('summarize_session', {
+        profileId: activeAiProfile?.id ?? null,
+        sessionTitle: selectedSession.title,
+        transcript,
+      })
+      setReviewText(result)
+    } catch (error) {
+      setReviewError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setReviewLoading(false)
+    }
+  }, [activeAiProfile?.id, selectedSession.provider, selectedSession.title, sessionContent])
+
   return (
     <div className="relative flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
       {/* Header toolbar */}
@@ -132,6 +164,15 @@ export const DetailPanel = memo(function DetailPanel({
             className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
           >
             <RotateCcw className="w-4 h-4" />
+          </button>
+        </ActionTip>
+        <ActionTip label="Review with AI">
+          <button
+            onClick={reviewSession}
+            className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+            aria-label="Review current session with AI"
+          >
+            <Brain className="w-4 h-4" />
           </button>
         </ActionTip>
         <div className="relative">
@@ -248,6 +289,117 @@ export const DetailPanel = memo(function DetailPanel({
           onCancel={() => setShowDeleteConfirm(false)}
         />
       )}
+      {reviewOpen && (
+        <SessionReviewDialog
+          title={selectedSession.title}
+          profileName={activeAiProfile?.name ?? null}
+          loading={reviewLoading}
+          error={reviewError}
+          content={reviewText}
+          onRetry={reviewSession}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
     </div>
   )
 })
+
+function SessionReviewDialog({
+  title, profileName, loading, error, content, onRetry, onClose,
+}: {
+  title: string
+  profileName: string | null
+  loading: boolean
+  error: string | null
+  content: string
+  onRetry: () => void
+  onClose: () => void
+}) {
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm">
+      <div className="flex max-h-[82vh] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
+        <div className="flex h-12 items-center gap-3 border-b border-edge/70 px-4">
+          <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-subtle text-accent">
+            {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-content">Session review</div>
+            <div className="truncate text-[11px] text-content-4">{profileName ? `${profileName} · ${title}` : title}</div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2" aria-label="Close session review">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="min-h-[280px] flex-1 overflow-y-auto px-6 py-5">
+          {loading ? (
+            <div className="flex h-52 flex-col items-center justify-center gap-3 text-content-4">
+              <LoaderCircle className="h-6 w-6 animate-spin" />
+              <div className="text-[13px] font-medium text-content-2">Reviewing conversation...</div>
+              <div className="text-[12px]">This can take a moment for longer sessions.</div>
+            </div>
+          ) : error ? (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-semibold text-red-400">Review failed</div>
+                  <div className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-relaxed text-content-3">{error}</div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="prose prose-sm max-w-none text-content prose-headings:text-content prose-p:text-content-2 prose-strong:text-content prose-li:text-content-2 prose-code:text-content">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
+                {content || 'No review content returned.'}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-edge/70 px-4 py-3">
+          <div className="text-[11px] text-content-4">Generated from the currently loaded session content.</div>
+          <div className="flex items-center gap-2">
+            {error && (
+              <button
+                onClick={onRetry}
+                className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
+              >
+                Retry
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="inline-flex h-8 items-center rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+function buildReviewTranscript(content: string, provider: SessionInfo['provider']): string {
+  const turns = parseConversation(content, provider)
+  const parts: string[] = []
+
+  for (const turn of turns) {
+    if (turn.kind === 'user_turn') {
+      parts.push(`User:\n${turn.message.content}`)
+    } else if (turn.kind === 'assistant_turn') {
+      const text = turn.messages
+        .filter(message => message.kind === 'text')
+        .map(message => message.content)
+        .join('\n')
+      if (text.trim()) parts.push(`Assistant:\n${text}`)
+    }
+  }
+
+  const transcript = parts.join('\n\n---\n\n').trim()
+  return transcript.length > 80_000
+    ? `${transcript.slice(0, 80_000)}\n\n[Transcript truncated for review.]`
+    : transcript
+}

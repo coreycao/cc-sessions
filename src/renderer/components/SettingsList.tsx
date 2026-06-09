@@ -1,7 +1,8 @@
-import { Bell, Brush, type LucideIcon } from 'lucide-react'
+import { Bell, Bot, Brush, type LucideIcon } from 'lucide-react'
 
 export type SettingsSection =
   | 'app'
+  | 'ai'
   | 'appearance'
 
 interface SettingsListProps {
@@ -11,6 +12,7 @@ interface SettingsListProps {
 
 const ITEMS: { id: SettingsSection; icon: LucideIcon; label: string; description: string }[] = [
   { id: 'app', icon: Bell, label: 'App', description: 'Version and updates' },
+  { id: 'ai', icon: Bot, label: 'AI', description: 'LLM API' },
   { id: 'appearance', icon: Brush, label: 'Appearance', description: 'Theme' },
 ]
 

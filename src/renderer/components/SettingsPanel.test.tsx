@@ -34,6 +34,12 @@ function renderSettings(updateState: UpdateState) {
     onCheckUpdate: vi.fn().mockResolvedValue(undefined),
     onInstallUpdate: vi.fn().mockResolvedValue(undefined),
     onRestartUpdate: vi.fn().mockResolvedValue(undefined),
+    aiSettings: { activeProfileId: null, profiles: [] },
+    setAiSettings: vi.fn(),
+    aiSettingsSaving: false,
+    testingProfileId: null,
+    onSaveAiSettings: vi.fn().mockResolvedValue({ activeProfileId: null, profiles: [] }),
+    onTestAiProfile: vi.fn().mockResolvedValue(undefined),
   }
 
   act(() => {
@@ -67,6 +73,46 @@ describe('SettingsPanel updater actions', () => {
 
     expect(props.onRestartUpdate).toHaveBeenCalledOnce()
     expect(props.onInstallUpdate).not.toHaveBeenCalled()
+  })
+})
+
+describe('SettingsPanel AI settings', () => {
+  it('adds an OpenAI-compatible API profile', () => {
+    const props = {
+      section: 'ai' as const,
+      theme: 'system' as const,
+      setTheme: vi.fn(),
+      appVersion: '1.0.0',
+      updateState: 'idle' as const,
+      updateVersion: null,
+      updateProgress: null,
+      updateError: null,
+      updaterMockMode: null,
+      setUpdaterMockMode: vi.fn(),
+      onCheckUpdate: vi.fn().mockResolvedValue(undefined),
+      onInstallUpdate: vi.fn().mockResolvedValue(undefined),
+      onRestartUpdate: vi.fn().mockResolvedValue(undefined),
+      aiSettings: { activeProfileId: null, profiles: [] },
+      setAiSettings: vi.fn(),
+      aiSettingsSaving: false,
+      testingProfileId: null,
+      onSaveAiSettings: vi.fn().mockResolvedValue({ activeProfileId: null, profiles: [] }),
+      onTestAiProfile: vi.fn().mockResolvedValue(undefined),
+    }
+
+    act(() => {
+      root.render(<SettingsPanel {...props} />)
+    })
+
+    act(() => findButton('Add API').click())
+
+    expect(props.setAiSettings).toHaveBeenCalledWith(expect.objectContaining({
+      activeProfileId: expect.any(String),
+      profiles: [expect.objectContaining({
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-4o-mini',
+      })],
+    }))
   })
 })
 

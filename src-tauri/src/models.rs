@@ -75,6 +75,23 @@ pub struct SavedMessagesStore {
     pub messages: Vec<SavedMessage>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AiProfile {
+    pub id: String,
+    pub name: String,
+    pub base_url: String,
+    pub api_key: String,
+    pub model: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AiSettings {
+    pub active_profile_id: Option<String>,
+    pub profiles: Vec<AiProfile>,
+}
+
 #[derive(Deserialize)]
 pub(crate) struct JsonlEntry {
     #[serde(rename = "type")]

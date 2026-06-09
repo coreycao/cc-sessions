@@ -1,0 +1,254 @@
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
+use serde::Deserialize;
+use serde_json::json;
+use tauri::Manager;
+
+use crate::gtd::atomic_write;
+use crate::models::{AiProfile, AiSettings};
+
+const DEFAULT_TIMEOUT_SECS: u64 = 45;
+const TEST_TIMEOUT_SECS: u64 = 20;
+
+pub fn ai_settings_path(app: &tauri::AppHandle) -> PathBuf {
+    app.path()
+        .app_data_dir()
+        .expect("no app data dir")
+        .join("ai-settings.json")
+}
+
+pub fn load_ai_settings_from_file(path: &Path) -> AiSettings {
+    match fs::read_to_string(path) {
+        Ok(content) => serde_json::from_str(&content).unwrap_or_default(),
+        Err(_) => AiSettings::default(),
+    }
+}
+
+pub fn save_ai_settings_to_file(path: &Path, settings: &AiSettings) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let json = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    atomic_write(path, json.as_bytes())
+}
+
+#[tauri::command]
+pub fn load_ai_settings(app: tauri::AppHandle) -> AiSettings {
+    load_ai_settings_from_file(&ai_settings_path(&app))
+}
+
+#[tauri::command]
+pub fn save_ai_settings(app: tauri::AppHandle, settings: AiSettings) -> Result<AiSettings, String> {
+    validate_settings(&settings)?;
+    save_ai_settings_to_file(&ai_settings_path(&app), &settings)?;
+    Ok(settings)
+}
+
+#[tauri::command]
+pub async fn test_ai_connection(profile: AiProfile) -> Result<String, String> {
+    validate_profile(&profile)?;
+    let text = call_chat_completion(
+        &profile,
+        "You are testing an OpenAI-compatible API connection. Reply with exactly: OK",
+        "Reply with exactly: OK",
+        16,
+        TEST_TIMEOUT_SECS,
+    )
+    .await?;
+
+    if text.trim().is_empty() {
+        return Err("The API responded, but no message content was returned".to_string());
+    }
+    Ok(text)
+}
+
+#[tauri::command]
+pub async fn summarize_session(
+    app: tauri::AppHandle,
+    profile_id: Option<String>,
+    session_title: String,
+    transcript: String,
+) -> Result<String, String> {
+    let settings = load_ai_settings_from_file(&ai_settings_path(&app));
+    let profile = resolve_profile(&settings, profile_id.as_deref())?;
+    validate_profile(profile)?;
+
+    let user = format!(
+        "Session title: {session_title}\n\nTranscript:\n{transcript}\n\nWrite the review now."
+    );
+
+    call_chat_completion(
+        profile,
+        "You are a careful engineering session reviewer. Summarize the current coding session in Markdown. Include: 1) the user's intent, 2) key decisions and code changes, 3) unresolved issues or risks, 4) suggested next actions. Be concise, concrete, and do not invent facts.",
+        &user,
+        900,
+        DEFAULT_TIMEOUT_SECS,
+    )
+    .await
+}
+
+fn validate_settings(settings: &AiSettings) -> Result<(), String> {
+    for profile in &settings.profiles {
+        validate_profile(profile)?;
+    }
+
+    if let Some(active) = &settings.active_profile_id {
+        if !settings.profiles.iter().any(|p| &p.id == active) {
+            return Err("Active AI profile does not exist".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+fn validate_profile(profile: &AiProfile) -> Result<(), String> {
+    if profile.id.trim().is_empty() {
+        return Err("Profile id is required".to_string());
+    }
+    if profile.name.trim().is_empty() {
+        return Err("Profile name is required".to_string());
+    }
+    if profile.base_url.trim().is_empty() {
+        return Err("Base URL is required".to_string());
+    }
+    if profile.api_key.trim().is_empty() {
+        return Err("API key is required".to_string());
+    }
+    if profile.model.trim().is_empty() {
+        return Err("Model is required".to_string());
+    }
+    Ok(())
+}
+
+fn resolve_profile<'a>(
+    settings: &'a AiSettings,
+    requested_id: Option<&str>,
+) -> Result<&'a AiProfile, String> {
+    if settings.profiles.is_empty() {
+        return Err("No AI API is configured. Add one in Settings > AI.".to_string());
+    }
+
+    let id = requested_id.or(settings.active_profile_id.as_deref());
+    if let Some(id) = id {
+        if let Some(profile) = settings.profiles.iter().find(|p| p.id == id) {
+            return Ok(profile);
+        }
+    }
+
+    settings
+        .profiles
+        .first()
+        .ok_or_else(|| "No AI API is configured. Add one in Settings > AI.".to_string())
+}
+
+async fn call_chat_completion(
+    profile: &AiProfile,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+    timeout_secs: u64,
+) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(timeout_secs))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let mut headers = HeaderMap::new();
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    let token = format!("Bearer {}", profile.api_key.trim());
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&token).map_err(|_| "API key contains invalid header characters")?,
+    );
+
+    let url = chat_completions_url(&profile.base_url);
+    let response = client
+        .post(url)
+        .headers(headers)
+        .json(&json!({
+            "model": profile.model.trim(),
+            "messages": [
+                { "role": "system", "content": system },
+                { "role": "user", "content": user }
+            ],
+            "temperature": 0.2,
+            "max_tokens": max_tokens
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("AI request failed: {e}"))?;
+
+    let status = response.status();
+    let body = response
+        .text()
+        .await
+        .map_err(|e| format!("Failed to read AI response: {e}"))?;
+
+    if !status.is_success() {
+        return Err(format!("AI API returned {status}: {}", truncate(&body, 500)));
+    }
+
+    let parsed: ChatCompletionResponse =
+        serde_json::from_str(&body).map_err(|e| format!("Invalid AI response: {e}"))?;
+    parsed
+        .choices
+        .into_iter()
+        .find_map(|choice| choice.message.content)
+        .map(|content| content.trim().to_string())
+        .filter(|content| !content.is_empty())
+        .ok_or_else(|| "The AI response did not include message content".to_string())
+}
+
+fn chat_completions_url(base_url: &str) -> String {
+    let trimmed = base_url.trim().trim_end_matches('/');
+    if trimmed.ends_with("/chat/completions") {
+        trimmed.to_string()
+    } else {
+        format!("{trimmed}/chat/completions")
+    }
+}
+
+fn truncate(value: &str, max: usize) -> String {
+    let mut chars = value.chars();
+    let truncated: String = chars.by_ref().take(max).collect();
+    if chars.next().is_some() {
+        format!("{truncated}...")
+    } else {
+        value.to_string()
+    }
+}
+
+#[derive(Deserialize)]
+struct ChatCompletionResponse {
+    choices: Vec<ChatChoice>,
+}
+
+#[derive(Deserialize)]
+struct ChatChoice {
+    message: ChatMessage,
+}
+
+#[derive(Deserialize)]
+struct ChatMessage {
+    content: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::chat_completions_url;
+
+    #[test]
+    fn builds_chat_completions_url() {
+        assert_eq!(
+            chat_completions_url("https://api.openai.com/v1"),
+            "https://api.openai.com/v1/chat/completions"
+        );
+        assert_eq!(
+            chat_completions_url("https://example.test/v1/chat/completions"),
+            "https://example.test/v1/chat/completions"
+        );
+    }
+}

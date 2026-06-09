@@ -1,3 +1,4 @@
+mod ai;
 mod commands;
 mod gtd;
 mod helpers;
@@ -174,6 +175,10 @@ pub fn run() {
             commands::delete_session,
             commands::restore_session,
             commands::export_markdown,
+            ai::load_ai_settings,
+            ai::save_ai_settings,
+            ai::test_ai_connection,
+            ai::summarize_session,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
