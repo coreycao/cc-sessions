@@ -39,6 +39,14 @@ function projectSourceBadgeClass(label: string): string {
   return 'border-accent/20 bg-accent-subtle/70 text-accent'
 }
 
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable
+    || target instanceof HTMLInputElement
+    || target instanceof HTMLTextAreaElement
+    || target instanceof HTMLSelectElement
+}
+
 function ProjectSourceBadge({ provider }: { provider: 'claude' | 'codex' }) {
   const label = provider === 'codex' ? 'Codex' : 'Claude'
   return (
@@ -268,7 +276,7 @@ export default function App() {
         setSidebarCollapsed(v => !v)
       }
       if ((e.metaKey || e.ctrlKey) && e.key === 'a') {
-        if (document.activeElement === searchRef.current) return
+        if (isEditableTarget(e.target) || isEditableTarget(document.activeElement)) return
         e.preventDefault()
         store.selectAllBatch(store.filteredSessions)
       }

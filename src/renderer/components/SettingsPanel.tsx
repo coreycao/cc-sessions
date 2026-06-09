@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import {
-  CheckCircle2, Download, KeyRound, LoaderCircle, Monitor, Moon, MoreHorizontal, Plus, RefreshCw, Trash2,
-  Sun, type LucideIcon,
+  CheckCircle2, ChevronDown, Download, KeyRound, LoaderCircle, Monitor, Moon, MoreHorizontal, Plus,
+  RefreshCw, Trash2, Sun, type LucideIcon,
 } from 'lucide-react'
 import type { AiProfile, AiSettings } from '../../shared/types'
 import { createEmptyAiProfile } from '../hooks/useAiSettings'
@@ -184,6 +185,10 @@ function AiSettingsContent({
     () => settings.profiles.find(profile => profile.id === activeId) ?? settings.profiles[0] ?? null,
     [activeId, settings.profiles]
   )
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, left: 0 })
+  const profileBtnRef = useRef<HTMLButtonElement>(null)
+  const profileMenuRef = useRef<HTMLDivElement>(null)
 
   const updateProfile = (id: string, updates: Partial<AiProfile>) => {
     setSettings({
@@ -208,6 +213,28 @@ function AiSettingsContent({
     })
   }
 
+  const openProfileMenu = () => {
+    if (profileBtnRef.current) {
+      const rect = profileBtnRef.current.getBoundingClientRect()
+      setProfileMenuPosition({ top: rect.bottom + 5, left: rect.left })
+    }
+    setProfileMenuOpen(v => !v)
+  }
+
+  useEffect(() => {
+    if (!profileMenuOpen) return
+    const handler = (event: PointerEvent) => {
+      const target = event.target as Node
+      if (profileBtnRef.current && profileMenuRef.current
+        && !profileBtnRef.current.contains(target)
+        && !profileMenuRef.current.contains(target)) {
+        setProfileMenuOpen(false)
+      }
+    }
+    document.addEventListener('pointerdown', handler, true)
+    return () => document.removeEventListener('pointerdown', handler, true)
+  }, [profileMenuOpen])
+
   return (
     <SettingsContent title="AI">
       <SettingsGroup title="LLM API">
@@ -229,15 +256,57 @@ function AiSettingsContent({
             title="Use for review"
             description="Session reviews use this profile by default."
             control={
-              <select
-                value={activeId ?? ''}
-                onChange={event => setSettings({ ...settings, activeProfileId: event.target.value || null })}
-                className="h-8 min-w-[180px] rounded-lg border border-edge bg-surface px-2 text-[12px] font-medium text-content-2 shadow-sm outline-none hover:bg-surface-2"
-              >
-                {settings.profiles.map(profile => (
-                  <option key={profile.id} value={profile.id}>{profile.name || 'Untitled API'}</option>
-                ))}
-              </select>
+              <div className="relative">
+                <button
+                  ref={profileBtnRef}
+                  onClick={openProfileMenu}
+                  className="inline-flex h-8 min-w-[220px] max-w-[320px] items-center gap-1.5 rounded-lg border border-edge bg-surface px-2 shadow-sm transition-colors hover:bg-surface-2"
+                  title={activeProfile ? `${activeProfile.name} · ${activeProfile.baseUrl}` : 'Choose a profile for review'}
+                  aria-label={activeProfile ? `Use for review: ${activeProfile.name}` : 'Choose a profile for review'}
+                  aria-expanded={profileMenuOpen}
+                >
+                  <KeyRound className="h-3.5 w-3.5 flex-shrink-0 text-content-4" />
+                  <span className="max-w-[170px] truncate text-[12px] font-medium text-content-2">
+                    {activeProfile?.name || 'Select API'}
+                  </span>
+                  {activeProfile && (
+                    <span className="inline-flex h-5 items-center rounded-full border border-edge/70 bg-surface-2 px-1.5 text-[10px] font-medium leading-none text-content-4">
+                      {activeProfile.model}
+                    </span>
+                  )}
+                  <ChevronDown className="h-3 w-3 flex-shrink-0 text-content-4 opacity-60" />
+                </button>
+                {profileMenuOpen && createPortal(
+                  <div
+                    ref={profileMenuRef}
+                    className="fixed z-[9999] min-w-[260px] max-w-[360px] overflow-hidden rounded-xl border border-edge bg-surface py-1 shadow-xl"
+                    style={profileMenuPosition}
+                  >
+                    {settings.profiles.map(profile => {
+                      const active = profile.id === activeId
+                      return (
+                        <button
+                          key={profile.id}
+                          onClick={() => {
+                            setSettings({ ...settings, activeProfileId: profile.id })
+                            setProfileMenuOpen(false)
+                          }}
+                          title={`${profile.name} · ${profile.baseUrl}`}
+                          className={`flex w-full items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${active ? 'bg-accent-subtle text-accent' : 'text-content-2 hover:bg-surface-3'}`}
+                        >
+                          <KeyRound className="h-3.5 w-3.5 flex-shrink-0" />
+                          <span className="min-w-0 flex-1 truncate text-left">{profile.name || 'Untitled API'}</span>
+                          <span className="rounded-full border border-edge/70 bg-surface-2 px-1.5 text-[10px] font-medium leading-none text-content-4">
+                            {profile.model}
+                          </span>
+                          {active && <span className="text-[10px] font-medium text-accent">Default</span>}
+                        </button>
+                      )
+                    })}
+                  </div>,
+                  document.body,
+                )}
+              </div>
             }
           />
         )}
