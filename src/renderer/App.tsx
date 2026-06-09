@@ -368,6 +368,7 @@ export default function App() {
           >
             <button
               onClick={() => { store.setSelectedProject(null); setProjectMenuOpen(false) }}
+              title="All Projects"
               className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
             >
               <FolderOpen className="w-3.5 h-3.5" />
@@ -379,10 +380,11 @@ export default function App() {
               <button
                 key={p.name}
                 onClick={() => { store.setSelectedProject(store.selectedProject === p.name ? null : p.name); setProjectMenuOpen(false) }}
+                title={p.path}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
               <FolderOpen className="w-3.5 h-3.5" />
-                <span className="truncate flex-1 text-left">{p.name}</span>
+                <span className="truncate flex-1 text-left">{projectDisplayName(p.path)}</span>
                 <div className="flex items-center gap-1">
                   {p.providers.length > 0 && (
                     p.providers.length === 1 ? (
