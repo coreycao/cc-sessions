@@ -4,6 +4,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { createRoot } from 'react-dom/client'
 import { act } from 'react'
 import { DeleteConfirmDialog, NoteInput, TagInput } from './DetailShared'
+import { I18nProvider } from '../lib/i18n'
 
 let container: HTMLDivElement
 
@@ -18,7 +19,7 @@ afterEach(() => {
 
 function render(el: React.ReactElement): string {
   const root = createRoot(container)
-  act(() => { root.render(el) })
+  act(() => { root.render(<I18nProvider>{el}</I18nProvider>) })
   const html = container.innerHTML
   act(() => { root.unmount() })
   return html
@@ -41,7 +42,7 @@ describe('TagInput', () => {
     const html = render(
       <TagInput value="" onChange={vi.fn()} onSubmit={vi.fn()} onClose={vi.fn()} suggestions={['bug', 'feature']} />
     )
-    expect(html).toContain('tag name...')
+    expect(html).toContain('new tag...')
     expect(html).toContain('type="text"')
   })
 
@@ -56,7 +57,7 @@ describe('TagInput', () => {
 describe('DeleteConfirmDialog', () => {
   it('renders title and buttons', () => {
     const root = createRoot(container)
-    act(() => { root.render(<DeleteConfirmDialog title="My Session" onConfirm={vi.fn()} onCancel={vi.fn()} />) })
+    act(() => { root.render(<I18nProvider><DeleteConfirmDialog title="My Session" onConfirm={vi.fn()} onCancel={vi.fn()} /></I18nProvider>) })
     const html = document.body.innerHTML
     act(() => { root.unmount() })
     expect(html).toContain('My Session')
@@ -66,7 +67,7 @@ describe('DeleteConfirmDialog', () => {
 
   it('renders warning message', () => {
     const root = createRoot(container)
-    act(() => { root.render(<DeleteConfirmDialog title="Test" onConfirm={vi.fn()} onCancel={vi.fn()} />) })
+    act(() => { root.render(<I18nProvider><DeleteConfirmDialog title="Test" onConfirm={vi.fn()} onCancel={vi.fn()} /></I18nProvider>) })
     const html = document.body.innerHTML
     act(() => { root.unmount() })
     expect(html).toContain('This action cannot be undone')

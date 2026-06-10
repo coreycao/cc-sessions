@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Bookmark, BookmarkMinus, Copy, FileDown } from 'lucide-react'
+import { useI18n } from '../lib/i18n'
 
 interface MenuItem {
   label: string
@@ -21,6 +22,7 @@ interface MessageContextMenuProps {
 }
 
 export function MessageContextMenu({ x, y, isSaved, onSave, onUnsave, onCopy, onExport, onClose }: MessageContextMenuProps) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -38,10 +40,10 @@ export function MessageContextMenu({ x, y, isSaved, onSave, onUnsave, onCopy, on
 
   const items: MenuItem[] = [
     isSaved
-      ? { label: 'Unsave message', icon: <BookmarkMinus className="w-3.5 h-3.5" />, onClick: () => { onUnsave(); onClose() } }
-      : { label: 'Save message', icon: <Bookmark className="w-3.5 h-3.5" />, onClick: () => { onSave(); onClose() } },
-    { label: 'Copy', icon: <Copy className="w-3.5 h-3.5" />, onClick: () => { onCopy(); onClose() } },
-    { label: 'Export as Markdown', icon: <FileDown className="w-3.5 h-3.5" />, onClick: () => { onExport(); onClose() } },
+      ? { label: t('session.unsaveMessage'), icon: <BookmarkMinus className="w-3.5 h-3.5" />, onClick: () => { onUnsave(); onClose() } }
+      : { label: t('session.saveMessage'), icon: <Bookmark className="w-3.5 h-3.5" />, onClick: () => { onSave(); onClose() } },
+    { label: t('session.copy'), icon: <Copy className="w-3.5 h-3.5" />, onClick: () => { onCopy(); onClose() } },
+    { label: t('detail.exportMarkdown'), icon: <FileDown className="w-3.5 h-3.5" />, onClick: () => { onExport(); onClose() } },
   ]
 
   return createPortal(

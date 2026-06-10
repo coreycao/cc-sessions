@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import type { AiProfile, AiSettings } from '../../shared/types'
 import { createEmptyAiProfile } from '../hooks/useAiSettings'
+import { useI18n, type Language } from '../lib/i18n'
 import type { UpdaterMockMode } from '../lib/updater'
 import type { SettingsSection } from './SettingsList'
 
@@ -40,8 +41,9 @@ export function SettingsPanel({
   updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
   aiSettings, setAiSettings, aiSettingsSaving, testingProfileId, onSaveAiSettings, onTestAiProfile,
 }: SettingsPanelProps) {
-  const updateLabel = getUpdateLabel(updateState, updateVersion, updateProgress)
-  const updateDescription = getUpdateDescription(updateState, updateVersion, updateError)
+  const { t, language, setLanguage } = useI18n()
+  const updateLabel = getUpdateLabel(t, updateState, updateVersion, updateProgress)
+  const updateDescription = getUpdateDescription(t, updateState, updateVersion, updateError)
   const updateBusy = updateState === 'checking' || updateState === 'downloading'
   const onUpdateAction = updateState === 'available'
     ? onInstallUpdate
@@ -52,23 +54,23 @@ export function SettingsPanel({
   return (
     <div className="flex flex-1 min-w-0 flex-col rounded-xl border border-edge/70 bg-surface shadow-sm overflow-hidden">
       <div className="relative h-[42px] flex items-center justify-center border-b border-edge/50 px-5" data-tauri-drag-region>
-        <h2 className="text-[14px] font-semibold text-content">{SECTION_TITLES[section]}</h2>
-        <button className="absolute right-5 rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors" aria-label="More settings actions">
+        <h2 className="text-[14px] font-semibold text-content">{getSectionTitle(t, section)}</h2>
+        <button className="absolute right-5 rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors" aria-label={t('settings.moreActions')}>
           <MoreHorizontal className="h-4 w-4" />
         </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-12 py-9">
         {section === 'app' && (
-          <SettingsContent title="App">
-            <SettingsGroup title="Updates">
+          <SettingsContent title={t('settings.app')}>
+            <SettingsGroup title={t('settings.updates')}>
               <SettingRow
-                title="Version"
-                description="CC Sessions desktop application"
+                title={t('settings.version')}
+                description={t('settings.appVersionDescription')}
                 control={<span className="text-[13px] text-content-4">{appVersion}</span>}
               />
               <SettingRow
-                title="Check for updates"
+                title={t('settings.checkUpdates')}
                 description={updateDescription}
                 control={
                   <button
@@ -83,20 +85,20 @@ export function SettingsPanel({
               />
               {updaterMockMode !== null && (
                 <SettingRow
-                  title="Dev updater mock"
-                  description="Choose a local updater response for testing update UI states."
+                  title={t('settings.devUpdaterMock')}
+                  description={t('settings.devUpdaterMockDescription')}
                   control={
                     <select
                       value={updaterMockMode}
                       onChange={event => setUpdaterMockMode(event.target.value as UpdaterMockMode)}
                       className="h-8 rounded-lg border border-edge bg-surface px-2 text-[12px] font-medium text-content-2 shadow-sm outline-none hover:bg-surface-2"
                     >
-                      <option value="available">Update available</option>
-                      <option value="current">Up to date</option>
-                      <option value="timeout">Check timeout</option>
-                      <option value="error">Check failed</option>
-                      <option value="download-error">Download failed</option>
-                      <option value="real">Real updater</option>
+                      <option value="available">{t('settings.mockAvailable')}</option>
+                      <option value="current">{t('settings.mockCurrent')}</option>
+                      <option value="timeout">{t('settings.mockTimeout')}</option>
+                      <option value="error">{t('settings.mockError')}</option>
+                      <option value="download-error">{t('settings.mockDownloadError')}</option>
+                      <option value="real">{t('settings.mockReal')}</option>
                     </select>
                   }
                 />
@@ -117,12 +119,17 @@ export function SettingsPanel({
         )}
 
         {section === 'appearance' && (
-          <SettingsContent title="Appearance">
-            <SettingsGroup title="Theme">
+          <SettingsContent title={t('settings.appearance')}>
+            <SettingsGroup title={t('settings.theme')}>
               <SettingRow
-                title="Color mode"
-                description="Choose a fixed appearance or follow macOS system settings."
+                title={t('settings.colorMode')}
+                description={t('settings.colorModeDescription')}
                 control={<ThemePicker value={theme} onChange={setTheme} />}
+              />
+              <SettingRow
+                title={t('settings.language')}
+                description={t('settings.languageDescription')}
+                control={<LanguagePicker value={language} onChange={setLanguage} />}
               />
             </SettingsGroup>
           </SettingsContent>
@@ -132,10 +139,13 @@ export function SettingsPanel({
   )
 }
 
-const SECTION_TITLES: Record<SettingsSection, string> = {
-  app: 'App',
-  ai: 'AI',
-  appearance: 'Appearance',
+function getSectionTitle(t: (key: string) => string, section: SettingsSection) {
+  const keys: Record<SettingsSection, string> = {
+    app: 'settings.app',
+    ai: 'settings.ai',
+    appearance: 'settings.appearance',
+  }
+  return t(keys[section])
 }
 
 function SettingsContent({ title, children }: { title: string; children: ReactNode }) {
@@ -180,6 +190,7 @@ function AiSettingsContent({
   onSave: (settings: AiSettings) => Promise<AiSettings>
   onTest: (profile: AiProfile) => Promise<void>
 }) {
+  const { t } = useI18n()
   const activeId = settings.activeProfileId ?? settings.profiles[0]?.id ?? null
   const activeProfile = useMemo(
     () => settings.profiles.find(profile => profile.id === activeId) ?? settings.profiles[0] ?? null,
@@ -237,37 +248,37 @@ function AiSettingsContent({
 
   return (
     <SettingsContent title="AI">
-      <SettingsGroup title="LLM API">
+      <SettingsGroup title={t('settings.llmApi')}>
         <SettingRow
-          title="Active API"
-          description={activeProfile ? `${activeProfile.name} · ${activeProfile.model}` : 'Add an OpenAI-compatible API before reviewing sessions.'}
+          title={t('settings.activeApi')}
+          description={activeProfile ? `${activeProfile.name} · ${activeProfile.model}` : t('settings.addApiDescription')}
           control={
             <button
               onClick={addProfile}
               className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
             >
               <Plus className="h-3.5 w-3.5" />
-              Add API
+              {t('settings.addApi')}
             </button>
           }
         />
         {settings.profiles.length > 0 && (
           <SettingRow
-            title="Use for review"
-            description="Session reviews use this profile by default."
+            title={t('settings.useForReview')}
+            description={t('settings.useForReviewDescription')}
             control={
               <div className="relative">
                 <button
                   ref={profileBtnRef}
                   onClick={openProfileMenu}
                   className="inline-flex h-8 min-w-[220px] max-w-[320px] items-center gap-1.5 rounded-lg border border-edge bg-surface px-2 shadow-sm transition-colors hover:bg-surface-2"
-                  title={activeProfile ? `${activeProfile.name} · ${activeProfile.baseUrl}` : 'Choose a profile for review'}
-                  aria-label={activeProfile ? `Use for review: ${activeProfile.name}` : 'Choose a profile for review'}
+                  title={activeProfile ? `${activeProfile.name} · ${activeProfile.baseUrl}` : t('settings.chooseProfile')}
+                  aria-label={activeProfile ? t('settings.useForReviewProfile', { name: activeProfile.name }) : t('settings.chooseProfile')}
                   aria-expanded={profileMenuOpen}
                 >
                   <KeyRound className="h-3.5 w-3.5 flex-shrink-0 text-content-4" />
                   <span className="max-w-[170px] truncate text-[12px] font-medium text-content-2">
-                    {activeProfile?.name || 'Select API'}
+                    {activeProfile?.name || t('common.selectApi')}
                   </span>
                   {activeProfile && (
                     <span className="inline-flex h-5 items-center rounded-full border border-edge/70 bg-surface-2 px-1.5 text-[10px] font-medium leading-none text-content-4">
@@ -295,11 +306,11 @@ function AiSettingsContent({
                           className={`flex w-full items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${active ? 'bg-accent-subtle text-accent' : 'text-content-2 hover:bg-surface-3'}`}
                         >
                           <KeyRound className="h-3.5 w-3.5 flex-shrink-0" />
-                          <span className="min-w-0 flex-1 truncate text-left">{profile.name || 'Untitled API'}</span>
+                          <span className="min-w-0 flex-1 truncate text-left">{profile.name || t('common.untitledApi')}</span>
                           <span className="rounded-full border border-edge/70 bg-surface-2 px-1.5 text-[10px] font-medium leading-none text-content-4">
                             {profile.model}
                           </span>
-                          {active && <span className="text-[10px] font-medium text-accent">Default</span>}
+                          {active && <span className="text-[10px] font-medium text-accent">{t('common.default')}</span>}
                         </button>
                       )
                     })}
@@ -321,13 +332,13 @@ function AiSettingsContent({
                 <KeyRound className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold text-content">{profile.name || 'Untitled API'}</div>
-                <div className="truncate text-[11px] text-content-4">{profile.baseUrl || 'No base URL'}</div>
+                <div className="text-[13px] font-semibold text-content">{profile.name || t('common.untitledApi')}</div>
+                <div className="truncate text-[11px] text-content-4">{profile.baseUrl || t('common.noBaseUrl')}</div>
               </div>
               <button
                 onClick={() => removeProfile(profile.id)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-content-4 hover:bg-surface-3 hover:text-red-400"
-                aria-label="Remove AI API"
+                aria-label={t('settings.removeAiApi')}
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -335,26 +346,26 @@ function AiSettingsContent({
 
             <div className="grid gap-3 p-4 md:grid-cols-2">
               <LabeledInput
-                label="Name"
+                label={t('settings.name')}
                 value={profile.name}
                 onChange={value => updateProfile(profile.id, { name: value })}
                 placeholder="Work OpenAI"
               />
               <LabeledInput
-                label="Model"
+                label={t('settings.model')}
                 value={profile.model}
                 onChange={value => updateProfile(profile.id, { model: value })}
                 placeholder="gpt-4o-mini"
               />
               <LabeledInput
-                label="Base URL"
+                label={t('settings.baseUrl')}
                 value={profile.baseUrl}
                 onChange={value => updateProfile(profile.id, { baseUrl: value })}
                 placeholder="https://api.openai.com/v1"
                 className="md:col-span-2"
               />
               <LabeledInput
-                label="API Key"
+                label={t('settings.apiKey')}
                 value={profile.apiKey}
                 onChange={value => updateProfile(profile.id, { apiKey: value })}
                 placeholder="sk-..."
@@ -369,7 +380,7 @@ function AiSettingsContent({
                 className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
               >
                 {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                Test
+                {t('common.test')}
               </button>
               <button
                 onClick={() => onSave(settings)}
@@ -377,7 +388,7 @@ function AiSettingsContent({
                 className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
               >
                 {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                Save
+                {t('common.save')}
               </button>
             </div>
           </section>
@@ -412,10 +423,11 @@ function LabeledInput({
 }
 
 function ThemePicker({ value, onChange }: { value: Theme; onChange: (theme: Theme) => void }) {
+  const { t } = useI18n()
   const items: { value: Theme; label: string; icon: LucideIcon }[] = [
-    { value: 'light', label: 'Light', icon: Sun },
-    { value: 'dark', label: 'Dark', icon: Moon },
-    { value: 'system', label: 'System', icon: Monitor },
+    { value: 'light', label: t('settings.light'), icon: Sun },
+    { value: 'dark', label: t('settings.dark'), icon: Moon },
+    { value: 'system', label: t('settings.system'), icon: Monitor },
   ]
   return (
     <div className="inline-flex rounded-lg border border-edge bg-surface-2 p-0.5">
@@ -433,24 +445,45 @@ function ThemePicker({ value, onChange }: { value: Theme; onChange: (theme: Them
   )
 }
 
-function getUpdateLabel(state: UpdateState, version: string | null, progress: number | null): string {
-  if (state === 'checking') return 'Checking'
-  if (state === 'available') return `Download ${version ?? 'update'}`
-  if (state === 'downloading') return progress == null ? 'Downloading' : `${progress}%`
-  if (state === 'ready') return 'Restart to update'
-  if (state === 'current') return 'Up to date'
-  if (state === 'error') return 'Try again'
-  return 'Check now'
+function LanguagePicker({ value, onChange }: { value: Language; onChange: (language: Language) => void }) {
+  const { t } = useI18n()
+  const items: { value: Language; label: string }[] = [
+    { value: 'en', label: t('settings.english') },
+    { value: 'zh', label: t('settings.chinese') },
+  ]
+  return (
+    <div className="inline-flex rounded-lg border border-edge bg-surface-2 p-0.5">
+      {items.map(({ value: option, label }) => (
+        <button
+          key={option}
+          onClick={() => onChange(option)}
+          className={`inline-flex h-7 items-center rounded-md px-2.5 text-[12px] font-medium transition-colors ${value === option ? 'bg-surface text-content shadow-sm' : 'text-content-4 hover:text-content-2'}`}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
-function getUpdateDescription(state: UpdateState, version: string | null, error: string | null): string {
-  if (state === 'checking') return 'Checking GitHub Releases for a signed update.'
-  if (state === 'available') return `Version ${version ?? 'update'} is available. Download it now and restart later.`
-  if (state === 'downloading') return 'Downloading and preparing the signed update. The app will not restart yet.'
-  if (state === 'ready') return `Version ${version ?? 'update'} is ready. Restart CC Sessions when you are ready.`
-  if (state === 'current') return 'You are running the latest available version.'
+function getUpdateLabel(t: (key: string, params?: Record<string, string | number>) => string, state: UpdateState, version: string | null, progress: number | null): string {
+  if (state === 'checking') return t('settings.checking')
+  if (state === 'available') return t('settings.downloadUpdate', { version: version ?? 'update' })
+  if (state === 'downloading') return progress == null ? t('settings.downloading') : `${progress}%`
+  if (state === 'ready') return t('settings.restartUpdate')
+  if (state === 'current') return t('settings.current')
+  if (state === 'error') return t('settings.tryAgain')
+  return t('settings.checkNow')
+}
+
+function getUpdateDescription(t: (key: string, params?: Record<string, string | number>) => string, state: UpdateState, version: string | null, error: string | null): string {
+  if (state === 'checking') return t('settings.checkingDescription')
+  if (state === 'available') return t('settings.availableDescription', { version: version ?? 'update' })
+  if (state === 'downloading') return t('settings.downloadingDescription')
+  if (state === 'ready') return t('settings.readyDescription', { version: version ?? 'update' })
+  if (state === 'current') return t('settings.currentDescription')
   if (state === 'error') return error ?? 'The update check failed. Try again.'
-  return 'Use the built-in updater to download signed releases.'
+  return t('settings.idleDescription')
 }
 
 function getUpdateIcon(state: UpdateState) {

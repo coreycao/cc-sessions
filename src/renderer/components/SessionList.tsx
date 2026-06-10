@@ -1,8 +1,9 @@
 import { useRef, useState, useEffect, useCallback, useMemo } from 'react'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
-import { formatDate, relativeProjectName, buildGroupedRows, DATE_GROUP_LABELS } from '../lib/utils'
+import { formatDate, relativeProjectName, buildGroupedRows } from '../lib/utils'
 import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
+import { useI18n } from '../lib/i18n'
 
 type FilterView = 'all' | 'new' | 'archived' | 'starred'
 
@@ -37,6 +38,7 @@ export function SessionList({
   lastClickedIndex,
   filterStatus,
 }: SessionListProps) {
+  const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewportHeight, setViewportHeight] = useState(0)
@@ -80,14 +82,14 @@ export function SessionList({
           {hasFilters ? (
             <>
               <Search className="w-6 h-6 text-content-5" />
-              <span>No matching sessions</span>
-              <span className="text-[11px] text-content-5">Try adjusting your filters</span>
+              <span>{t('session.noMatching')}</span>
+              <span className="text-[11px] text-content-5">{t('session.adjustFilters')}</span>
             </>
           ) : (
             <>
               <FileText className="w-6 h-6 text-content-5" />
-              <span>No sessions yet</span>
-              <span className="text-[11px] text-content-5">Sessions appear after using Claude Code or Codex CLI</span>
+              <span>{t('session.noSessions')}</span>
+              <span className="text-[11px] text-content-5">{t('session.appearAfterUse')}</span>
             </>
           )}
         </div>
@@ -132,7 +134,7 @@ export function SessionList({
                     className="flex items-center px-4 bg-surface text-[12px] font-semibold text-content-4"
                     style={{ height: HEADER_HEIGHT }}
                   >
-                    {DATE_GROUP_LABELS[row.group]}
+                    {t(`date.${row.group}`)}
                   </div>
                 )
               }
@@ -205,7 +207,7 @@ export function SessionList({
                         <span className="text-[10px] text-content-4">{formatDate(session.modified)}</span>
                         {dimArchived && (
                           <span className="rounded border border-edge/70 bg-surface-2 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-content-5">
-                            Archived
+                            {t('session.archived')}
                           </span>
                         )}
                         {session.gitBranch && session.gitBranch !== 'HEAD' && (

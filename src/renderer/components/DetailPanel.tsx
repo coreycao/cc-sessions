@@ -19,6 +19,7 @@ import {
   RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle,
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
+import { useI18n } from '../lib/i18n'
 
 interface DetailPanelProps {
   selectedSession: SessionInfo
@@ -49,6 +50,7 @@ export const DetailPanel = memo(function DetailPanel({
   isSaved, addSavedMessage, removeSavedMessage,
   activeAiProfile,
 }: DetailPanelProps) {
+  const { t } = useI18n()
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [compact, setCompact] = useState(false)
@@ -142,7 +144,7 @@ export const DetailPanel = memo(function DetailPanel({
           <ProviderLogo provider={selectedSession.provider} size="md" />
           <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
         </div>
-        <ActionTip label={gtd.status === 'archived' ? 'Unarchive' : 'Archive'}>
+        <ActionTip label={gtd.status === 'archived' ? t('detail.unarchive') : t('detail.archive')}>
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}
             className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
@@ -150,7 +152,7 @@ export const DetailPanel = memo(function DetailPanel({
             {gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
           </button>
         </ActionTip>
-        <ActionTip label="Star">
+        <ActionTip label={t('detail.star')}>
           <button
             onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
             className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.starred ? 'text-amber-400' : 'text-content-4 hover:text-content-2'}`}
@@ -158,7 +160,7 @@ export const DetailPanel = memo(function DetailPanel({
             <Star className={`w-4 h-4 ${gtd.starred ? 'fill-amber-400' : ''}`} />
           </button>
         </ActionTip>
-        <ActionTip label="Resume in Terminal">
+        <ActionTip label={t('detail.resumeTerminal')}>
           <button
             onClick={() => restoreSession(selectedSession)}
             className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
@@ -166,17 +168,17 @@ export const DetailPanel = memo(function DetailPanel({
             <RotateCcw className="w-4 h-4" />
           </button>
         </ActionTip>
-        <ActionTip label="Review with AI">
+        <ActionTip label={t('detail.reviewWithAi')}>
           <button
             onClick={reviewSession}
             className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-            aria-label="Review current session with AI"
+            aria-label={t('detail.reviewCurrentSession')}
           >
             <Brain className="w-4 h-4" />
           </button>
         </ActionTip>
         <div className="relative">
-          <ActionTip label="More actions">
+          <ActionTip label={t('detail.moreActions')}>
             <button
               ref={overflowRef}
               onClick={() => setShowOverflow(v => !v)}
@@ -201,7 +203,7 @@ export const DetailPanel = memo(function DetailPanel({
       {/* Metadata */}
       <div className="px-5 py-3 bg-surface-2/35 border-b border-edge/40 space-y-3">
         <div className="flex items-center gap-3">
-          <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">Tags</span>
+          <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
           <div className="flex items-center gap-1.5 flex-wrap">
             {gtd.tags.map(tag => (
               <span key={tag} className="group flex items-center gap-1 text-[12px] bg-surface text-content-2 border border-edge/70 pl-2 pr-1.5 py-0.5 rounded-lg hover:bg-surface-3">
@@ -225,7 +227,7 @@ export const DetailPanel = memo(function DetailPanel({
                 onClick={() => setShowTagInput(true)}
                 className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors"
               >
-                <Plus className="w-3 h-3" />Add tag
+                <Plus className="w-3 h-3" />{t('detail.addTag')}
               </button>
             )}
           </div>
@@ -239,7 +241,7 @@ export const DetailPanel = memo(function DetailPanel({
 
         <div className="flex items-center gap-4 text-[11px] text-content-4">
           <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(selectedSession.created).toLocaleDateString()}</span>
-          <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount} msgs</span>
+          <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount}</span>
           {selectedSession.gitBranch && <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" />{selectedSession.gitBranch}</span>}
           {selectedSession.version && <span>v{selectedSession.version}</span>}
         </div>
@@ -261,21 +263,21 @@ export const DetailPanel = memo(function DetailPanel({
 
       {/* Scroll controls */}
       <div className="absolute bottom-4 right-4 z-20 flex flex-col overflow-hidden rounded-lg border border-edge bg-surface/95 shadow-lg backdrop-blur">
-        <ActionTip label="Scroll to top">
+        <ActionTip label={t('detail.scrollTop')}>
           <button
             onClick={() => scrollConversation('top')}
             className="h-8 w-8 inline-flex items-center justify-center text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors"
-            aria-label="Scroll conversation to top"
+            aria-label={t('detail.scrollTop')}
           >
             <ChevronUp className="w-4 h-4" />
           </button>
         </ActionTip>
         <div className="h-px bg-edge/70" />
-        <ActionTip label="Scroll to bottom">
+        <ActionTip label={t('detail.scrollBottom')}>
           <button
             onClick={() => scrollConversation('bottom')}
             className="h-8 w-8 inline-flex items-center justify-center text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors"
-            aria-label="Scroll conversation to bottom"
+            aria-label={t('detail.scrollBottom')}
           >
             <ChevronDown className="w-4 h-4" />
           </button>
@@ -315,6 +317,7 @@ function SessionReviewDialog({
   onRetry: () => void
   onClose: () => void
 }) {
+  const { t } = useI18n()
   return createPortal(
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div className="flex max-h-[82vh] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
@@ -323,7 +326,7 @@ function SessionReviewDialog({
             {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
           </div>
           <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold text-content">Session review</div>
+            <div className="truncate text-[13px] font-semibold text-content">{t('detail.sessionReview')}</div>
             <div className="truncate text-[11px] text-content-4">{profileName ? `${profileName} · ${title}` : title}</div>
           </div>
           <button onClick={onClose} className="rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2" aria-label="Close session review">
@@ -335,15 +338,15 @@ function SessionReviewDialog({
           {loading ? (
             <div className="flex h-52 flex-col items-center justify-center gap-3 text-content-4">
               <LoaderCircle className="h-6 w-6 animate-spin" />
-              <div className="text-[13px] font-medium text-content-2">Reviewing conversation...</div>
-              <div className="text-[12px]">This can take a moment for longer sessions.</div>
+              <div className="text-[13px] font-medium text-content-2">{t('detail.reviewingConversation')}</div>
+              <div className="text-[12px]">{t('detail.reviewingHint')}</div>
             </div>
           ) : error ? (
             <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-red-400" />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13px] font-semibold text-red-400">Review failed</div>
+                  <div className="text-[13px] font-semibold text-red-400">{t('detail.reviewFailed')}</div>
                   <div className="mt-1 whitespace-pre-wrap break-words text-[12px] leading-relaxed text-content-3">{error}</div>
                 </div>
               </div>
@@ -351,28 +354,28 @@ function SessionReviewDialog({
           ) : (
             <div className="prose prose-sm max-w-none text-content prose-headings:text-content prose-p:text-content-2 prose-strong:text-content prose-li:text-content-2 prose-code:text-content">
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeHighlight]}>
-                {content || 'No review content returned.'}
+                {content || t('detail.noReviewContent')}
               </ReactMarkdown>
             </div>
           )}
         </div>
 
         <div className="flex items-center justify-between border-t border-edge/70 px-4 py-3">
-          <div className="text-[11px] text-content-4">Generated from the currently loaded session content.</div>
+          <div className="text-[11px] text-content-4">{t('detail.generatedFromCurrentSession')}</div>
           <div className="flex items-center gap-2">
             {error && (
               <button
                 onClick={onRetry}
                 className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
               >
-                Retry
+                {t('common.retry')}
               </button>
             )}
             <button
               onClick={onClose}
               className="inline-flex h-8 items-center rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90"
             >
-              Done
+              {t('common.done')}
             </button>
           </div>
         </div>

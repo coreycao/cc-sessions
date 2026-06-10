@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { SettingsPanel, type UpdateState } from './SettingsPanel'
+import { I18nProvider } from '../lib/i18n'
 
 let container: HTMLDivElement
 let root: Root
@@ -43,7 +44,7 @@ function renderSettings(updateState: UpdateState) {
   }
 
   act(() => {
-    root.render(<SettingsPanel {...props} />)
+    root.render(<I18nProvider><SettingsPanel {...props} /></I18nProvider>)
   })
 
   return props
@@ -101,7 +102,7 @@ describe('SettingsPanel AI settings', () => {
     }
 
     act(() => {
-      root.render(<SettingsPanel {...props} />)
+      root.render(<I18nProvider><SettingsPanel {...props} /></I18nProvider>)
     })
 
     act(() => findButton('Add API').click())

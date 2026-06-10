@@ -1,6 +1,7 @@
 import type { SavedMessage } from '../../shared/types'
 import { formatDate } from '../lib/utils'
 import { Bookmark } from 'lucide-react'
+import { useI18n } from '../lib/i18n'
 
 interface SavedMessagesListProps {
   savedMessages: SavedMessage[]
@@ -9,13 +10,14 @@ interface SavedMessagesListProps {
 }
 
 export function SavedMessagesList({ savedMessages, selectedSavedId, setSelectedSavedId }: SavedMessagesListProps) {
+  const { t } = useI18n()
   if (savedMessages.length === 0) {
     return (
-      <div className="flex-1 min-h-0 flex flex-col bg-surface" role="list" aria-label="Saved messages">
+      <div className="flex-1 min-h-0 flex flex-col bg-surface" role="list" aria-label={t('app.savedTitle')}>
         <div className="flex-1 flex flex-col items-center justify-center text-content-4 text-xs gap-2">
           <Bookmark className="w-6 h-6 text-content-5" />
-          <span>No saved messages</span>
-          <span className="text-[11px] text-content-5">Right-click a message to save it</span>
+          <span>{t('session.noSavedMessages')}</span>
+          <span className="text-[11px] text-content-5">{t('session.rightClickToSave')}</span>
         </div>
       </div>
     )
@@ -24,7 +26,7 @@ export function SavedMessagesList({ savedMessages, selectedSavedId, setSelectedS
   const sorted = [...savedMessages].sort((a, b) => b.savedAt.localeCompare(a.savedAt))
 
   return (
-    <div className="flex-1 min-h-0 flex flex-col bg-surface" role="list" aria-label="Saved messages">
+    <div className="flex-1 min-h-0 flex flex-col bg-surface" role="list" aria-label={t('app.savedTitle')}>
       <div className="flex-1 overflow-y-auto">
         {sorted.map(msg => {
           const isSelected = selectedSavedId === msg.id

@@ -6,6 +6,7 @@ import rehypeHighlight from 'rehype-highlight'
 import type { SavedMessage, SessionInfo } from '../../shared/types'
 import { formatDate } from '../lib/utils'
 import { Bookmark, BookmarkMinus, Copy, FileDown, X, ExternalLink } from 'lucide-react'
+import { useI18n } from '../lib/i18n'
 
 interface SavedMessageDetailProps {
   message: SavedMessage
@@ -16,6 +17,7 @@ interface SavedMessageDetailProps {
 }
 
 export function SavedMessageDetail({ message, sessions, removeSavedMessage, setSelectedSavedId, onJumpToSession }: SavedMessageDetailProps) {
+  const { t } = useI18n()
   const sourceSession = sessions.find(s => s.sessionId === message.sessionId)
   const sourceExists = !!sourceSession
   const assistantLabel = sourceSession?.provider === 'codex' ? 'Codex' : 'Claude'
@@ -59,44 +61,44 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
             <button
               onClick={() => onJumpToSession(message.sessionId)}
               className="text-[14px] font-semibold text-content truncate hover:text-accent transition-colors inline-flex items-center gap-1 min-w-0"
-              title="Open source session"
+              title={t('session.openSource')}
             >
               <span className="truncate">{message.sessionTitle}</span>
               <ExternalLink className="w-3 h-3 flex-shrink-0 opacity-60" />
             </button>
           ) : (
-            <span className="text-sm text-content-4 truncate" title="Source session deleted">
-              {message.sessionTitle} <span className="text-content-5">(deleted)</span>
+            <span className="text-sm text-content-4 truncate" title={t('session.sourceDeleted')}>
+              {message.sessionTitle} <span className="text-content-5">({t('session.deleted')})</span>
             </span>
           )}
         </div>
         <button
           onClick={handleCopy}
           className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-          title="Copy"
+          title={t('session.copy')}
         >
           <Copy className="w-4 h-4" />
         </button>
         <button
           onClick={handleExport}
           className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-          title="Export as Markdown"
+          title={t('detail.exportMarkdown')}
         >
           <FileDown className="w-4 h-4" />
         </button>
         <button
           onClick={handleUnsave}
           className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors"
-          title="Unsave"
+          title={t('session.unsaveMessage')}
         >
           <BookmarkMinus className="w-4 h-4" />
         </button>
       </div>
 
       <div className="px-5 py-2.5 border-b border-edge/50 bg-surface-2/35 flex items-center gap-4 text-[11px] text-content-4">
-        <span>Saved {formatDate(message.savedAt)}</span>
-        {message.timestamp && <span>Original {formatDate(message.timestamp)}</span>}
-        <span className="ml-auto">{message.content.length.toLocaleString()} chars</span>
+        <span>{t('session.savedAt', { date: formatDate(message.savedAt) })}</span>
+        {message.timestamp && <span>{t('session.originalAt', { date: formatDate(message.timestamp) })}</span>}
+        <span className="ml-auto">{t('session.chars', { count: message.content.length.toLocaleString() })}</span>
       </div>
 
       <div className="flex-1 overflow-y-auto px-7 py-5">

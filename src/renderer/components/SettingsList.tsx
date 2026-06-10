@@ -1,4 +1,5 @@
 import { Bell, Bot, Brush, type LucideIcon } from 'lucide-react'
+import { useI18n } from '../lib/i18n'
 
 export type SettingsSection =
   | 'app'
@@ -10,21 +11,22 @@ interface SettingsListProps {
   onSelect: (section: SettingsSection) => void
 }
 
-const ITEMS: { id: SettingsSection; icon: LucideIcon; label: string; description: string }[] = [
-  { id: 'app', icon: Bell, label: 'App', description: 'Version and updates' },
-  { id: 'ai', icon: Bot, label: 'AI', description: 'LLM API' },
-  { id: 'appearance', icon: Brush, label: 'Appearance', description: 'Theme' },
-]
-
 export function SettingsList({ selected, onSelect }: SettingsListProps) {
+  const { t } = useI18n()
+  const items: { id: SettingsSection; icon: LucideIcon; label: string; description: string }[] = [
+    { id: 'app', icon: Bell, label: t('settings.app'), description: t('settings.appDescription') },
+    { id: 'ai', icon: Bot, label: t('settings.ai'), description: t('settings.aiDescription') },
+    { id: 'appearance', icon: Brush, label: t('settings.appearance'), description: t('settings.appearanceDescription') },
+  ]
+
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="relative flex-shrink-0 h-[42px] flex items-center justify-center border-b border-edge/50">
-        <h2 className="text-[14px] font-semibold text-content">Settings</h2>
+        <h2 className="text-[14px] font-semibold text-content">{t('settings.title')}</h2>
       </div>
       <div className="flex-1 overflow-y-auto px-4 py-8">
         <div className="space-y-1">
-          {ITEMS.map(({ id, icon: Icon, label, description }) => {
+          {items.map(({ id, icon: Icon, label, description }) => {
             const active = selected === id
             return (
               <button

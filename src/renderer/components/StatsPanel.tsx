@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import type { SessionInfo } from '../../shared/types'
+import { useI18n } from '../lib/i18n'
 
 interface StatsPanelProps {
   sessions: SessionInfo[]
 }
 
 export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
+  const { t, language } = useI18n()
   const [expanded, setExpanded] = useState(false)
 
   const stats = useMemo(() => {
@@ -33,7 +35,7 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
     for (let i = 6; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
       const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
-      dayLabels.push(d.toLocaleString('en', { weekday: 'short' }).slice(0, 2))
+      dayLabels.push(d.toLocaleString(language === 'zh' ? 'zh-CN' : 'en', { weekday: 'short' }).slice(0, 2))
       let count = 0
       for (const s of sessions) {
         const sd = new Date(s.created)
@@ -54,7 +56,7 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
       dayLabels,
       dayValues,
     }
-  }, [sessions])
+  }, [language, sessions])
 
   const maxDayVal = Math.max(...stats.dayValues, 1)
 
@@ -66,7 +68,7 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
         onClick={() => setExpanded(v => !v)}
         className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-content-4 hover:text-content-3 transition-colors"
       >
-        <span>Stats</span>
+        <span>{t('stats.title')}</span>
         <svg
           className={`w-3 h-3 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
@@ -79,19 +81,19 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
         <div className="px-3 pb-3 space-y-3">
           {/* Key metrics grid */}
           <div className="grid grid-cols-2 gap-2">
-            <MetricCard label="Total" value={stats.total} accent />
-            <MetricCard label="This Month" value={stats.thisMonthCount} accent={stats.thisMonthCount > 0} />
-            <MetricCard label="Avg Length" value={`${stats.avgMessages}`} sub="messages" />
+            <MetricCard label={t('stats.total')} value={stats.total} accent />
+            <MetricCard label={t('stats.thisMonth')} value={stats.thisMonthCount} accent={stats.thisMonthCount > 0} />
+            <MetricCard label={t('stats.avgLength')} value={`${stats.avgMessages}`} sub={t('stats.messages')} />
             <MetricCard
-              label="Top Project"
+              label={t('stats.topProject')}
               value={stats.topProject ? abbreviate(stats.topProject[0], 12) : '—'}
-              sub={stats.topProject ? `${stats.topProject[1]} sessions` : undefined}
+              sub={stats.topProject ? t('stats.sessions', { count: stats.topProject[1] }) : undefined}
             />
           </div>
 
           {/* Activity - last 7 days */}
           <div>
-            <div className="text-[10px] text-content-4 mb-1.5">This Week</div>
+            <div className="text-[10px] text-content-4 mb-1.5">{t('stats.thisWeek')}</div>
             <div className="flex items-end gap-[3px] h-8">
               {stats.dayValues.map((v, i) => {
                 const pct = Math.max((v / maxDayVal) * 100, 4)

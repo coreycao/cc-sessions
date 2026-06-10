@@ -20,6 +20,7 @@ import {
   ChevronRight, ChevronDown, Wrench, CheckCircle2, XCircle,
   Brain, Clock, Terminal, Copy, Check, X, Maximize2, Bookmark,
 } from 'lucide-react'
+import { useI18n } from '../lib/i18n'
 
 // ---- Per-message save action callbacks (passed down by DetailPanel) ----
 
@@ -409,6 +410,7 @@ export function FullscreenMessageModal({ message, assistantLabel = 'Claude', onC
   assistantLabel?: string
   onClose: () => void
 }) {
+  const { t } = useI18n()
   const isUser = message.role === 'user'
   const [copied, setCopied] = useState(false)
 
@@ -442,25 +444,25 @@ export function FullscreenMessageModal({ message, assistantLabel = 'Claude', onC
       <div className="relative flex items-center justify-center px-6 py-3 border-b border-edge/50 shrink-0">
         <div className="flex items-center gap-3">
           <span className={`text-xs font-semibold uppercase tracking-wider px-2 py-0.5 rounded-md ${isUser ? 'text-blue-400 bg-blue-500/10' : 'text-emerald-400 bg-emerald-500/10'}`}>
-            {isUser ? 'You' : assistantLabel}
+            {isUser ? t('session.you') : assistantLabel}
           </span>
           {message.timestamp && (
             <span className="text-xs text-content-4">{formatDate(message.timestamp)}</span>
           )}
-          <span className="text-[10px] text-content-5">{message.text.length.toLocaleString()} chars</span>
+          <span className="text-[10px] text-content-5">{t('session.chars', { count: message.text.length.toLocaleString() })}</span>
         </div>
         <div className="absolute right-6 flex items-center gap-1">
           <button
             onClick={handleCopy}
             className="p-1.5 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors cursor-pointer"
-            title="Copy content"
+            title={t('session.copyContent')}
           >
             {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
           </button>
           <button
             onClick={onClose}
             className="p-1.5 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors cursor-pointer"
-            title="Close (Esc)"
+            title={t('session.closeEsc')}
           >
             <X className="w-4 h-4" />
           </button>

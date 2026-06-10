@@ -5,6 +5,7 @@ import {
   Plus, Tag, X, Trash2, RotateCcw, AlertTriangle,
   FileText, FileCode, FileDown, MoreHorizontal,
 } from 'lucide-react'
+import { useI18n } from '../lib/i18n'
 
 // ---- Action tooltip ----
 
@@ -45,6 +46,7 @@ export function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onE
   onExport: () => void
   onDelete: () => void
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, left: 0 })
 
@@ -71,15 +73,15 @@ export function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onE
     >
       <button onClick={onToggleCompact} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
         <span className="text-content-4">{compact ? <FileCode className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}</span>
-        {compact ? 'Full view' : 'Compact view'}
+        {compact ? t('detail.fullView') : t('detail.compactView')}
       </button>
       <button onClick={onExport} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
         <span className="text-content-4"><FileDown className="w-3.5 h-3.5" /></span>
-        Export as Markdown
+        {t('detail.exportMarkdown')}
       </button>
       <button onClick={onDelete} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-red-400 hover:bg-surface-3">
         <span><Trash2 className="w-3.5 h-3.5" /></span>
-        Delete
+        {t('common.delete')}
       </button>
     </div>,
     document.body,
@@ -95,6 +97,7 @@ export function TagInput({ value, onChange, onSubmit, onClose, suggestions }: {
   onClose: () => void
   suggestions: string[]
 }) {
+  const { t } = useI18n()
   const ref = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(true)
   const [highlighted, setHighlighted] = useState(-1)
@@ -145,7 +148,7 @@ export function TagInput({ value, onChange, onSubmit, onClose, suggestions }: {
             if (e.key === 'Enter' && highlighted >= 0 && highlighted < filtered.length) { e.preventDefault(); select(filtered[highlighted]) }
           }}
           onFocus={() => setOpen(true)}
-          placeholder="tag name..."
+          placeholder={t('sidebar.newTagPlaceholder')}
           className="bg-surface-2 border border-edge rounded-md px-2 py-0.5 text-[11px] text-content placeholder-content-4 focus:outline-none focus:border-content-3 w-24"
           autoFocus
         />
@@ -179,6 +182,7 @@ export function NoteInput({ value, updatedAt, onSave }: {
   updatedAt: string
   onSave: (notes: string) => void
 }) {
+  const { t } = useI18n()
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
 
@@ -203,19 +207,19 @@ export function NoteInput({ value, updatedAt, onSave }: {
   if (editing) {
     return (
       <div className="flex items-start gap-3">
-        <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14 pt-1.5">Notes</span>
+        <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14 pt-1.5">{t('detail.notes')}</span>
         <div className="flex-1 min-w-0">
           <textarea
             value={draft}
             onChange={e => setDraft(e.target.value)}
             onBlur={save}
             onKeyDown={handleKeyDown}
-            placeholder="Add a note..."
+            placeholder={t('detail.addNote')}
             rows={1}
             autoFocus
             className="w-full bg-surface-2/60 border border-edge rounded-md px-2 py-1.5 text-[11px] text-content-2 placeholder-content-4 focus:outline-none focus:border-content-3 resize-none leading-relaxed"
           />
-          <span className="text-[9px] text-content-5 mt-0.5 block">⌘Enter to save · Esc to cancel</span>
+          <span className="text-[9px] text-content-5 mt-0.5 block">{t('detail.noteHint')}</span>
         </div>
       </div>
     )
@@ -223,12 +227,12 @@ export function NoteInput({ value, updatedAt, onSave }: {
 
   return (
     <div className="flex items-start gap-3">
-      <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14 pt-1.5">Notes</span>
+      <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14 pt-1.5">{t('detail.notes')}</span>
       {value ? (
         <div
           onClick={startEdit}
           className="flex-1 min-w-0 cursor-pointer bg-surface-2/40 rounded-md px-2 py-1.5 hover:bg-surface-2/80 transition-colors"
-          title="Click to edit"
+          title={t('detail.clickToEdit')}
         >
           <p className="text-[11px] text-content-2 leading-relaxed line-clamp-2">{value}</p>
           {updatedAt && <span className="text-[9px] text-content-5 mt-0.5 block">{formatDate(updatedAt)}</span>}
@@ -238,7 +242,7 @@ export function NoteInput({ value, updatedAt, onSave }: {
           onClick={startEdit}
           className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors py-1.5"
         >
-          <Plus className="w-3 h-3" />Add a note...
+          <Plus className="w-3 h-3" />{t('detail.addNote')}
         </button>
       )}
     </div>
@@ -252,6 +256,7 @@ export function DeleteConfirmDialog({ title, onConfirm, onCancel }: {
   onConfirm: () => void
   onCancel: () => void
 }) {
+  const { t } = useI18n()
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
     document.addEventListener('keydown', handler)
@@ -266,9 +271,9 @@ export function DeleteConfirmDialog({ title, onConfirm, onCancel }: {
             <AlertTriangle className="w-5 h-5 text-red-400" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-content mb-1">Delete Session</h3>
+            <h3 className="text-sm font-semibold text-content mb-1">{t('detail.deleteSession')}</h3>
             <p className="text-xs text-content-3 leading-relaxed">
-              Are you sure you want to delete <span className="text-content font-medium">"{title}"</span>? This action cannot be undone.
+              {t('detail.deleteSessionMessage', { title })}
             </p>
           </div>
         </div>
@@ -277,13 +282,13 @@ export function DeleteConfirmDialog({ title, onConfirm, onCancel }: {
             onClick={onCancel}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-content-2 hover:bg-surface transition-colors"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             onClick={onConfirm}
             className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
           >
-            Delete
+            {t('common.delete')}
           </button>
         </div>
       </div>
