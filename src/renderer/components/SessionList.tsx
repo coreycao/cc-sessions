@@ -1,4 +1,4 @@
-import { useRef, useMemo } from 'react'
+import { useCallback, useEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
 import { formatDate, relativeProjectName, buildGroupedRows } from '../lib/utils'
@@ -43,6 +43,39 @@ export function SessionList({
 }: SessionListProps) {
   const { t } = useI18n()
   const scrollRef = useRef<HTMLDivElement>(null)
+  const deferredSelectFrame = useRef<number | null>(null)
+  const deferredSelectTimer = useRef<number | null>(null)
+  const [optimisticSelectedId, setOptimisticSelectedId] = useState<string | null>(selectedSessionId)
+
+  useEffect(() => {
+    setOptimisticSelectedId(selectedSessionId)
+  }, [selectedSessionId])
+
+  useEffect(() => () => {
+    if (deferredSelectFrame.current != null) {
+      cancelAnimationFrame(deferredSelectFrame.current)
+    }
+    if (deferredSelectTimer.current != null) {
+      window.clearTimeout(deferredSelectTimer.current)
+    }
+  }, [])
+
+  const selectSessionAfterSelectionPaint = useCallback((session: SessionInfo) => {
+    setOptimisticSelectedId(session.sessionId)
+    if (deferredSelectFrame.current != null) {
+      cancelAnimationFrame(deferredSelectFrame.current)
+    }
+    if (deferredSelectTimer.current != null) {
+      window.clearTimeout(deferredSelectTimer.current)
+    }
+    deferredSelectFrame.current = requestAnimationFrame(() => {
+      deferredSelectFrame.current = null
+      deferredSelectTimer.current = window.setTimeout(() => {
+        deferredSelectTimer.current = null
+        selectSession(session)
+      }, 0)
+    })
+  }, [selectSession])
 
   const hasBatchSelection = batchSelectedIds.size > 0
 
@@ -106,8 +139,8 @@ export function SessionList({
               >
                 <SessionListRow
                   row={row}
-                  selectedSessionId={selectedSessionId}
-                  selectSession={selectSession}
+                  selectedSessionId={optimisticSelectedId}
+                  selectSession={selectSessionAfterSelectionPaint}
                   getGTD={getGTD}
                   contentResults={contentResults}
                   hasBatchSelection={hasBatchSelection}
