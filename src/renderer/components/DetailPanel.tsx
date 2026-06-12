@@ -113,11 +113,9 @@ export const DetailPanel = memo(function DetailPanel({
     })
   }, [])
 
-  const handleConversationScroll = useCallback(() => {
-    const el = conversationScrollRef.current
-    if (!el) return
-    if (el.scrollTop > 60) setMetadataCollapsed(true)
-    else if (el.scrollTop <= 10) setMetadataCollapsed(false)
+  const handleConversationScroll = useCallback((scrollTop: number) => {
+    if (scrollTop > 60) setMetadataCollapsed(true)
+    else if (scrollTop <= 10) setMetadataCollapsed(false)
   }, [])
 
   const reviewSession = useCallback(async () => {
@@ -299,7 +297,7 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Conversation */}
-      <div ref={conversationScrollRef} onScroll={handleConversationScroll} className="flex-1 overflow-y-auto px-7 py-5 bg-surface">
+      <div className="flex-1 overflow-hidden bg-surface">
         {sessionContentLoading ? (
           <ConversationLoadingState />
         ) : (
@@ -311,6 +309,8 @@ export const DetailPanel = memo(function DetailPanel({
               assistantLabel={assistantLabel}
               compact={compact}
               actions={messageActions}
+              onScroll={handleConversationScroll}
+              scrollContainerRef={conversationScrollRef}
             />
           </InlineErrorBoundary>
         )}

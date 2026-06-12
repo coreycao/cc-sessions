@@ -1,4 +1,6 @@
-import { useState, useMemo, useEffect, startTransition } from 'react'
+import { useRef, useState, useMemo, useEffect, startTransition } from 'react'
+import type { MutableRefObject } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { parseConversation } from '../lib/parseConversation'
 import { TurnRenderer, FullscreenMessageModal } from './ConversationMessage'
 import type { MessageActions } from './ConversationMessage'
@@ -7,23 +9,39 @@ import type { ConversationTurn, SessionProvider } from '../../shared/types'
 export { FullscreenMessageModal } from './ConversationMessage'
 export type { MessageActions } from './ConversationMessage'
 
-export function ConversationPreview({ content, sessionId, provider, assistantLabel, compact, actions }: {
+export function ConversationPreview({ content, sessionId, provider, assistantLabel, compact, actions, onScroll, scrollContainerRef }: {
   content: string
   sessionId: string
   provider: SessionProvider
   assistantLabel: string
   compact: boolean
   actions: MessageActions
+  onScroll?: (scrollTop: number) => void
+  scrollContainerRef?: MutableRefObject<HTMLDivElement | null>
 }) {
   const [expandedMsg, setExpandedMsg] = useState<{ role: string; text: string; timestamp: string } | null>(null)
+  const internalScrollRef = useRef<HTMLDivElement>(null)
+  const scrollRef = scrollContainerRef ?? internalScrollRef
   const renderKey = conversationParseKey(content, provider, sessionId)
 
   const { turns, parsing, error } = useParsedConversation(content, provider, sessionId)
-  const visibleCount = useProgressiveMount(turns.length, renderKey)
+  const virtualizer = useVirtualizer({
+    count: turns.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: (index) => estimateTurnHeight(turns[index]),
+    getItemKey: (index) => turns[index]?.id ?? index,
+    initialRect: { width: 900, height: 640 },
+    overscan: 8,
+  })
 
   useEffect(() => {
     setExpandedMsg(null)
+    scrollRef.current?.scrollTo({ top: 0 })
   }, [renderKey])
+
+  useEffect(() => {
+    virtualizer.measure()
+  }, [compact, renderKey, virtualizer])
 
   if (parsing) {
     return <ConversationParseState />
@@ -37,18 +55,47 @@ export function ConversationPreview({ content, sessionId, provider, assistantLab
     return <div className="text-content-4 text-xs">No conversation content available.</div>
   }
 
-  const visibleTurns = visibleCount >= turns.length ? turns : turns.slice(0, visibleCount)
-  const remaining = turns.length - visibleCount
+  const virtualItems = virtualizer.getVirtualItems()
 
   return (
     <>
-      <div className="space-y-5 flex flex-col">
-        {visibleTurns.map((turn, i) => (
-          <div key={turn.id} className="turn-enter" style={{ animationDelay: `${Math.min(i, 12) * 8}ms` }}>
-            <TurnRenderer turn={turn} onExpand={setExpandedMsg} compact={compact} actions={actions} assistantLabel={assistantLabel} />
+      <div
+        ref={scrollRef}
+        className="h-full overflow-y-auto"
+        onScroll={event => onScroll?.(event.currentTarget.scrollTop)}
+      >
+        <div
+          className="relative mx-7 my-5"
+          style={{ height: `${virtualizer.getTotalSize()}px` }}
+        >
+          {virtualItems.map(virtualItem => {
+            const turn = turns[virtualItem.index]
+            if (!turn) return null
+
+            return (
+              <div
+                key={virtualItem.key}
+                ref={virtualizer.measureElement}
+                data-index={virtualItem.index}
+                className="absolute left-0 right-0 top-0 pb-5"
+                style={{ transform: `translateY(${virtualItem.start}px)` }}
+              >
+                <TurnRenderer
+                  turn={turn}
+                  onExpand={setExpandedMsg}
+                  compact={compact}
+                  actions={actions}
+                  assistantLabel={assistantLabel}
+                />
+              </div>
+            )
+          })}
+        </div>
+        {turns.length > 80 && (
+          <div className="pointer-events-none sticky bottom-2 mx-auto mb-1 w-fit rounded-full border border-edge/70 bg-surface/90 px-2 py-1 text-[10px] text-content-4 shadow-sm backdrop-blur">
+            {(virtualItems[0]?.index ?? 0) + 1} / {turns.length}
           </div>
-        ))}
-        {remaining > 0 && <LoadingIndicator remaining={remaining} total={turns.length} />}
+        )}
       </div>
       {expandedMsg && (
         <FullscreenMessageModal
@@ -87,9 +134,6 @@ export function PlainConversation({ content, provider = 'claude' }: { content: s
   )
 }
 
-const FIRST_BATCH = 20
-const BATCH_SIZE = 12
-const BATCH_SIZE_LARGE = 24
 const WORKER_PARSE_THRESHOLD = 100_000
 
 type ParseState = {
@@ -194,55 +238,28 @@ function conversationParseKey(content: string, provider: SessionProvider, sessio
   ].join(':')
 }
 
-function useProgressiveMount(total: number, resetKey: string): number {
-  const [visibleCount, setVisibleCount] = useState(() => Math.min(total, FIRST_BATCH))
-
-  useEffect(() => {
-    setVisibleCount(Math.min(total, FIRST_BATCH))
-    if (total <= FIRST_BATCH) return
-
-    let cancelled = false
-    let rafId = 0
-    let current = Math.min(total, FIRST_BATCH)
-
-    const step = () => {
-      if (cancelled) return
-      const batch = current < 80 ? BATCH_SIZE : BATCH_SIZE_LARGE
-      const next = Math.min(total, current + batch)
-      current = next
-      startTransition(() => setVisibleCount(next))
-      if (next < total) {
-        rafId = requestAnimationFrame(step)
-      }
-    }
-
-    rafId = requestAnimationFrame(step)
-    return () => {
-      cancelled = true
-      cancelAnimationFrame(rafId)
-    }
-  }, [total, resetKey])
-
-  return visibleCount
+function estimateTurnHeight(turn: ConversationTurn | undefined): number {
+  if (!turn) return 120
+  if (turn.kind === 'system') return 56
+  if (turn.kind === 'user_turn') {
+    return Math.min(260, 92 + Math.ceil(turn.message.content.length / 88) * 18)
+  }
+  if (turn.kind === 'assistant_turn') {
+    const textLength = turn.messages.reduce((sum, message) => (
+      message.kind === 'text' || message.kind === 'thinking'
+        ? sum + message.content.length
+        : sum + 160
+    ), 0)
+    const visibleMessageCount = Math.max(1, turn.messages.length)
+    return Math.min(520, 72 + visibleMessageCount * 56 + Math.ceil(textLength / 92) * 18)
+  }
+  return 120
 }
 
 function ConversationParseState() {
   return (
     <div className="flex min-h-[220px] items-center justify-center text-[12px] text-content-4">
       <span>Preparing conversation...</span>
-    </div>
-  )
-}
-
-function LoadingIndicator({ remaining, total }: { remaining: number; total: number }) {
-  return (
-    <div className="flex items-center justify-center gap-2 py-2 text-[10px] text-content-5">
-      <span className="inline-flex gap-0.5">
-        <span className="w-1 h-1 rounded-full bg-content-4 animate-pulse" style={{ animationDelay: '0ms' }} />
-        <span className="w-1 h-1 rounded-full bg-content-4 animate-pulse" style={{ animationDelay: '150ms' }} />
-        <span className="w-1 h-1 rounded-full bg-content-4 animate-pulse" style={{ animationDelay: '300ms' }} />
-      </span>
-      <span>Loading {total - remaining} / {total} messages…</span>
     </div>
   )
 }
