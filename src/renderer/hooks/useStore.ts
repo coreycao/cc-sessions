@@ -23,6 +23,7 @@ export function useStore() {
   const [view, setView] = useState<View>('sessions')
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
   const [hasUpdates, setHasUpdates] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
 
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
@@ -56,9 +57,14 @@ export function useStore() {
 
   const refreshWithUpdates = useCallback(async () => {
     setHasUpdates(false)
-    await loadData()
-    if (selectedSession?.fullPath) {
-      sessions.loadSessionContent(selectedSession.fullPath)
+    setRefreshing(true)
+    try {
+      await loadData()
+      if (selectedSession?.fullPath) {
+        sessions.loadSessionContent(selectedSession.fullPath)
+      }
+    } finally {
+      setRefreshing(false)
     }
   }, [loadData, selectedSession, sessions.loadSessionContent])
 
@@ -118,6 +124,7 @@ export function useStore() {
     loadData,
     hasUpdates,
     dismissUpdates,
+    refreshing,
     refreshWithUpdates,
     hasFilters,
     toasts,

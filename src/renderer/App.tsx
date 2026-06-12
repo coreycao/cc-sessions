@@ -337,6 +337,12 @@ export default function App() {
   return (
     <ErrorBoundary>
     <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
+      {/* Global refresh progress bar */}
+      {store.refreshing && (
+        <div className="absolute top-0 inset-x-0 z-50 h-0.5 bg-surface-2 overflow-hidden">
+          <div className="h-full bg-accent animate-indeterminate-progress" />
+        </div>
+      )}
       {/* Unified title bar */}
       <header className="h-[44px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/95" data-tauri-drag-region>
         <div className="w-[72px] flex-shrink-0" />
