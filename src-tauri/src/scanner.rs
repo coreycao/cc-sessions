@@ -448,164 +448,167 @@ fn discover_codex_session_files(root: &Path) -> Vec<std::path::PathBuf> {
 }
 
 #[tauri::command]
-pub fn scan_sessions(app: tauri::AppHandle, state: tauri::State<'_, AppState>) -> Vec<SessionInfo> {
-    let pdir = projects_dir();
-    let cdir = codex_sessions_dir();
-    if !pdir.exists() && !cdir.exists() {
-        state.index_ready.store(true, Ordering::SeqCst);
-        let _ = app.emit("search-index-ready", ());
-        return vec![];
-    }
+pub async fn scan_sessions(app: tauri::AppHandle) -> Vec<SessionInfo> {
+    tokio::task::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let pdir = projects_dir();
+        let cdir = codex_sessions_dir();
+        if !pdir.exists() && !cdir.exists() {
+            state.index_ready.store(true, Ordering::SeqCst);
+            let _ = app.emit("search-index-ready", ());
+            return vec![];
+        }
 
-    let mut cache = state.cache.lock().unwrap();
-    let mut dirty = false;
-    let mut index_additions: Vec<IndexChange> = Vec::new();
+        let mut cache = state.cache.lock().unwrap();
+        let mut dirty = false;
+        let mut index_additions: Vec<IndexChange> = Vec::new();
 
-    let mut sessions: Vec<SessionInfo> = Vec::new();
-    let mut seen_keys: HashSet<String> = HashSet::new();
+        let mut sessions: Vec<SessionInfo> = Vec::new();
+        let mut seen_keys: HashSet<String> = HashSet::new();
 
-    if let Ok(project_dirs) = fs::read_dir(&pdir) {
-        for entry in project_dirs.flatten() {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            let dir_name = match path.file_name().and_then(|n| n.to_str()) {
-                Some(n) => n.to_string(),
-                None => continue,
-            };
-            if dir_name.starts_with('.') {
-                continue;
-            }
+        if let Ok(project_dirs) = fs::read_dir(&pdir) {
+            for entry in project_dirs.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                let dir_name = match path.file_name().and_then(|n| n.to_str()) {
+                    Some(n) => n.to_string(),
+                    None => continue,
+                };
+                if dir_name.starts_with('.') {
+                    continue;
+                }
 
-            let Ok(files) = fs::read_dir(&path) else {
-                continue;
-            };
+                let Ok(files) = fs::read_dir(&path) else {
+                    continue;
+                };
 
-            for file_entry in files.flatten() {
-                let fp = file_entry.path();
-                if fp.extension().and_then(|e| e.to_str()) == Some("jsonl") {
-                    let key = fp.to_string_lossy().to_string();
-                    seen_keys.insert(key.clone());
+                for file_entry in files.flatten() {
+                    let fp = file_entry.path();
+                    if fp.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+                        let key = fp.to_string_lossy().to_string();
+                        seen_keys.insert(key.clone());
 
-                    let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
+                        let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
 
-                    let cached = cache.entries.get(&key);
-                    let use_cache = cached.is_some()
-                        && mtime.is_some()
-                        && cached.unwrap().to_system_time() == mtime.unwrap();
+                        let cached = cache.entries.get(&key);
+                        let use_cache = cached.is_some()
+                            && mtime.is_some()
+                            && cached.unwrap().to_system_time() == mtime.unwrap();
 
-                    if use_cache {
-                        sessions.push(cached.unwrap().session.clone());
-                    } else if let Some(parsed) = parse_session_file(&fp, &dir_name) {
-                        index_additions.push(IndexChange {
-                            session_id: parsed.session.session_id.clone(),
-                            user_messages: parsed.session.user_messages.clone(),
-                            assistant_texts: parsed.assistant_texts.clone(),
-                            tool_inputs: parsed.tool_inputs.clone(),
-                        });
-                        if let Some(mt) = mtime {
-                            cache.entries.insert(
-                                key.clone(),
-                                SessionCacheEntry::from_session_and_mtime(
-                                    parsed.session.clone(),
-                                    mt,
-                                    parsed.assistant_texts,
-                                    parsed.tool_inputs,
-                                ),
-                            );
-                            dirty = true;
+                        if use_cache {
+                            sessions.push(cached.unwrap().session.clone());
+                        } else if let Some(parsed) = parse_session_file(&fp, &dir_name) {
+                            index_additions.push(IndexChange {
+                                session_id: parsed.session.session_id.clone(),
+                                user_messages: parsed.session.user_messages.clone(),
+                                assistant_texts: parsed.assistant_texts.clone(),
+                                tool_inputs: parsed.tool_inputs.clone(),
+                            });
+                            if let Some(mt) = mtime {
+                                cache.entries.insert(
+                                    key.clone(),
+                                    SessionCacheEntry::from_session_and_mtime(
+                                        parsed.session.clone(),
+                                        mt,
+                                        parsed.assistant_texts,
+                                        parsed.tool_inputs,
+                                    ),
+                                );
+                                dirty = true;
+                            }
+                            sessions.push(parsed.session);
                         }
-                        sessions.push(parsed.session);
                     }
                 }
             }
         }
-    }
 
-    for fp in discover_codex_session_files(&cdir) {
-        let key = fp.to_string_lossy().to_string();
-        seen_keys.insert(key.clone());
+        for fp in discover_codex_session_files(&cdir) {
+            let key = fp.to_string_lossy().to_string();
+            seen_keys.insert(key.clone());
 
-        let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
+            let mtime = fs::metadata(&fp).ok().and_then(|m| m.modified().ok());
 
-        let cached = cache.entries.get(&key);
-        let use_cache = cached.is_some()
-            && mtime.is_some()
-            && cached.unwrap().to_system_time() == mtime.unwrap();
+            let cached = cache.entries.get(&key);
+            let use_cache = cached.is_some()
+                && mtime.is_some()
+                && cached.unwrap().to_system_time() == mtime.unwrap();
 
-        if use_cache {
-            sessions.push(cached.unwrap().session.clone());
-        } else if let Some(parsed) = parse_codex_session_file(&fp) {
-            index_additions.push(IndexChange {
-                session_id: parsed.session.session_id.clone(),
-                user_messages: parsed.session.user_messages.clone(),
-                assistant_texts: parsed.assistant_texts.clone(),
-                tool_inputs: parsed.tool_inputs.clone(),
-            });
-            if let Some(mt) = mtime {
-                cache.entries.insert(
-                    key.clone(),
-                    SessionCacheEntry::from_session_and_mtime(
-                        parsed.session.clone(),
-                        mt,
-                        parsed.assistant_texts,
-                        parsed.tool_inputs,
-                    ),
-                );
-                dirty = true;
-            }
-            sessions.push(parsed.session);
-        }
-    }
-
-    // Evict deleted files from cache and collect session IDs for index removal
-    let before = cache.entries.len();
-    let evicted_ids: Vec<String> = cache
-        .entries
-        .iter()
-        .filter(|(k, _)| !seen_keys.contains(*k))
-        .map(|(_, v)| v.session.session_id.clone())
-        .collect();
-    cache.entries.retain(|k, _| seen_keys.contains(k));
-    if cache.entries.len() != before {
-        dirty = true;
-    }
-
-    if dirty {
-        if let Err(e) = save_session_cache_to_file(&session_cache_path(&app), &cache) {
-            tracing::warn!("Failed to save session cache: {e}");
-        }
-    }
-
-    // Apply incremental index updates
-    if !index_additions.is_empty() || !evicted_ids.is_empty() {
-        match state.search_index.write() {
-            Ok(mut idx) => {
-                for change in &index_additions {
-                    idx.index_session(
-                        &change.session_id,
-                        &change.user_messages,
-                        &change.assistant_texts,
-                        &change.tool_inputs,
+            if use_cache {
+                sessions.push(cached.unwrap().session.clone());
+            } else if let Some(parsed) = parse_codex_session_file(&fp) {
+                index_additions.push(IndexChange {
+                    session_id: parsed.session.session_id.clone(),
+                    user_messages: parsed.session.user_messages.clone(),
+                    assistant_texts: parsed.assistant_texts.clone(),
+                    tool_inputs: parsed.tool_inputs.clone(),
+                });
+                if let Some(mt) = mtime {
+                    cache.entries.insert(
+                        key.clone(),
+                        SessionCacheEntry::from_session_and_mtime(
+                            parsed.session.clone(),
+                            mt,
+                            parsed.assistant_texts,
+                            parsed.tool_inputs,
+                        ),
                     );
+                    dirty = true;
                 }
-                for id in &evicted_ids {
-                    idx.delete_session(id);
-                }
-                if let Err(e) = idx.commit_and_reload() {
-                    tracing::warn!("Incremental index commit failed: {e}");
-                }
+                sessions.push(parsed.session);
             }
-            Err(e) => tracing::warn!("Search index lock poisoned: {e}"),
         }
-    }
 
-    state.index_ready.store(true, Ordering::SeqCst);
-    let _ = app.emit("search-index-ready", ());
+        // Evict deleted files from cache and collect session IDs for index removal
+        let before = cache.entries.len();
+        let evicted_ids: Vec<String> = cache
+            .entries
+            .iter()
+            .filter(|(k, _)| !seen_keys.contains(*k))
+            .map(|(_, v)| v.session.session_id.clone())
+            .collect();
+        cache.entries.retain(|k, _| seen_keys.contains(k));
+        if cache.entries.len() != before {
+            dirty = true;
+        }
 
-    sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
-    sessions
+        if dirty {
+            if let Err(e) = save_session_cache_to_file(&session_cache_path(&app), &cache) {
+                tracing::warn!("Failed to save session cache: {e}");
+            }
+        }
+
+        // Apply incremental index updates
+        if !index_additions.is_empty() || !evicted_ids.is_empty() {
+            match state.search_index.write() {
+                Ok(mut idx) => {
+                    for change in &index_additions {
+                        idx.index_session(
+                            &change.session_id,
+                            &change.user_messages,
+                            &change.assistant_texts,
+                            &change.tool_inputs,
+                        );
+                    }
+                    for id in &evicted_ids {
+                        idx.delete_session(id);
+                    }
+                    if let Err(e) = idx.commit_and_reload() {
+                        tracing::warn!("Incremental index commit failed: {e}");
+                    }
+                }
+                Err(e) => tracing::warn!("Search index lock poisoned: {e}"),
+            }
+        }
+
+        state.index_ready.store(true, Ordering::SeqCst);
+        let _ = app.emit("search-index-ready", ());
+
+        sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
+        sessions
+    }).await.unwrap_or_default()
 }
 
 #[tauri::command]
