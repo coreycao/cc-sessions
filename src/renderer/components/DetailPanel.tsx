@@ -24,6 +24,7 @@ import { useI18n } from '../lib/i18n'
 interface DetailPanelProps {
   selectedSession: SessionInfo
   sessionContent: string
+  sessionContentLoading: boolean
   getGTD: (sessionId: string) => GTDMetadata
   updateSessionGTD: (sessionId: string, updates: Partial<GTDMetadata>) => Promise<void>
   addTag: (sessionId: string, tag: string) => Promise<void>
@@ -43,7 +44,7 @@ interface DetailPanelProps {
 }
 
 export const DetailPanel = memo(function DetailPanel({
-  selectedSession, sessionContent, getGTD,
+  selectedSession, sessionContent, sessionContentLoading, getGTD,
   updateSessionGTD, addTag, removeTag, allTags,
   deleteSession, restoreSession, setSelectedSessionId,
   showTagInput, setShowTagInput, newTag, setNewTag,
@@ -244,52 +245,54 @@ export const DetailPanel = memo(function DetailPanel({
 
         {/* Expanded content — animated */}
         <div
-          className="overflow-hidden transition-[max-height] duration-200 ease-in-out"
-          style={{ maxHeight: metadataCollapsed ? '0px' : '12rem' }}
+          className="grid transition-[grid-template-rows] duration-200 ease-in-out"
+          style={{ gridTemplateRows: metadataCollapsed ? '0fr' : '1fr' }}
         >
-          <div className="px-5 py-3 space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {gtd.tags.map(tag => (
-                  <span key={tag} className="group flex items-center gap-1 text-[12px] bg-surface text-content-2 border border-edge/70 pl-2 pr-1.5 py-0.5 rounded-lg hover:bg-surface-3">
-                    {tag}
-                    <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
-                    <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
-                      <X className="w-2.5 h-2.5" />
+          <div className="min-h-0 overflow-hidden">
+            <div className="px-5 py-3 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {gtd.tags.map(tag => (
+                    <span key={tag} className="group flex items-center gap-1 text-[12px] bg-surface text-content-2 border border-edge/70 pl-2 pr-1.5 py-0.5 rounded-lg hover:bg-surface-3">
+                      {tag}
+                      <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
+                      <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </span>
+                  ))}
+                  {showTagInput ? (
+                    <TagInput
+                      value={newTag}
+                      onChange={setNewTag}
+                      onSubmit={() => addTag(selectedSession.sessionId, newTag)}
+                      onClose={() => { setShowTagInput(false); setNewTag('') }}
+                      suggestions={allTags.filter(t => !gtd.tags.includes(t))}
+                    />
+                  ) : (
+                    <button
+                      onClick={() => setShowTagInput(true)}
+                      className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" />{t('detail.addTag')}
                     </button>
-                  </span>
-                ))}
-                {showTagInput ? (
-                  <TagInput
-                    value={newTag}
-                    onChange={setNewTag}
-                    onSubmit={() => addTag(selectedSession.sessionId, newTag)}
-                    onClose={() => { setShowTagInput(false); setNewTag('') }}
-                    suggestions={allTags.filter(t => !gtd.tags.includes(t))}
-                  />
-                ) : (
-                  <button
-                    onClick={() => setShowTagInput(true)}
-                    className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors"
-                  >
-                    <Plus className="w-3 h-3" />{t('detail.addTag')}
-                  </button>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
 
-            <NoteInput
-              value={gtd.notes}
-              updatedAt={gtd.updatedAt}
-              onSave={notes => updateSessionGTD(selectedSession.sessionId, { notes })}
-            />
+              <NoteInput
+                value={gtd.notes}
+                updatedAt={gtd.updatedAt}
+                onSave={notes => updateSessionGTD(selectedSession.sessionId, { notes })}
+              />
 
-            <div className="flex items-center gap-4 text-[11px] text-content-4">
-              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(selectedSession.created).toLocaleDateString()}</span>
-              <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount}</span>
-              {selectedSession.gitBranch && <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" />{selectedSession.gitBranch}</span>}
-              {selectedSession.version && <span>v{selectedSession.version}</span>}
+              <div className="flex items-center gap-4 text-[11px] text-content-4">
+                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(selectedSession.created).toLocaleDateString()}</span>
+                <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount}</span>
+                {selectedSession.gitBranch && <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" />{selectedSession.gitBranch}</span>}
+                {selectedSession.version && <span>v{selectedSession.version}</span>}
+              </div>
             </div>
           </div>
         </div>
@@ -297,16 +300,20 @@ export const DetailPanel = memo(function DetailPanel({
 
       {/* Conversation */}
       <div ref={conversationScrollRef} onScroll={handleConversationScroll} className="flex-1 overflow-y-auto px-7 py-5 bg-surface">
-        <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} provider={selectedSession.provider} />}>
-          <ConversationPreview
-            content={sessionContent}
-            sessionId={selectedSession.sessionId}
-            provider={selectedSession.provider}
-            assistantLabel={assistantLabel}
-            compact={compact}
-            actions={messageActions}
-          />
-        </InlineErrorBoundary>
+        {sessionContentLoading ? (
+          <ConversationLoadingState />
+        ) : (
+          <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} provider={selectedSession.provider} />}>
+            <ConversationPreview
+              content={sessionContent}
+              sessionId={selectedSession.sessionId}
+              provider={selectedSession.provider}
+              assistantLabel={assistantLabel}
+              compact={compact}
+              actions={messageActions}
+            />
+          </InlineErrorBoundary>
+        )}
       </div>
 
       {/* Scroll controls */}
@@ -353,6 +360,17 @@ export const DetailPanel = memo(function DetailPanel({
     </div>
   )
 })
+
+function ConversationLoadingState() {
+  return (
+    <div className="flex h-full min-h-[240px] items-center justify-center">
+      <div className="flex items-center gap-2 text-[12px] text-content-4">
+        <LoaderCircle className="h-4 w-4 animate-spin" />
+        <span>Loading conversation...</span>
+      </div>
+    </div>
+  )
+}
 
 function SessionReviewDialog({
   title, profileName, loading, error, content, onRetry, onClose,

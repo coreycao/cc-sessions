@@ -42,6 +42,9 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'app.mockUpdateComplete': ({ version }) => `Mock update ${version} completed`,
     'app.failedUpdateCheck': 'Failed to check for updates',
     'app.updatesAvailable': 'New session updates available',
+    'app.dismissUpdates': 'Dismiss updates notification',
+    'app.refreshingSessions': 'Refreshing sessions',
+    'app.refreshingSessionsHint': 'Scanning updates. Please wait a moment.',
     'app.refresh': 'Refresh',
 
     'sidebar.all': 'All',
@@ -236,6 +239,9 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'app.mockUpdateComplete': ({ version }) => `模拟更新 ${version} 已完成`,
     'app.failedUpdateCheck': '检查更新失败',
     'app.updatesAvailable': '检测到会话文件更新',
+    'app.dismissUpdates': '关闭会话更新提示',
+    'app.refreshingSessions': '正在刷新会话',
+    'app.refreshingSessionsHint': '正在扫描更新，请稍候。',
     'app.refresh': '刷新',
 
     'sidebar.all': '全部',

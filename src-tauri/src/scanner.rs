@@ -448,18 +448,21 @@ fn discover_codex_session_files(root: &Path) -> Vec<std::path::PathBuf> {
 }
 
 #[tauri::command]
-pub async fn scan_sessions(app: tauri::AppHandle) -> Vec<SessionInfo> {
-    tokio::task::spawn_blocking(move || {
+pub async fn scan_sessions(app: tauri::AppHandle) -> Result<Vec<SessionInfo>, String> {
+    tokio::task::spawn_blocking(move || -> Result<Vec<SessionInfo>, String> {
         let state = app.state::<AppState>();
         let pdir = projects_dir();
         let cdir = codex_sessions_dir();
         if !pdir.exists() && !cdir.exists() {
             state.index_ready.store(true, Ordering::SeqCst);
             let _ = app.emit("search-index-ready", ());
-            return vec![];
+            return Ok(vec![]);
         }
 
-        let mut cache = state.cache.lock().unwrap();
+        let mut cache = state
+            .cache
+            .lock()
+            .map_err(|e| format!("Session cache lock poisoned: {e}"))?;
         let mut dirty = false;
         let mut index_additions: Vec<IndexChange> = Vec::new();
 
@@ -607,8 +610,10 @@ pub async fn scan_sessions(app: tauri::AppHandle) -> Vec<SessionInfo> {
         let _ = app.emit("search-index-ready", ());
 
         sessions.sort_by(|a, b| b.modified.cmp(&a.modified));
-        sessions
-    }).await.unwrap_or_default()
+        Ok(sessions)
+    })
+    .await
+    .map_err(|e| format!("Scan task failed: {e}"))?
 }
 
 #[tauri::command]

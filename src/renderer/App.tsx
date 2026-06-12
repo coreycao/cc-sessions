@@ -337,10 +337,24 @@ export default function App() {
   return (
     <ErrorBoundary>
     <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
-      {/* Global refresh progress bar */}
+      {/* Global refresh lock */}
       {store.refreshing && (
-        <div className="absolute top-0 inset-x-0 z-50 h-0.5 bg-surface-2 overflow-hidden">
-          <div className="h-full bg-accent animate-indeterminate-progress" />
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-surface/70 backdrop-blur-sm"
+          role="status"
+          aria-live="polite"
+          aria-busy="true"
+        >
+          <div className="flex min-w-[240px] flex-col items-center gap-3 rounded-xl border border-edge bg-surface px-6 py-5 shadow-2xl">
+            <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
+            <div className="text-center">
+              <div className="text-[13px] font-semibold text-content">{t('app.refreshingSessions')}</div>
+              <div className="mt-1 text-[11px] text-content-4">{t('app.refreshingSessionsHint')}</div>
+            </div>
+            <div className="h-0.5 w-full overflow-hidden rounded-full bg-surface-3">
+              <div className="h-full bg-accent animate-indeterminate-progress" />
+            </div>
+          </div>
         </div>
       )}
       {/* Unified title bar */}
@@ -482,7 +496,7 @@ export default function App() {
           <button
             onClick={store.dismissUpdates}
             className="p-0.5 rounded hover:bg-accent/15 text-accent/50 hover:text-accent transition-colors"
-            aria-label="Dismiss"
+            aria-label={t('app.dismissUpdates')}
           >
             <X className="w-3 h-3" />
           </button>
@@ -583,10 +597,11 @@ export default function App() {
 
         {store.view === 'sessions' ? (
           store.selectedSession ? (
-            <DetailPanel
-              selectedSession={store.selectedSession}
-              sessionContent={store.sessionContent}
-              getGTD={store.getGTD}
+              <DetailPanel
+                selectedSession={store.selectedSession}
+                sessionContent={store.sessionContent}
+                sessionContentLoading={store.sessionContentLoading}
+                getGTD={store.getGTD}
               updateSessionGTD={store.updateSessionGTD}
               addTag={store.addTag}
               removeTag={store.removeTag}

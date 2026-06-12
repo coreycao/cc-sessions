@@ -107,6 +107,7 @@ export function useStore() {
     tagCounts: filters.tagCounts,
     projects: filters.projects,
     sessionContent: sessions.sessionContent,
+    sessionContentLoading: sessions.sessionContentLoading,
     showTagInput: gtd.showTagInput,
     setShowTagInput: gtd.setShowTagInput,
     newTag: gtd.newTag,

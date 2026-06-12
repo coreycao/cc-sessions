@@ -6,9 +6,11 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
   const [sessions, setSessions] = useState<SessionInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [sessionContent, setSessionContent] = useState('')
+  const [sessionContentLoading, setSessionContentLoading] = useState(false)
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null)
   const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(new Set())
   const lastClickedIndex = useRef<number | null>(null)
+  const contentRequestId = useRef(0)
 
   const loadData = useCallback(async (): Promise<AppStore | null> => {
     try {
@@ -28,12 +30,22 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
   }, [addToast])
 
   const loadSessionContent = useCallback(async (filePath: string) => {
+    const requestId = contentRequestId.current + 1
+    contentRequestId.current = requestId
+    setSessionContent('')
+    setSessionContentLoading(true)
     try {
       const content = await invoke<string>('read_session_content', { filePath })
+      if (contentRequestId.current !== requestId) return
       setSessionContent(content)
     } catch (e) {
+      if (contentRequestId.current !== requestId) return
       console.error('Failed to load session content:', e)
       addToast('Failed to load session content')
+    } finally {
+      if (contentRequestId.current === requestId) {
+        setSessionContentLoading(false)
+      }
     }
   }, [addToast])
 
@@ -48,6 +60,7 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
       setSessions(prev => prev.filter(s => s.sessionId !== session.sessionId))
       setSelectedSessionId(null)
       setSessionContent('')
+      setSessionContentLoading(false)
       addToast('Session deleted', 'success')
     } catch (e) {
       console.error('Failed to delete session:', e)
@@ -117,6 +130,7 @@ export function useSessions(addToast: (msg: string, type?: 'error' | 'success') 
     sessions,
     loading,
     sessionContent,
+    sessionContentLoading,
     selectedSessionId,
     setSelectedSessionId,
     loadData,
