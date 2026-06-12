@@ -122,6 +122,7 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'detail.star': 'Star',
     'detail.resumeTerminal': 'Resume in Terminal',
     'detail.moreActions': 'More actions',
+    'detail.expandMetadata': 'Show metadata',
 
     'stats.title': 'Stats',
     'stats.total': 'Total',
@@ -315,6 +316,7 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'detail.star': '星标',
     'detail.resumeTerminal': '在终端恢复',
     'detail.moreActions': '更多操作',
+    'detail.expandMetadata': '展开元信息',
 
     'stats.title': '统计',
     'stats.total': '总数',

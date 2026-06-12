@@ -54,6 +54,9 @@ export const DetailPanel = memo(function DetailPanel({
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [compact, setCompact] = useState(false)
+  const [metadataCollapsed, setMetadataCollapsed] = useState(false)
+  // Reset metadata collapse when switching sessions
+  useEffect(() => { setMetadataCollapsed(false) }, [selectedSession.sessionId])
   const [showOverflow, setShowOverflow] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
@@ -107,6 +110,13 @@ export const DetailPanel = memo(function DetailPanel({
       top: position === 'top' ? 0 : el.scrollHeight,
       behavior: 'smooth',
     })
+  }, [])
+
+  const handleConversationScroll = useCallback(() => {
+    const el = conversationScrollRef.current
+    if (!el) return
+    if (el.scrollTop > 60) setMetadataCollapsed(true)
+    else if (el.scrollTop <= 10) setMetadataCollapsed(false)
   }, [])
 
   const reviewSession = useCallback(async () => {
@@ -201,54 +211,92 @@ export const DetailPanel = memo(function DetailPanel({
       </div>
 
       {/* Metadata */}
-      <div className="px-5 py-3 bg-surface-2/35 border-b border-edge/40 space-y-3">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {gtd.tags.map(tag => (
-              <span key={tag} className="group flex items-center gap-1 text-[12px] bg-surface text-content-2 border border-edge/70 pl-2 pr-1.5 py-0.5 rounded-lg hover:bg-surface-3">
-                {tag}
-                <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
-                <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
-                  <X className="w-2.5 h-2.5" />
-                </button>
-              </span>
-            ))}
-            {showTagInput ? (
-              <TagInput
-                value={newTag}
-                onChange={setNewTag}
-                onSubmit={() => addTag(selectedSession.sessionId, newTag)}
-                onClose={() => { setShowTagInput(false); setNewTag('') }}
-                suggestions={allTags.filter(t => !gtd.tags.includes(t))}
-              />
-            ) : (
-              <button
-                onClick={() => setShowTagInput(true)}
-                className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors"
-              >
-                <Plus className="w-3 h-3" />{t('detail.addTag')}
-              </button>
-            )}
+      <div className="flex-shrink-0 bg-surface-2/35 border-b border-edge/40">
+        {/* Collapsed bar — animated */}
+        <div
+          className="overflow-hidden transition-[max-height] duration-200 ease-in-out"
+          style={{ maxHeight: metadataCollapsed ? '2rem' : '0px' }}
+        >
+          <div className="h-8 flex items-center gap-2 px-5">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 overflow-hidden">
+              {gtd.tags.length > 0 ? gtd.tags.map(tag => (
+                <span key={tag} className="flex-shrink-0 text-[10px] bg-surface text-content-2 border border-edge/70 px-1.5 py-px rounded">
+                  {tag}
+                </span>
+              )) : (
+                <Tag className="w-3 h-3 text-content-4 flex-shrink-0" />
+              )}
+              {gtd.notes && (
+                <span className="flex-shrink-0 text-content-4" title={gtd.notes}>
+                  <MessageSquare className="w-3 h-3" />
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => { setMetadataCollapsed(false); conversationScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' }) }}
+              className="p-1 rounded hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors flex-shrink-0"
+              title={t('detail.expandMetadata')}
+            >
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
 
-        <NoteInput
-          value={gtd.notes}
-          updatedAt={gtd.updatedAt}
-          onSave={notes => updateSessionGTD(selectedSession.sessionId, { notes })}
-        />
+        {/* Expanded content — animated */}
+        <div
+          className="overflow-hidden transition-[max-height] duration-200 ease-in-out"
+          style={{ maxHeight: metadataCollapsed ? '0px' : '12rem' }}
+        >
+          <div className="px-5 py-3 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {gtd.tags.map(tag => (
+                  <span key={tag} className="group flex items-center gap-1 text-[12px] bg-surface text-content-2 border border-edge/70 pl-2 pr-1.5 py-0.5 rounded-lg hover:bg-surface-3">
+                    {tag}
+                    <Tag className="w-2.5 h-2.5 text-content-4 inline group-hover:hidden" />
+                    <button onClick={() => removeTag(selectedSession.sessionId, tag)} className="text-content-3 hover:text-content hidden group-hover:inline">
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+                  </span>
+                ))}
+                {showTagInput ? (
+                  <TagInput
+                    value={newTag}
+                    onChange={setNewTag}
+                    onSubmit={() => addTag(selectedSession.sessionId, newTag)}
+                    onClose={() => { setShowTagInput(false); setNewTag('') }}
+                    suggestions={allTags.filter(t => !gtd.tags.includes(t))}
+                  />
+                ) : (
+                  <button
+                    onClick={() => setShowTagInput(true)}
+                    className="text-[11px] text-content-4 hover:text-content-2 flex items-center gap-0.5 transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />{t('detail.addTag')}
+                  </button>
+                )}
+              </div>
+            </div>
 
-        <div className="flex items-center gap-4 text-[11px] text-content-4">
-          <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(selectedSession.created).toLocaleDateString()}</span>
-          <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount}</span>
-          {selectedSession.gitBranch && <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" />{selectedSession.gitBranch}</span>}
-          {selectedSession.version && <span>v{selectedSession.version}</span>}
+            <NoteInput
+              value={gtd.notes}
+              updatedAt={gtd.updatedAt}
+              onSave={notes => updateSessionGTD(selectedSession.sessionId, { notes })}
+            />
+
+            <div className="flex items-center gap-4 text-[11px] text-content-4">
+              <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{new Date(selectedSession.created).toLocaleDateString()}</span>
+              <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" />{selectedSession.messageCount}</span>
+              {selectedSession.gitBranch && <span className="flex items-center gap-1"><GitBranch className="w-3 h-3" />{selectedSession.gitBranch}</span>}
+              {selectedSession.version && <span>v{selectedSession.version}</span>}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Conversation */}
-      <div ref={conversationScrollRef} className="flex-1 overflow-y-auto px-7 py-5 bg-surface">
+      <div ref={conversationScrollRef} onScroll={handleConversationScroll} className="flex-1 overflow-y-auto px-7 py-5 bg-surface">
         <InlineErrorBoundary fallback={<PlainConversation content={sessionContent} provider={selectedSession.provider} />}>
           <ConversationPreview
             content={sessionContent}
