@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useMemo, useRef, useState } from 'react'
+import { useEffect, useCallback, useMemo, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { useSessions } from './useSessions'
 import { useGTD } from './useGTD'
@@ -22,6 +22,7 @@ export function useStore() {
   const ai = useAiSettings(addToast)
   const [view, setView] = useState<View>('sessions')
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
+  const [hasUpdates, setHasUpdates] = useState(false)
 
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
@@ -40,20 +41,26 @@ export function useStore() {
     [sessions.sessions, sessions.selectedSessionId]
   )
 
-  // Auto-refresh when session files change on disk
-  const selectedPathRef = useRef<string | null>(null)
-  selectedPathRef.current = selectedSession?.fullPath ?? null
-
+  // Show a lightweight notification when session files change on disk
   useEffect(() => {
     let unlisten: (() => void) | undefined
-    listen('session-files-changed', async () => {
-      await loadData()
-      if (selectedPathRef.current) {
-        sessions.loadSessionContent(selectedPathRef.current)
-      }
+    listen('session-files-changed', () => {
+      setHasUpdates(true)
     }).then(fn => { unlisten = fn })
     return () => { unlisten?.() }
-  }, [loadData, sessions.loadSessionContent])
+  }, [])
+
+  const dismissUpdates = useCallback(() => {
+    setHasUpdates(false)
+  }, [])
+
+  const refreshWithUpdates = useCallback(async () => {
+    setHasUpdates(false)
+    await loadData()
+    if (selectedSession?.fullPath) {
+      sessions.loadSessionContent(selectedSession.fullPath)
+    }
+  }, [loadData, selectedSession, sessions.loadSessionContent])
 
   const hasFilters = filters.selectedProject !== null
     || filters.searchQuery !== ''
@@ -109,6 +116,9 @@ export function useStore() {
     deleteSession,
     restoreSession: sessions.restoreSession,
     loadData,
+    hasUpdates,
+    dismissUpdates,
+    refreshWithUpdates,
     hasFilters,
     toasts,
     addToast,

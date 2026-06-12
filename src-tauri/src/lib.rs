@@ -118,7 +118,7 @@ pub fn run() {
                 }
 
                 let _watcher = watcher;
-                let debounce = std::time::Duration::from_millis(500);
+                let debounce = std::time::Duration::from_millis(3000);
 
                 while let Ok(res) = rx.recv() {
                     match res {

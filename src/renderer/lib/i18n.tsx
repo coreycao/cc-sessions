@@ -41,6 +41,8 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'app.updateReady': ({ version }) => `Update ${version} is ready. Restart to finish installing.`,
     'app.mockUpdateComplete': ({ version }) => `Mock update ${version} completed`,
     'app.failedUpdateCheck': 'Failed to check for updates',
+    'app.updatesAvailable': 'New session updates available',
+    'app.refresh': 'Refresh',
 
     'sidebar.all': 'All',
     'sidebar.new': 'New',
@@ -232,6 +234,8 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'app.updateReady': ({ version }) => `更新 ${version} 已准备好。重启后完成安装。`,
     'app.mockUpdateComplete': ({ version }) => `模拟更新 ${version} 已完成`,
     'app.failedUpdateCheck': '检查更新失败',
+    'app.updatesAvailable': '检测到会话文件更新',
+    'app.refresh': '刷新',
 
     'sidebar.all': '全部',
     'sidebar.new': '新会话',

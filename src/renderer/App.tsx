@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { getVersion } from '@tauri-apps/api/app'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown } from 'lucide-react'
+import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, RefreshCw, ArrowDownCircle } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
@@ -458,6 +458,28 @@ export default function App() {
         <div className="h-6 flex-shrink-0 flex items-center justify-center gap-1.5 bg-amber-500/10 border-b border-amber-500/20 text-[10px] text-amber-600 dark:text-amber-400">
           <LoaderCircle className="w-3 h-3 animate-spin" />
           <span>{t('app.buildingIndex')}</span>
+        </div>
+      )}
+
+      {/* Session updates available banner */}
+      {store.hasUpdates && (
+        <div className="h-8 flex-shrink-0 flex items-center justify-center gap-2 bg-accent/8 border-b border-accent/15 animate-slide-down">
+          <ArrowDownCircle className="w-3.5 h-3.5 text-accent" />
+          <span className="text-[11px] text-accent font-medium">{t('app.updatesAvailable')}</span>
+          <button
+            onClick={store.refreshWithUpdates}
+            className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-accent/15 hover:bg-accent/25 text-[10px] text-accent font-medium transition-colors"
+          >
+            <RefreshCw className="w-3 h-3" />
+            {t('app.refresh')}
+          </button>
+          <button
+            onClick={store.dismissUpdates}
+            className="p-0.5 rounded hover:bg-accent/15 text-accent/50 hover:text-accent transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="w-3 h-3" />
+          </button>
         </div>
       )}
 
