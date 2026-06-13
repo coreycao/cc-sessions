@@ -50,19 +50,21 @@ pub fn save_ai_settings(app: tauri::AppHandle, settings: AiSettings) -> Result<A
 #[tauri::command]
 pub async fn test_ai_connection(profile: AiProfile) -> Result<String, String> {
     validate_profile(&profile)?;
-    let text = call_chat_completion(
+    let text = call_chat_completion_with_options(
         &profile,
         "You are testing an OpenAI-compatible API connection. Reply with exactly: OK",
         "Reply with exactly: OK",
         16,
         TEST_TIMEOUT_SECS,
+        false,
     )
     .await?;
 
-    if text.trim().is_empty() {
-        return Err("The API responded, but no message content was returned".to_string());
-    }
-    Ok(text)
+    Ok(if text.trim().is_empty() {
+        "OK".to_string()
+    } else {
+        text
+    })
 }
 
 #[tauri::command]
@@ -151,6 +153,17 @@ async fn call_chat_completion(
     max_tokens: u32,
     timeout_secs: u64,
 ) -> Result<String, String> {
+    call_chat_completion_with_options(profile, system, user, max_tokens, timeout_secs, true).await
+}
+
+async fn call_chat_completion_with_options(
+    profile: &AiProfile,
+    system: &str,
+    user: &str,
+    max_tokens: u32,
+    timeout_secs: u64,
+    require_content: bool,
+) -> Result<String, String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(timeout_secs))
         .build()
@@ -193,13 +206,19 @@ async fn call_chat_completion(
 
     let parsed: ChatCompletionResponse =
         serde_json::from_str(&body).map_err(|e| format!("Invalid AI response: {e}"))?;
-    parsed
+    let has_choice = !parsed.choices.is_empty();
+    let content = parsed
         .choices
         .into_iter()
-        .find_map(|choice| choice.message.content)
+        .filter_map(|choice| choice.message.content.and_then(|content| content.into_text()))
         .map(|content| content.trim().to_string())
-        .filter(|content| !content.is_empty())
-        .ok_or_else(|| "The AI response did not include message content".to_string())
+        .find(|content| !content.is_empty());
+
+    match (content, require_content, has_choice) {
+        (Some(content), _, _) => Ok(content),
+        (None, false, true) => Ok(String::new()),
+        _ => Err("The AI response did not include message content".to_string()),
+    }
 }
 
 fn chat_completions_url(base_url: &str) -> String {
@@ -233,12 +252,40 @@ struct ChatChoice {
 
 #[derive(Deserialize)]
 struct ChatMessage {
-    content: Option<String>,
+    content: Option<ChatContent>,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum ChatContent {
+    Text(String),
+    Parts(Vec<ChatContentPart>),
+}
+
+impl ChatContent {
+    fn into_text(self) -> Option<String> {
+        match self {
+            ChatContent::Text(text) => Some(text),
+            ChatContent::Parts(parts) => {
+                let text = parts
+                    .into_iter()
+                    .filter_map(|part| part.text)
+                    .collect::<Vec<_>>()
+                    .join("");
+                Some(text)
+            }
+        }
+    }
+}
+
+#[derive(Deserialize)]
+struct ChatContentPart {
+    text: Option<String>,
 }
 
 #[cfg(test)]
 mod tests {
-    use super::chat_completions_url;
+    use super::{chat_completions_url, ChatCompletionResponse};
 
     #[test]
     fn builds_chat_completions_url() {
@@ -250,5 +297,29 @@ mod tests {
             chat_completions_url("https://example.test/v1/chat/completions"),
             "https://example.test/v1/chat/completions"
         );
+    }
+
+    #[test]
+    fn parses_string_message_content() {
+        let parsed: ChatCompletionResponse =
+            serde_json::from_str(r#"{"choices":[{"message":{"content":"OK"}}]}"#).unwrap();
+        let text = parsed
+            .choices
+            .into_iter()
+            .find_map(|choice| choice.message.content.and_then(|content| content.into_text()));
+        assert_eq!(text.as_deref(), Some("OK"));
+    }
+
+    #[test]
+    fn parses_array_message_content() {
+        let parsed: ChatCompletionResponse = serde_json::from_str(
+            r#"{"choices":[{"message":{"content":[{"type":"text","text":"O"},{"type":"text","text":"K"}]}}]}"#,
+        )
+        .unwrap();
+        let text = parsed
+            .choices
+            .into_iter()
+            .find_map(|choice| choice.message.content.and_then(|content| content.into_text()));
+        assert_eq!(text.as_deref(), Some("OK"));
     }
 }

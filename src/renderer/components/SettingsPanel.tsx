@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { createPortal } from 'react-dom'
 import {
   Activity, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download, Folder,
-  HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, Plus, RefreshCw, Sun, Trash2,
+  HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, Pencil, Plus, RefreshCw, Sun, Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import type { AiProfile, AiSettings, SessionInfo, SessionProvider } from '../../shared/types'
@@ -783,6 +783,7 @@ function AiSettingsContent({
   )
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, left: 0 })
+  const [editingProfileIds, setEditingProfileIds] = useState<Set<string>>(new Set())
   const profileBtnRef = useRef<HTMLButtonElement>(null)
   const profileMenuRef = useRef<HTMLDivElement>(null)
 
@@ -799,6 +800,7 @@ function AiSettingsContent({
       activeProfileId: profile.id,
       profiles: [...settings.profiles, profile],
     })
+    setEditingProfileIds(prev => new Set(prev).add(profile.id))
   }
 
   const removeProfile = (id: string) => {
@@ -806,6 +808,24 @@ function AiSettingsContent({
     setSettings({
       activeProfileId: settings.activeProfileId === id ? nextProfiles[0]?.id ?? null : settings.activeProfileId,
       profiles: nextProfiles,
+    })
+    setEditingProfileIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
+
+  const editProfile = (id: string) => {
+    setEditingProfileIds(prev => new Set(prev).add(id))
+  }
+
+  const saveProfile = async (id: string) => {
+    await onSave(settings)
+    setEditingProfileIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
     })
   }
 
@@ -910,6 +930,7 @@ function AiSettingsContent({
 
       {settings.profiles.map(profile => {
         const testing = testingProfileId === profile.id
+        const editing = editingProfileIds.has(profile.id)
         return (
           <section key={profile.id} className="rounded-xl border border-edge bg-surface shadow-sm">
             <div className="flex min-h-[52px] items-center gap-3 border-b border-edge-2 px-4 py-3">
@@ -920,6 +941,15 @@ function AiSettingsContent({
                 <div className="text-[13px] font-semibold text-content">{profile.name || t('common.untitledApi')}</div>
                 <div className="truncate text-[11px] text-content-4">{profile.baseUrl || t('common.noBaseUrl')}</div>
               </div>
+              {!editing && (
+                <button
+                  onClick={() => editProfile(profile.id)}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {t('common.edit')}
+                </button>
+              )}
               <button
                 onClick={() => removeProfile(profile.id)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-content-4 hover:bg-surface-3 hover:text-red-400"
@@ -929,58 +959,85 @@ function AiSettingsContent({
               </button>
             </div>
 
-            <div className="grid gap-3 p-4 md:grid-cols-2">
-              <LabeledInput
-                label={t('settings.name')}
-                value={profile.name}
-                onChange={value => updateProfile(profile.id, { name: value })}
-                placeholder="Work OpenAI"
-              />
-              <LabeledInput
-                label={t('settings.model')}
-                value={profile.model}
-                onChange={value => updateProfile(profile.id, { model: value })}
-                placeholder="gpt-4o-mini"
-              />
-              <LabeledInput
-                label={t('settings.baseUrl')}
-                value={profile.baseUrl}
-                onChange={value => updateProfile(profile.id, { baseUrl: value })}
-                placeholder="https://api.openai.com/v1"
-                className="md:col-span-2"
-              />
-              <LabeledInput
-                label={t('settings.apiKey')}
-                value={profile.apiKey}
-                onChange={value => updateProfile(profile.id, { apiKey: value })}
-                placeholder="sk-..."
-                type="password"
-                className="md:col-span-2"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-edge-2 px-4 py-3">
-              <button
-                onClick={() => onTest(profile)}
-                disabled={testing || saving}
-                className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
-              >
-                {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                {t('common.test')}
-              </button>
-              <button
-                onClick={() => onSave(settings)}
-                disabled={saving || testing}
-                className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
-              >
-                {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                {t('common.save')}
-              </button>
-            </div>
+            {editing ? (
+              <div className="grid gap-3 p-4 md:grid-cols-2">
+                <LabeledInput
+                  label={t('settings.name')}
+                  value={profile.name}
+                  onChange={value => updateProfile(profile.id, { name: value })}
+                  placeholder="Work OpenAI"
+                />
+                <LabeledInput
+                  label={t('settings.model')}
+                  value={profile.model}
+                  onChange={value => updateProfile(profile.id, { model: value })}
+                  placeholder="gpt-4o-mini"
+                />
+                <LabeledInput
+                  label={t('settings.baseUrl')}
+                  value={profile.baseUrl}
+                  onChange={value => updateProfile(profile.id, { baseUrl: value })}
+                  placeholder="https://api.openai.com/v1"
+                  className="md:col-span-2"
+                />
+                <LabeledInput
+                  label={t('settings.apiKey')}
+                  value={profile.apiKey}
+                  onChange={value => updateProfile(profile.id, { apiKey: value })}
+                  placeholder="sk-..."
+                  type="password"
+                  className="md:col-span-2"
+                />
+              </div>
+            ) : (
+              <div className="grid gap-3 p-4 md:grid-cols-3">
+                <ProfileField label={t('settings.model')} value={profile.model || '—'} />
+                <ProfileField label={t('settings.baseUrl')} value={profile.baseUrl || t('common.noBaseUrl')} wide />
+                <ProfileField label={t('settings.apiKey')} value={maskApiKey(profile.apiKey)} mono />
+              </div>
+            )}
+            {editing && (
+              <div className="flex items-center justify-end gap-2 border-t border-edge-2 px-4 py-3">
+                <button
+                  onClick={() => onTest(profile)}
+                  disabled={testing || saving}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+                  {t('common.test')}
+                </button>
+                <button
+                  onClick={() => saveProfile(profile.id)}
+                  disabled={saving || testing}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
+                >
+                  {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+                  {t('common.save')}
+                </button>
+              </div>
+            )}
           </section>
         )
       })}
     </SettingsContent>
   )
+}
+
+function ProfileField({ label, value, wide, mono }: { label: string; value: string; wide?: boolean; mono?: boolean }) {
+  return (
+    <div className={`min-w-0 rounded-lg bg-surface-2/60 px-3 py-2.5 ${wide ? 'md:col-span-1' : ''}`}>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-content-4">{label}</div>
+      <div className={`mt-1 truncate text-[12px] font-medium text-content-2 ${mono ? 'font-mono' : ''}`} title={value}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function maskApiKey(key: string) {
+  if (!key.trim()) return '—'
+  if (key.length <= 8) return '••••••••'
+  return `${key.slice(0, 3)}••••${key.slice(-4)}`
 }
 
 function LabeledInput({
