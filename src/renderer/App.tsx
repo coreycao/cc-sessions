@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { getVersion } from '@tauri-apps/api/app'
+import { listen } from '@tauri-apps/api/event'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, Download, RotateCw } from 'lucide-react'
 import { useStore } from './hooks/useStore'
@@ -222,6 +223,25 @@ export default function App() {
       handleCheckUpdate(true)
     }
   }, [handleCheckUpdate])
+
+  useEffect(() => {
+    let unlistenSettings: (() => void) | undefined
+    let unlistenUpdate: (() => void) | undefined
+
+    listen('app-menu-settings', () => {
+      store.setView('settings')
+      setSettingsSection('app')
+    }).then(unlisten => { unlistenSettings = unlisten })
+
+    listen('app-menu-check-updates', () => {
+      handleCheckUpdate(false)
+    }).then(unlisten => { unlistenUpdate = unlisten })
+
+    return () => {
+      unlistenSettings?.()
+      unlistenUpdate?.()
+    }
+  }, [handleCheckUpdate, store.setView])
 
   useEffect(() => clearUpdateCheckTimeout, [clearUpdateCheckTimeout])
 

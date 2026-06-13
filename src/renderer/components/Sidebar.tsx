@@ -86,7 +86,7 @@ export const Sidebar = memo(function Sidebar({
 
   const [showNewTag, setShowNewTag] = useState(false)
   const [newTagValue, setNewTagValue] = useState('')
-  const [tagsCollapsed, setTagsCollapsed] = useState(false)
+  const [tagsCollapsed, setTagsCollapsed] = useState(true)
 
   const submitNewTag = useCallback(async () => {
     if (newTagValue.trim()) {

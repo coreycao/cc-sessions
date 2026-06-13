@@ -8,7 +8,7 @@ interface StatsPanelProps {
 
 export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
   const { t, language } = useI18n()
-  const [expanded, setExpanded] = useState(true)
+  const [expanded, setExpanded] = useState(false)
 
   const stats = useMemo(() => {
     const now = new Date()

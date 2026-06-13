@@ -9,6 +9,7 @@ mod search_index;
 
 use notify::Watcher;
 use std::sync::atomic::{AtomicBool, Ordering};
+use tauri::menu::{AboutMetadata, MenuBuilder, MenuItemBuilder, SubmenuBuilder};
 use tauri::{Emitter, Manager};
 
 use crate::helpers::session_roots;
@@ -32,7 +33,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "app-settings" => {
+                let _ = app.emit("app-menu-settings", ());
+            }
+            "app-check-updates" => {
+                let _ = app.emit("app-menu-check-updates", ());
+            }
+            _ => {}
+        })
         .setup(|app| {
+            configure_app_menu(app)?;
+
             let gtd_path = gtd_store_path(app.handle());
             let initial_store = load_gtd_from_file(&gtd_path);
             let cache_path = session_cache_path(app.handle());
@@ -183,6 +195,65 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn configure_app_menu(app: &mut tauri::App) -> tauri::Result<()> {
+    let app_handle = app.handle();
+    let settings = MenuItemBuilder::with_id("app-settings", "Settings")
+        .accelerator("CmdOrCtrl+,")
+        .build(app_handle)?;
+    let check_updates =
+        MenuItemBuilder::with_id("app-check-updates", "Check for Updates...").build(app_handle)?;
+
+    let app_menu = SubmenuBuilder::new(app_handle, "CC Sessions")
+        .about(Some(AboutMetadata {
+            name: Some("CC Sessions".into()),
+            copyright: Some("Released June 13, 2026".into()),
+            ..Default::default()
+        }))
+        .separator()
+        .item(&settings)
+        .item(&check_updates)
+        .separator()
+        .services()
+        .separator()
+        .hide()
+        .hide_others()
+        .show_all()
+        .separator()
+        .quit_with_text("Quit CC Sessions")
+        .build()?;
+    let file_menu = SubmenuBuilder::new(app_handle, "File")
+        .close_window()
+        .build()?;
+    let edit_menu = SubmenuBuilder::new(app_handle, "Edit")
+        .undo()
+        .redo()
+        .separator()
+        .cut()
+        .copy()
+        .paste()
+        .select_all()
+        .build()?;
+    let view_menu = SubmenuBuilder::new(app_handle, "View")
+        .fullscreen()
+        .build()?;
+    let window_menu = SubmenuBuilder::new(app_handle, "Window")
+        .minimize()
+        .fullscreen()
+        .separator()
+        .bring_all_to_front()
+        .build()?;
+    let help_menu = SubmenuBuilder::new(app_handle, "Help").build()?;
+    let menu = MenuBuilder::new(app_handle)
+        .item(&app_menu)
+        .item(&file_menu)
+        .item(&edit_menu)
+        .item(&view_menu)
+        .item(&window_menu)
+        .item(&help_menu)
+        .build()?;
+    app.set_menu(menu).map(|_| ())
 }
 
 #[cfg(target_os = "macos")]
