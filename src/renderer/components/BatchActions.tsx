@@ -47,12 +47,15 @@ export function BatchActions({
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const [showProviderMenu, setShowProviderMenu] = useState(false)
+  const [showRefreshTooltip, setShowRefreshTooltip] = useState(false)
   const tagMenuRef = useRef<HTMLDivElement>(null)
   const tagBtnRef = useRef<HTMLButtonElement>(null)
   const providerMenuRef = useRef<HTMLDivElement>(null)
   const providerBtnRef = useRef<HTMLButtonElement>(null)
+  const refreshBtnRef = useRef<HTMLButtonElement>(null)
   const [tagMenuPos, setTagMenuPos] = useState({ top: 0, left: 0 })
   const [providerMenuPos, setProviderMenuPos] = useState({ top: 0, left: 0 })
+  const [refreshTooltipPos, setRefreshTooltipPos] = useState({ top: 0, left: 0 })
 
   const ids = Array.from(batchSelectedIds)
   const count = ids.length
@@ -92,6 +95,15 @@ export function BatchActions({
       setProviderMenuPos({ top: r.bottom + 4, left: r.left })
     }
     setShowProviderMenu(v => !v)
+  }
+
+  const showRefreshHint = () => {
+    if (refreshBtnRef.current) {
+      const rect = refreshBtnRef.current.getBoundingClientRect()
+      const left = Math.min(Math.max(rect.left + rect.width / 2, 180), window.innerWidth - 180)
+      setRefreshTooltipPos({ top: rect.bottom + 8, left })
+    }
+    setShowRefreshTooltip(true)
   }
 
   const chooseProvider = (filter: ProviderFilter) => {
@@ -170,9 +182,13 @@ export function BatchActions({
             <div className="flex-1" />
             {hasUpdates && (
               <button
+                ref={refreshBtnRef}
                 onClick={refreshWithUpdates}
+                onMouseEnter={showRefreshHint}
+                onMouseLeave={() => setShowRefreshTooltip(false)}
+                onFocus={showRefreshHint}
+                onBlur={() => setShowRefreshTooltip(false)}
                 className="relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-accent/25 bg-accent-subtle/70 text-accent shadow-sm transition-colors hover:bg-accent-subtle"
-                title={t('batch.sessionUpdatesAvailable')}
                 aria-label={t('batch.sessionUpdatesAvailable')}
               >
                 <RefreshCw className="h-3.5 w-3.5" />
@@ -191,6 +207,16 @@ export function BatchActions({
           </>
         )}
       </div>
+
+      {showRefreshTooltip && createPortal(
+        <div
+          className="pointer-events-none fixed z-[9999] max-w-[420px] -translate-x-1/2 rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-[11px] font-medium text-content-2 shadow-lg"
+          style={{ top: refreshTooltipPos.top, left: refreshTooltipPos.left }}
+        >
+          {t('batch.sessionUpdatesAvailable')}
+        </div>,
+        document.body,
+      )}
 
       {showTagMenu && createPortal(
         <div

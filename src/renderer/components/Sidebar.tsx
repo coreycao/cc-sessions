@@ -142,51 +142,56 @@ export const Sidebar = memo(function Sidebar({
               <ChevronDown className={`w-3 h-3 text-content-4 group-hover:text-content-3 transition-transform ${tagsCollapsed ? '-rotate-90' : ''}`} />
             </span>
           </button>
-          {!tagsCollapsed && (
-            <>
-              {showNewTag && (
-                <form onSubmit={e => { e.preventDefault(); submitNewTag() }} className="px-2 mb-1">
-                  <input
-                    type="text"
-                    value={newTagValue}
-                    onChange={e => setNewTagValue(e.target.value)}
-                    onKeyDown={e => { if (e.key === 'Escape') { setShowNewTag(false); setNewTagValue('') } }}
-                    placeholder={t('sidebar.newTagPlaceholder')}
-                    className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
-                    autoFocus
-                  />
-                </form>
-              )}
-              {allTags.length > 0 && (
-                <div className="space-y-0.5">
-                  {allTags.map(tag => (
-                    editingTag === tag ? (
-                      <form key={tag} onSubmit={e => { e.preventDefault(); submitEditTag() }} className="px-2">
-                        <input
-                          type="text"
-                          value={editValue}
-                          onChange={e => setEditValue(e.target.value)}
-                          onKeyDown={e => { if (e.key === 'Escape') { setEditingTag(null); setEditValue('') } }}
-                          className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
-                          autoFocus
+          <div
+            className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out ${tagsCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}
+            aria-hidden={tagsCollapsed}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div className={`transition-all duration-300 ease-out ${tagsCollapsed ? '-translate-y-1 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}>
+                {showNewTag && (
+                  <form onSubmit={e => { e.preventDefault(); submitNewTag() }} className="px-2 mb-1">
+                    <input
+                      type="text"
+                      value={newTagValue}
+                      onChange={e => setNewTagValue(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Escape') { setShowNewTag(false); setNewTagValue('') } }}
+                      placeholder={t('sidebar.newTagPlaceholder')}
+                      className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
+                      autoFocus
+                    />
+                  </form>
+                )}
+                {allTags.length > 0 && (
+                  <div className="space-y-0.5">
+                    {allTags.map(tag => (
+                      editingTag === tag ? (
+                        <form key={tag} onSubmit={e => { e.preventDefault(); submitEditTag() }} className="px-2">
+                          <input
+                            type="text"
+                            value={editValue}
+                            onChange={e => setEditValue(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Escape') { setEditingTag(null); setEditValue('') } }}
+                            className="w-full bg-surface-2 border border-edge rounded-md px-2 py-1 text-xs text-content placeholder-content-4 focus:outline-none focus:border-content-3"
+                            autoFocus
+                          />
+                        </form>
+                      ) : (
+                        <FilterButton
+                          key={tag}
+                          active={view === 'sessions' && filterTag === tag}
+                          onClick={() => { setView('sessions'); setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
+                          onContextMenu={e => handleTagContextMenu(e, tag)}
+                          icon={<Tag className="w-3 h-3" />}
+                          label={tag}
+                          count={tagCounts[tag] || 0}
                         />
-                      </form>
-                    ) : (
-                      <FilterButton
-                        key={tag}
-                        active={view === 'sessions' && filterTag === tag}
-                        onClick={() => { setView('sessions'); setFilterTag(filterTag === tag ? null : tag); setFilterStatus('all') }}
-                        onContextMenu={e => handleTagContextMenu(e, tag)}
-                        icon={<Tag className="w-3 h-3" />}
-                        label={tag}
-                        count={tagCounts[tag] || 0}
-                      />
-                    )
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+                      )
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
         {ctxMenu && createPortal(
           <div
