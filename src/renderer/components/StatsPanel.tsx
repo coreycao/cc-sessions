@@ -83,51 +83,56 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
         </svg>
       </button>
 
-      {expanded && (
-        <div className="px-3 pb-3 space-y-3">
-          {/* Key metrics grid */}
-          <div className="grid grid-cols-2 gap-2">
-            <MetricCard label={t('stats.total')} value={stats.total} accent />
-            <MetricCard label={t('stats.thisMonth')} value={stats.thisMonthCount} accent={stats.thisMonthCount > 0} />
-            <MetricCard label={t('stats.avgLength')} value={`${stats.avgMessages}`} sub={t('stats.messages')} />
-            <MetricCard
-              label={t('stats.topProject')}
-              value={stats.topProject ? abbreviate(stats.topProject[0], 12) : '—'}
-              sub={stats.topProject ? t('stats.sessions', { count: stats.topProject[1] }) : undefined}
-            />
-            <MetricCard label={t('stats.claudeCode')} value={stats.claudeCount} />
-            <MetricCard label={t('stats.codexCli')} value={stats.codexCount} accent={stats.codexCount > 0} />
-          </div>
+      <div
+        className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
+        aria-hidden={!expanded}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className={`px-3 pb-3 space-y-3 transition-all duration-300 ease-out ${expanded ? 'translate-y-0 opacity-100' : '-translate-y-1 opacity-0 pointer-events-none'}`}>
+            {/* Key metrics grid */}
+            <div className="grid grid-cols-2 gap-2">
+              <MetricCard label={t('stats.total')} value={stats.total} accent />
+              <MetricCard label={t('stats.thisMonth')} value={stats.thisMonthCount} accent={stats.thisMonthCount > 0} />
+              <MetricCard label={t('stats.avgLength')} value={`${stats.avgMessages}`} sub={t('stats.messages')} />
+              <MetricCard
+                label={t('stats.topProject')}
+                value={stats.topProject ? abbreviate(stats.topProject[0], 12) : '—'}
+                sub={stats.topProject ? t('stats.sessions', { count: stats.topProject[1] }) : undefined}
+              />
+              <MetricCard label={t('stats.claudeCode')} value={stats.claudeCount} />
+              <MetricCard label={t('stats.codexCli')} value={stats.codexCount} accent={stats.codexCount > 0} />
+            </div>
 
-          {/* Activity - last 7 days */}
-          <div>
-            <div className="text-[10px] text-content-4 mb-1.5">{t('stats.thisWeek')}</div>
-            <div className="flex items-end gap-[3px] h-8">
-              {stats.dayValues.map((v, i) => {
-                const pct = Math.max((v / maxDayVal) * 100, 4)
-                return (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
-                    <div
-                      className="w-full rounded-sm transition-all duration-300"
-                      style={{
-                        height: `${pct}%`,
-                        minHeight: 3,
-                        background: i === stats.dayValues.length - 1
-                          ? 'var(--color-accent)'
-                          : 'var(--color-content-4)',
-                        opacity: v > 0 ? 1 : 0.3,
-                      }}
-                    />
-                    <span className="text-[8px] text-content-5 leading-none">
-                      {stats.dayLabels[i]}
-                    </span>
-                  </div>
-                )
-              })}
+            {/* Activity - last 7 days */}
+            <div>
+              <div className="text-[10px] text-content-4 mb-1.5">{t('stats.thisWeek')}</div>
+              <div className="flex items-end gap-[3px] h-8">
+                {stats.dayValues.map((v, i) => {
+                  const pct = Math.max((v / maxDayVal) * 100, 4)
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-0.5">
+                      <div
+                        className="w-full rounded-sm transition-all duration-300"
+                        style={{
+                          height: `${pct}%`,
+                          minHeight: 3,
+                          background: i === stats.dayValues.length - 1
+                            ? 'var(--color-accent)'
+                            : 'var(--color-content-4)',
+                          opacity: v > 0 ? 1 : 0.3,
+                        }}
+                      />
+                      <span className="text-[8px] text-content-5 leading-none">
+                        {stats.dayLabels[i]}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
