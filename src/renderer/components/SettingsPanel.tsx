@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { invoke } from '@tauri-apps/api/core'
 import { createPortal } from 'react-dom'
 import {
-  CheckCircle2, ChevronDown, Download, KeyRound, LoaderCircle, Monitor, Moon, MoreHorizontal, Plus,
-  RefreshCw, Trash2, Sun, type LucideIcon,
+  Activity, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download, Folder,
+  HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, Pencil, Plus, RefreshCw, Sun, Trash2,
+  type LucideIcon,
 } from 'lucide-react'
-import type { AiProfile, AiSettings } from '../../shared/types'
+import type { AiProfile, AiSettings, SessionInfo, SessionProvider } from '../../shared/types'
 import { createEmptyAiProfile } from '../hooks/useAiSettings'
 import { useI18n, type Language } from '../lib/i18n'
 import type { UpdaterMockMode } from '../lib/updater'
@@ -13,6 +15,19 @@ import type { SettingsSection } from './SettingsList'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'current' | 'error'
+
+interface StorageUsageItem {
+  id: string
+  label: string
+  path: string
+  bytes: number
+}
+
+interface StorageUsage {
+  appDataPath: string
+  totalBytes: number
+  items: StorageUsageItem[]
+}
 
 interface SettingsPanelProps {
   section: SettingsSection
@@ -34,12 +49,16 @@ interface SettingsPanelProps {
   testingProfileId: string | null
   onSaveAiSettings: (settings: AiSettings) => Promise<AiSettings>
   onTestAiProfile: (profile: AiProfile) => Promise<void>
+  sessions?: SessionInfo[]
+  onSyncSessions?: () => Promise<void>
+  syncSessionsBusy?: boolean
 }
 
 export function SettingsPanel({
   section, theme, setTheme, appVersion, updateState, updateVersion, updateProgress, updateError,
   updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
   aiSettings, setAiSettings, aiSettingsSaving, testingProfileId, onSaveAiSettings, onTestAiProfile,
+  sessions = [], onSyncSessions, syncSessionsBusy = false,
 }: SettingsPanelProps) {
   const { t, language, setLanguage } = useI18n()
   const updateLabel = getUpdateLabel(t, updateState, updateVersion, updateProgress)
@@ -55,9 +74,6 @@ export function SettingsPanel({
     <div className="flex flex-1 min-w-0 flex-col rounded-xl border border-edge/70 bg-surface shadow-sm overflow-hidden">
       <div className="relative h-[42px] flex items-center justify-center border-b border-edge/50 px-5" data-tauri-drag-region>
         <h2 className="text-[14px] font-semibold text-content">{getSectionTitle(t, section)}</h2>
-        <button className="absolute right-5 rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2 transition-colors" aria-label={t('settings.moreActions')}>
-          <MoreHorizontal className="h-4 w-4" />
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-12 py-9">
@@ -134,6 +150,18 @@ export function SettingsPanel({
             </SettingsGroup>
           </SettingsContent>
         )}
+
+        {section === 'statistics' && (
+          <StatisticsSettingsContent sessions={sessions} />
+        )}
+
+        {section === 'data' && (
+          <DataSettingsContent
+            sessions={sessions}
+            onSyncSessions={onSyncSessions}
+            syncSessionsBusy={syncSessionsBusy}
+          />
+        )}
       </div>
     </div>
   )
@@ -143,6 +171,8 @@ function getSectionTitle(t: (key: string) => string, section: SettingsSection) {
   const keys: Record<SettingsSection, string> = {
     app: 'settings.app',
     ai: 'settings.ai',
+    statistics: 'settings.statistics',
+    data: 'settings.data',
     appearance: 'settings.appearance',
   }
   return t(keys[section])
@@ -180,6 +210,561 @@ function SettingRow({ title, description, control }: { title: string; descriptio
   )
 }
 
+function DataSettingsContent({
+  sessions, onSyncSessions, syncSessionsBusy,
+}: {
+  sessions: SessionInfo[]
+  onSyncSessions?: () => Promise<void>
+  syncSessionsBusy: boolean
+}) {
+  const { t } = useI18n()
+  const [usage, setUsage] = useState<StorageUsage | null>(null)
+  const [loadingUsage, setLoadingUsage] = useState(false)
+  const [usageError, setUsageError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+
+  const loadUsage = useCallback(async () => {
+    setLoadingUsage(true)
+    setUsageError(null)
+    try {
+      const next = await invoke<StorageUsage>('get_storage_usage')
+      setUsage(next)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      setUsageError(message)
+    } finally {
+      setLoadingUsage(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadUsage()
+  }, [loadUsage])
+
+  const handleSync = async () => {
+    if (!onSyncSessions || syncing || syncSessionsBusy) return
+    setSyncing(true)
+    try {
+      await onSyncSessions()
+      await loadUsage()
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  const busy = syncing || syncSessionsBusy
+  const sortedItems = useMemo(
+    () => [...(usage?.items ?? [])].sort((a, b) => b.bytes - a.bytes),
+    [usage]
+  )
+
+  return (
+    <SettingsContent title={t('settings.data')}>
+      <section className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
+              <HardDrive className="h-4.5 w-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-[12px] font-medium uppercase tracking-wide text-content-4">{t('data.localStorage')}</div>
+              <div className="mt-1 text-[26px] font-semibold leading-none text-content tabular-nums">
+                {loadingUsage && !usage ? t('data.loadingUsage') : formatBytes(usage?.totalBytes ?? 0)}
+              </div>
+              <div className="mt-2 truncate text-[11px] text-content-4" title={usage?.appDataPath ?? ''}>
+                {usage?.appDataPath ?? t('data.storagePathLoading')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm md:min-w-[260px]">
+          <div className="text-[12px] font-semibold text-content">{t('data.syncSessions')}</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-content-4">{t('data.syncSessionsDescription')}</p>
+          <button
+            onClick={handleSync}
+            disabled={!onSyncSessions || busy}
+            className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
+            {busy ? t('data.syncing') : t('data.syncNow')}
+          </button>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-[15px] font-semibold text-content">{t('data.storageBreakdown')}</h3>
+            <p className="mt-0.5 text-[12px] text-content-4">{t('data.storageBreakdownDescription')}</p>
+          </div>
+          <button
+            onClick={loadUsage}
+            disabled={loadingUsage}
+            className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loadingUsage ? 'animate-spin' : ''}`} />
+            {t('data.refreshUsage')}
+          </button>
+        </div>
+
+        {usageError ? (
+          <div className="rounded-lg border border-red-400/20 bg-red-500/10 px-3 py-2 text-[12px] text-red-500">
+            {usageError}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {sortedItems.map(item => (
+              <StorageUsageRow key={item.id} item={localizeStorageItem(item, t)} totalBytes={usage?.totalBytes ?? 0} />
+            ))}
+            {sortedItems.length === 0 && (
+              <div className="flex min-h-[120px] items-center justify-center text-[12px] text-content-4">
+                {loadingUsage ? t('data.loadingUsage') : t('data.noStorageData')}
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="grid gap-3 sm:grid-cols-3">
+        <DataMiniMetric label={t('data.indexedSessions')} value={sessions.length.toLocaleString()} />
+        <DataMiniMetric label={t('data.cachedProjects')} value={new Set(sessions.map(s => s.projectPath)).size.toLocaleString()} />
+        <DataMiniMetric label={t('data.cachedMessages')} value={sessions.reduce((sum, s) => sum + s.messageCount, 0).toLocaleString()} />
+      </section>
+    </SettingsContent>
+  )
+}
+
+function StorageUsageRow({ item, totalBytes }: { item: StorageUsageItem; totalBytes: number }) {
+  const pct = totalBytes > 0 ? Math.round((item.bytes / totalBytes) * 100) : 0
+  const color = storageColor(item.id)
+
+  return (
+    <div className="rounded-lg bg-surface-2/55 px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <div className={`inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${color.icon}`}>
+          <Database className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <span className="truncate text-[12px] font-semibold text-content">{item.label}</span>
+            <span className="flex-shrink-0 text-[12px] font-semibold text-content-2 tabular-nums">{formatBytes(item.bytes)}</span>
+          </div>
+          <div className="mt-0.5 truncate text-[10px] text-content-4" title={item.path}>{item.path}</div>
+        </div>
+        <span className="w-9 flex-shrink-0 text-right text-[11px] text-content-4 tabular-nums">{pct}%</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface">
+        <div className={`h-full rounded-full ${color.bar}`} style={{ width: `${Math.max(pct, item.bytes > 0 ? 3 : 0)}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function DataMiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-content-4">{label}</div>
+      <div className="mt-1 text-[20px] font-semibold text-content tabular-nums">{value}</div>
+    </div>
+  )
+}
+
+function localizeStorageItem(item: StorageUsageItem, t: (key: string) => string): StorageUsageItem {
+  const keys: Record<string, string> = {
+    searchIndex: 'data.searchIndex',
+    sessionCache: 'data.sessionCache',
+    gtdStore: 'data.gtdStore',
+    savedMessages: 'data.savedMessages',
+    aiSettings: 'data.aiSettings',
+    other: 'data.otherAppData',
+  }
+  return { ...item, label: keys[item.id] ? t(keys[item.id]) : item.label }
+}
+
+function storageColor(id: string) {
+  const colors: Record<string, { icon: string; bar: string }> = {
+    searchIndex: { icon: 'bg-blue-500/10 text-blue-500', bar: 'bg-blue-500' },
+    sessionCache: { icon: 'bg-emerald-500/10 text-emerald-500', bar: 'bg-emerald-500' },
+    gtdStore: { icon: 'bg-amber-500/10 text-amber-500', bar: 'bg-amber-500' },
+    savedMessages: { icon: 'bg-rose-500/10 text-rose-500', bar: 'bg-rose-500' },
+    aiSettings: { icon: 'bg-violet-500/10 text-violet-500', bar: 'bg-violet-500' },
+    other: { icon: 'bg-zinc-500/10 text-zinc-500', bar: 'bg-zinc-400' },
+  }
+  return colors[id] ?? colors.other
+}
+
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  const digits = value >= 10 || unit === 0 ? 0 : 1
+  return `${value.toFixed(digits)} ${units[unit]}`
+}
+
+function StatisticsSettingsContent({ sessions }: { sessions: SessionInfo[] }) {
+  const { t, language } = useI18n()
+  const stats = useMemo(() => buildStatistics(sessions, language), [language, sessions])
+
+  if (sessions.length === 0) {
+    return (
+      <SettingsContent title={t('settings.statistics')}>
+        <section className="flex min-h-[240px] flex-col items-center justify-center rounded-xl border border-dashed border-edge bg-surface text-center">
+          <div className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent-subtle text-accent">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <h3 className="text-[14px] font-semibold text-content">{t('statistics.noSessions')}</h3>
+          <p className="mt-1 max-w-sm text-[12px] leading-relaxed text-content-4">
+            {t('statistics.noSessionsDescription')}
+          </p>
+        </section>
+      </SettingsContent>
+    )
+  }
+
+  return (
+    <SettingsContent title={t('settings.statistics')}>
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatisticMetric
+          icon={MessageSquare}
+          label={t('statistics.totalSessions')}
+          value={stats.totalSessionsLabel}
+          description={t('statistics.thisMonthValue', { count: stats.thisMonth })}
+          accent="blue"
+        />
+        <StatisticMetric
+          icon={Folder}
+          label={t('statistics.projects')}
+          value={stats.totalProjectsLabel}
+          description={t('statistics.activeDaysValue', { count: stats.activeDays })}
+          accent="emerald"
+        />
+        <StatisticMetric
+          icon={Activity}
+          label={t('statistics.totalMessages')}
+          value={stats.totalMessagesLabel}
+          description={t('statistics.averageMessagesValue', { count: stats.avgMessages })}
+          accent="amber"
+        />
+        <StatisticMetric
+          icon={CalendarDays}
+          label={t('statistics.thisWeek')}
+          value={stats.thisWeekLabel}
+          description={t('statistics.recentActivity')}
+          accent="rose"
+        />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[15px] font-semibold text-content">{t('statistics.providerMix')}</h3>
+              <p className="mt-0.5 text-[12px] text-content-4">{t('statistics.providerMixDescription')}</p>
+            </div>
+            <span className="rounded-full border border-edge bg-surface-2 px-2 py-1 text-[10px] font-medium text-content-4">
+              {stats.totalSessionsLabel}
+            </span>
+          </div>
+          <div className="space-y-3">
+            <ProviderRow
+              label={t('stats.claudeCode')}
+              count={stats.providerCounts.claude}
+              total={stats.totalSessions}
+              colorClass="bg-[#ff9f43]"
+            />
+            <ProviderRow
+              label={t('stats.codexCli')}
+              count={stats.providerCounts.codex}
+              total={stats.totalSessions}
+              colorClass="bg-[#5b7cfa]"
+            />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h3 className="text-[15px] font-semibold text-content">{t('statistics.activityTrend')}</h3>
+              <p className="mt-0.5 text-[12px] text-content-4">{t('statistics.activityTrendDescription')}</p>
+            </div>
+          </div>
+          <div className="flex h-28 items-end gap-2">
+            {stats.activity.map(day => (
+              <div key={day.key} className="flex min-w-0 flex-1 flex-col items-center gap-1.5">
+                <div className="flex h-20 w-full items-end rounded-md bg-surface-2/70 px-1">
+                  <div
+                    className="w-full rounded-sm bg-gradient-to-t from-accent to-[#7dd3fc] transition-[height] duration-300"
+                    style={{ height: `${Math.max(day.percent, day.count > 0 ? 12 : 4)}%`, opacity: day.count > 0 ? 1 : 0.28 }}
+                    title={t('statistics.sessionsCount', { count: day.count })}
+                  />
+                </div>
+                <span className="truncate text-[10px] text-content-5">{day.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+          <h3 className="text-[15px] font-semibold text-content">{t('statistics.topProjects')}</h3>
+          <p className="mt-0.5 text-[12px] text-content-4">{t('statistics.topProjectsDescription')}</p>
+          <div className="mt-4 space-y-2.5">
+            {stats.topProjects.map((project, index) => (
+              <ProjectRankRow
+                key={project.key}
+                project={project}
+                rank={index + 1}
+                total={stats.totalSessions}
+              />
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+          <h3 className="text-[15px] font-semibold text-content">{t('statistics.longSessions')}</h3>
+          <p className="mt-0.5 text-[12px] text-content-4">{t('statistics.longSessionsDescription')}</p>
+          <div className="mt-4 space-y-2">
+            {stats.longSessions.map(session => (
+              <div key={session.sessionId} className="flex items-center gap-3 rounded-lg bg-surface-2/55 px-3 py-2">
+                <ProviderDot provider={session.provider} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[12px] font-medium text-content">{session.title || session.projectName}</div>
+                  <div className="truncate text-[10px] text-content-4">{session.projectName}</div>
+                </div>
+                <span className="flex-shrink-0 tabular-nums text-[12px] font-semibold text-content-2">
+                  {stats.format(session.messageCount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </SettingsContent>
+  )
+}
+
+type StatisticAccent = 'blue' | 'emerald' | 'amber' | 'rose'
+
+interface ProjectStatistic {
+  key: string
+  name: string
+  path: string
+  count: number
+  messages: number
+  providers: Set<SessionProvider>
+}
+
+function StatisticMetric({
+  icon: Icon, label, value, description, accent,
+}: {
+  icon: LucideIcon
+  label: string
+  value: string
+  description: string
+  accent: StatisticAccent
+}) {
+  const accentClasses: Record<StatisticAccent, string> = {
+    blue: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+    emerald: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+    amber: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
+    rose: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-edge bg-surface p-4 shadow-sm">
+      <div className={`mb-5 inline-flex h-8 w-8 items-center justify-center rounded-lg border ${accentClasses[accent]}`}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="text-[11px] font-medium uppercase tracking-wide text-content-4">{label}</div>
+      <div className="mt-1 text-[24px] font-semibold leading-none text-content tabular-nums">{value}</div>
+      <div className="mt-2 text-[11px] leading-relaxed text-content-4">{description}</div>
+      <div className="pointer-events-none absolute -right-7 -top-8 h-20 w-20 rounded-full bg-accent/10 blur-xl" />
+    </div>
+  )
+}
+
+function ProviderRow({
+  label, count, total, colorClass,
+}: {
+  label: string
+  count: number
+  total: number
+  colorClass: string
+}) {
+  const { t, language } = useI18n()
+  const percent = total > 0 ? Math.round((count / total) * 100) : 0
+
+  return (
+    <div>
+      <div className="mb-1.5 flex items-center justify-between gap-3">
+        <span className="text-[12px] font-medium text-content-2">{label}</span>
+        <span className="text-[11px] text-content-4">
+          {new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en').format(count)} · {percent}%
+        </span>
+      </div>
+      <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+        <div
+          className={`h-full rounded-full ${colorClass}`}
+          style={{ width: `${Math.max(percent, count > 0 ? 3 : 0)}%` }}
+          title={t('statistics.sessionsCount', { count })}
+        />
+      </div>
+    </div>
+  )
+}
+
+function ProjectRankRow({ project, rank, total }: { project: ProjectStatistic; rank: number; total: number }) {
+  const { t, language } = useI18n()
+  const pct = total > 0 ? Math.round((project.count / total) * 100) : 0
+  const numberFormat = new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en')
+  const providerLabel = project.providers.size > 1
+    ? t('common.mixed')
+    : project.providers.has('claude')
+      ? t('common.claude')
+      : t('common.codex')
+
+  return (
+    <div className="rounded-lg bg-surface-2/55 px-3 py-2.5">
+      <div className="flex items-center gap-3">
+        <span className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-surface text-[11px] font-semibold text-content-3 shadow-sm">
+          {rank}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[12px] font-medium text-content" title={project.path}>{project.name}</div>
+          <div className="mt-0.5 flex items-center gap-2 text-[10px] text-content-4">
+            <span>{t('statistics.sessionsCount', { count: project.count })}</span>
+            <span className="h-1 w-1 rounded-full" style={{ backgroundColor: 'var(--color-content-5)' }} />
+            <span>{providerLabel}</span>
+            <span className="h-1 w-1 rounded-full" style={{ backgroundColor: 'var(--color-content-5)' }} />
+            <span>{numberFormat.format(project.messages)} {t('stats.messages')}</span>
+          </div>
+        </div>
+        <span className="flex-shrink-0 text-[11px] font-semibold text-content-3 tabular-nums">{pct}%</span>
+      </div>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface">
+        <div className="h-full rounded-full bg-gradient-to-r from-accent via-[#22c55e] to-[#f59e0b]" style={{ width: `${Math.max(pct, 3)}%` }} />
+      </div>
+    </div>
+  )
+}
+
+function ProviderDot({ provider }: { provider: SessionProvider }) {
+  return (
+    <span
+      className={`h-2.5 w-2.5 flex-shrink-0 rounded-full ${provider === 'claude' ? 'bg-[#ff9f43]' : 'bg-[#5b7cfa]'}`}
+      aria-hidden="true"
+    />
+  )
+}
+
+function buildStatistics(sessions: SessionInfo[], language: Language) {
+  const locale = language === 'zh' ? 'zh-CN' : 'en'
+  const numberFormat = new Intl.NumberFormat(locale)
+  const now = new Date()
+  const monthKey = now.getFullYear() * 100 + now.getMonth()
+  const startOfWeek = startOfLocalDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6))
+  const projects = new Map<string, ProjectStatistic>()
+  const providerCounts: Record<SessionProvider, number> = { claude: 0, codex: 0 }
+  const activityCounts = new Map<string, number>()
+  let totalMessages = 0
+  let thisMonth = 0
+  let thisWeek = 0
+
+  for (let i = 6; i >= 0; i--) {
+    const day = startOfLocalDay(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i))
+    activityCounts.set(dayKey(day), 0)
+  }
+
+  for (const session of sessions) {
+    totalMessages += session.messageCount
+    providerCounts[session.provider] += 1
+
+    const created = new Date(session.created)
+    if (Number.isFinite(created.valueOf())) {
+      if (created.getFullYear() * 100 + created.getMonth() === monthKey) thisMonth += 1
+      if (startOfLocalDay(created) >= startOfWeek) thisWeek += 1
+
+      const key = dayKey(created)
+      if (activityCounts.has(key)) {
+        activityCounts.set(key, (activityCounts.get(key) ?? 0) + 1)
+      }
+    }
+
+    const projectKey = session.projectPath || session.cwd || session.projectName || 'Unknown'
+    const existing = projects.get(projectKey) ?? {
+      key: projectKey,
+      name: basename(session.projectName || projectKey),
+      path: projectKey,
+      count: 0,
+      messages: 0,
+      providers: new Set<SessionProvider>(),
+    }
+    existing.count += 1
+    existing.messages += session.messageCount
+    existing.providers.add(session.provider)
+    projects.set(projectKey, existing)
+  }
+
+  const topProjects = Array.from(projects.values())
+    .sort((a, b) => b.count - a.count || b.messages - a.messages)
+    .slice(0, 6)
+  const longSessions = [...sessions]
+    .sort((a, b) => b.messageCount - a.messageCount)
+    .slice(0, 6)
+  const maxActivity = Math.max(...activityCounts.values(), 1)
+  const activity = Array.from(activityCounts.entries()).map(([key, count]) => {
+    const date = dateFromDayKey(key)
+    return {
+      key,
+      count,
+      percent: (count / maxActivity) * 100,
+      label: date.toLocaleDateString(locale, { weekday: 'short' }).slice(0, 2),
+    }
+  })
+
+  return {
+    totalSessions: sessions.length,
+    totalSessionsLabel: numberFormat.format(sessions.length),
+    totalProjectsLabel: numberFormat.format(projects.size),
+    totalMessagesLabel: numberFormat.format(totalMessages),
+    thisWeekLabel: numberFormat.format(thisWeek),
+    providerCounts,
+    thisMonth,
+    thisWeek,
+    activeDays: Array.from(activityCounts.values()).filter(Boolean).length,
+    avgMessages: sessions.length > 0 ? Math.round(totalMessages / sessions.length) : 0,
+    topProjects,
+    longSessions,
+    activity,
+    format: (value: number) => numberFormat.format(value),
+  }
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function dayKey(date: Date) {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`
+}
+
+function dateFromDayKey(key: string) {
+  const [year, month, day] = key.split('-').map(Number)
+  return new Date(year, month, day)
+}
+
+function basename(path: string): string {
+  const seg = path.replace(/\/+$/, '').split('/')
+  return seg[seg.length - 1] || path
+}
+
 function AiSettingsContent({
   settings, setSettings, saving, testingProfileId, onSave, onTest,
 }: {
@@ -198,6 +783,7 @@ function AiSettingsContent({
   )
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, left: 0 })
+  const [editingProfileIds, setEditingProfileIds] = useState<Set<string>>(new Set())
   const profileBtnRef = useRef<HTMLButtonElement>(null)
   const profileMenuRef = useRef<HTMLDivElement>(null)
 
@@ -214,6 +800,7 @@ function AiSettingsContent({
       activeProfileId: profile.id,
       profiles: [...settings.profiles, profile],
     })
+    setEditingProfileIds(prev => new Set(prev).add(profile.id))
   }
 
   const removeProfile = (id: string) => {
@@ -221,6 +808,24 @@ function AiSettingsContent({
     setSettings({
       activeProfileId: settings.activeProfileId === id ? nextProfiles[0]?.id ?? null : settings.activeProfileId,
       profiles: nextProfiles,
+    })
+    setEditingProfileIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
+
+  const editProfile = (id: string) => {
+    setEditingProfileIds(prev => new Set(prev).add(id))
+  }
+
+  const saveProfile = async (id: string) => {
+    await onSave(settings)
+    setEditingProfileIds(prev => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
     })
   }
 
@@ -325,6 +930,7 @@ function AiSettingsContent({
 
       {settings.profiles.map(profile => {
         const testing = testingProfileId === profile.id
+        const editing = editingProfileIds.has(profile.id)
         return (
           <section key={profile.id} className="rounded-xl border border-edge bg-surface shadow-sm">
             <div className="flex min-h-[52px] items-center gap-3 border-b border-edge-2 px-4 py-3">
@@ -335,6 +941,15 @@ function AiSettingsContent({
                 <div className="text-[13px] font-semibold text-content">{profile.name || t('common.untitledApi')}</div>
                 <div className="truncate text-[11px] text-content-4">{profile.baseUrl || t('common.noBaseUrl')}</div>
               </div>
+              {!editing && (
+                <button
+                  onClick={() => editProfile(profile.id)}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {t('common.edit')}
+                </button>
+              )}
               <button
                 onClick={() => removeProfile(profile.id)}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-content-4 hover:bg-surface-3 hover:text-red-400"
@@ -344,58 +959,85 @@ function AiSettingsContent({
               </button>
             </div>
 
-            <div className="grid gap-3 p-4 md:grid-cols-2">
-              <LabeledInput
-                label={t('settings.name')}
-                value={profile.name}
-                onChange={value => updateProfile(profile.id, { name: value })}
-                placeholder="Work OpenAI"
-              />
-              <LabeledInput
-                label={t('settings.model')}
-                value={profile.model}
-                onChange={value => updateProfile(profile.id, { model: value })}
-                placeholder="gpt-4o-mini"
-              />
-              <LabeledInput
-                label={t('settings.baseUrl')}
-                value={profile.baseUrl}
-                onChange={value => updateProfile(profile.id, { baseUrl: value })}
-                placeholder="https://api.openai.com/v1"
-                className="md:col-span-2"
-              />
-              <LabeledInput
-                label={t('settings.apiKey')}
-                value={profile.apiKey}
-                onChange={value => updateProfile(profile.id, { apiKey: value })}
-                placeholder="sk-..."
-                type="password"
-                className="md:col-span-2"
-              />
-            </div>
-            <div className="flex items-center justify-end gap-2 border-t border-edge-2 px-4 py-3">
-              <button
-                onClick={() => onTest(profile)}
-                disabled={testing || saving}
-                className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
-              >
-                {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                {t('common.test')}
-              </button>
-              <button
-                onClick={() => onSave(settings)}
-                disabled={saving || testing}
-                className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
-              >
-                {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
-                {t('common.save')}
-              </button>
-            </div>
+            {editing ? (
+              <div className="grid gap-3 p-4 md:grid-cols-2">
+                <LabeledInput
+                  label={t('settings.name')}
+                  value={profile.name}
+                  onChange={value => updateProfile(profile.id, { name: value })}
+                  placeholder="Work OpenAI"
+                />
+                <LabeledInput
+                  label={t('settings.model')}
+                  value={profile.model}
+                  onChange={value => updateProfile(profile.id, { model: value })}
+                  placeholder="gpt-4o-mini"
+                />
+                <LabeledInput
+                  label={t('settings.baseUrl')}
+                  value={profile.baseUrl}
+                  onChange={value => updateProfile(profile.id, { baseUrl: value })}
+                  placeholder="https://api.openai.com/v1"
+                  className="md:col-span-2"
+                />
+                <LabeledInput
+                  label={t('settings.apiKey')}
+                  value={profile.apiKey}
+                  onChange={value => updateProfile(profile.id, { apiKey: value })}
+                  placeholder="sk-..."
+                  type="password"
+                  className="md:col-span-2"
+                />
+              </div>
+            ) : (
+              <div className="grid gap-3 p-4 md:grid-cols-3">
+                <ProfileField label={t('settings.model')} value={profile.model || '—'} />
+                <ProfileField label={t('settings.baseUrl')} value={profile.baseUrl || t('common.noBaseUrl')} wide />
+                <ProfileField label={t('settings.apiKey')} value={maskApiKey(profile.apiKey)} mono />
+              </div>
+            )}
+            {editing && (
+              <div className="flex items-center justify-end gap-2 border-t border-edge-2 px-4 py-3">
+                <button
+                  onClick={() => onTest(profile)}
+                  disabled={testing || saving}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+                >
+                  {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+                  {t('common.test')}
+                </button>
+                <button
+                  onClick={() => saveProfile(profile.id)}
+                  disabled={saving || testing}
+                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
+                >
+                  {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
+                  {t('common.save')}
+                </button>
+              </div>
+            )}
           </section>
         )
       })}
     </SettingsContent>
   )
+}
+
+function ProfileField({ label, value, wide, mono }: { label: string; value: string; wide?: boolean; mono?: boolean }) {
+  return (
+    <div className={`min-w-0 rounded-lg bg-surface-2/60 px-3 py-2.5 ${wide ? 'md:col-span-1' : ''}`}>
+      <div className="text-[10px] font-medium uppercase tracking-wide text-content-4">{label}</div>
+      <div className={`mt-1 truncate text-[12px] font-medium text-content-2 ${mono ? 'font-mono' : ''}`} title={value}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function maskApiKey(key: string) {
+  if (!key.trim()) return '—'
+  if (key.length <= 8) return '••••••••'
+  return `${key.slice(0, 3)}••••${key.slice(-4)}`
 }
 
 function LabeledInput({

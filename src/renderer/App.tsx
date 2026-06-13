@@ -679,6 +679,9 @@ export default function App() {
             testingProfileId={store.testingProfileId}
             onSaveAiSettings={store.saveAiSettings}
             onTestAiProfile={store.testAiProfile}
+            sessions={store.sessions}
+            onSyncSessions={store.refreshWithUpdates}
+            syncSessionsBusy={store.refreshing}
           />
         )}
       </div>

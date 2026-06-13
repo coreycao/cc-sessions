@@ -1,9 +1,11 @@
-import { Bell, Bot, Brush, type LucideIcon } from 'lucide-react'
+import { BarChart3, Bell, Bot, Brush, Database, type LucideIcon } from 'lucide-react'
 import { useI18n } from '../lib/i18n'
 
 export type SettingsSection =
   | 'app'
   | 'ai'
+  | 'statistics'
+  | 'data'
   | 'appearance'
 
 interface SettingsListProps {
@@ -16,6 +18,8 @@ export function SettingsList({ selected, onSelect }: SettingsListProps) {
   const items: { id: SettingsSection; icon: LucideIcon; label: string; description: string }[] = [
     { id: 'app', icon: Bell, label: t('settings.app'), description: t('settings.appDescription') },
     { id: 'ai', icon: Bot, label: t('settings.ai'), description: t('settings.aiDescription') },
+    { id: 'statistics', icon: BarChart3, label: t('settings.statistics'), description: t('settings.statisticsDescription') },
+    { id: 'data', icon: Database, label: t('settings.data'), description: t('settings.dataDescription') },
     { id: 'appearance', icon: Brush, label: t('settings.appearance'), description: t('settings.appearanceDescription') },
   ]
 

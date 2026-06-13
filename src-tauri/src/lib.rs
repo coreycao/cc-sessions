@@ -175,6 +175,7 @@ pub fn run() {
             commands::delete_session,
             commands::restore_session,
             commands::export_markdown,
+            commands::get_storage_usage,
             ai::load_ai_settings,
             ai::save_ai_settings,
             ai::test_ai_connection,
