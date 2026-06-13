@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
+import { buildReviewCacheKey, readReviewCache, writeReviewCache } from '../lib/aiReviewCache'
 
 interface DetailPanelProps {
   selectedSession: SessionInfo
@@ -126,18 +127,27 @@ export const DetailPanel = memo(function DetailPanel({
 
     try {
       const transcript = buildReviewTranscript(sessionContent, selectedSession.provider)
+      const cacheKey = buildReviewCacheKey(selectedSession, transcript, activeAiProfile)
+      const cached = readReviewCache(cacheKey)
+      if (cached) {
+        setReviewText(cached)
+        setReviewLoading(false)
+        return
+      }
+
       const result = await invoke<string>('summarize_session', {
         profileId: activeAiProfile?.id ?? null,
         sessionTitle: selectedSession.title,
         transcript,
       })
+      writeReviewCache(cacheKey, result)
       setReviewText(result)
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : String(error))
     } finally {
       setReviewLoading(false)
     }
-  }, [activeAiProfile?.id, selectedSession.provider, selectedSession.title, sessionContent])
+  }, [activeAiProfile, selectedSession, sessionContent])
 
   return (
     <div className="relative flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
@@ -384,6 +394,17 @@ function SessionReviewDialog({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [onClose])
+
   return createPortal(
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div className="flex max-h-[82vh] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
