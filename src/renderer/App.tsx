@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { getVersion } from '@tauri-apps/api/app'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, RefreshCw, ArrowDownCircle, Download, RotateCw } from 'lucide-react'
+import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, Download, RotateCw } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
@@ -515,28 +515,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Session updates available banner */}
-      {store.hasUpdates && (
-        <div className="h-8 flex-shrink-0 flex items-center justify-center gap-2 bg-accent/8 border-b border-accent/15 animate-slide-down">
-          <ArrowDownCircle className="w-3.5 h-3.5 text-accent" />
-          <span className="text-[11px] text-accent font-medium">{t('app.updatesAvailable')}</span>
-          <button
-            onClick={store.refreshWithUpdates}
-            className="inline-flex items-center gap-1 h-5 px-2 rounded-md bg-accent/15 hover:bg-accent/25 text-[10px] text-accent font-medium transition-colors"
-          >
-            <RefreshCw className="w-3 h-3" />
-            {t('app.refresh')}
-          </button>
-          <button
-            onClick={store.dismissUpdates}
-            className="p-0.5 rounded hover:bg-accent/15 text-accent/50 hover:text-accent transition-colors"
-            aria-label={t('app.dismissUpdates')}
-          >
-            <X className="w-3 h-3" />
-          </button>
-        </div>
-      )}
-
       {/* Content area */}
       <div className="flex flex-1 overflow-hidden relative bg-surface-2 p-2 gap-2">
         <Sidebar
@@ -577,6 +555,8 @@ export default function App() {
                 providerFilter={store.providerFilter}
                 setProviderFilter={store.setProviderFilter}
                 providerCounts={store.providerCounts}
+                hasUpdates={store.hasUpdates}
+                refreshWithUpdates={store.refreshWithUpdates}
               />
               {store.selectedProject && (
                 <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/50 bg-accent-subtle/40">

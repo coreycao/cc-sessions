@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import type { GTDMetadata, SessionProvider } from '../../shared/types'
 import type { ProviderFilter } from '../hooks/useFilters'
-import { Archive, Circle, Star, Tag, Trash2, X, AlertTriangle, Plus, Filter } from 'lucide-react'
+import { Archive, Circle, Star, Tag, Trash2, X, AlertTriangle, Plus, Filter, RefreshCw } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
 
@@ -22,6 +22,8 @@ interface BatchActionsProps {
   providerFilter: ProviderFilter
   setProviderFilter: (filter: ProviderFilter) => void
   providerCounts: Record<ProviderFilter, number>
+  hasUpdates: boolean
+  refreshWithUpdates: () => Promise<void>
 }
 
 export function BatchActions({
@@ -38,6 +40,8 @@ export function BatchActions({
   providerFilter,
   setProviderFilter,
   providerCounts,
+  hasUpdates,
+  refreshWithUpdates,
 }: BatchActionsProps) {
   const { t } = useI18n()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -164,6 +168,16 @@ export function BatchActions({
               {filterLabels[filterStatus]} <span className="text-content-4 tabular-nums ml-0.5">({filteredCount})</span>
             </span>
             <div className="flex-1" />
+            {hasUpdates && (
+              <button
+                onClick={refreshWithUpdates}
+                className="relative z-10 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-accent/25 bg-accent-subtle/70 text-accent shadow-sm transition-colors hover:bg-accent-subtle"
+                title={t('batch.sessionUpdatesAvailable')}
+                aria-label={t('batch.sessionUpdatesAvailable')}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+              </button>
+            )}
             <button
               ref={providerBtnRef}
               onClick={openProviderMenu}
