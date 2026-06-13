@@ -8,7 +8,7 @@ interface StatsPanelProps {
 
 export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
   const { t, language } = useI18n()
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded] = useState(true)
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -16,10 +16,14 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
 
     let thisMonthCount = 0
     let totalMessages = 0
+    let claudeCount = 0
+    let codexCount = 0
     const projectCounts: Record<string, number> = {}
 
     for (const s of sessions) {
       totalMessages += s.messageCount
+      if (s.provider === 'codex') codexCount++
+      else claudeCount++
 
       const d = new Date(s.created)
       const ym = d.getFullYear() * 100 + (d.getMonth() + 1)
@@ -52,6 +56,8 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
       total: sessions.length,
       thisMonthCount,
       avgMessages,
+      claudeCount,
+      codexCount,
       topProject,
       dayLabels,
       dayValues,
@@ -70,7 +76,7 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
       >
         <span>{t('stats.title')}</span>
         <svg
-          className={`w-3 h-3 transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}
+          className={`w-3 h-3 transition-transform duration-200 ${expanded ? '' : '-rotate-90'}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -89,6 +95,8 @@ export const StatsPanel = function StatsPanel({ sessions }: StatsPanelProps) {
               value={stats.topProject ? abbreviate(stats.topProject[0], 12) : '—'}
               sub={stats.topProject ? t('stats.sessions', { count: stats.topProject[1] }) : undefined}
             />
+            <MetricCard label={t('stats.claudeCode')} value={stats.claudeCount} />
+            <MetricCard label={t('stats.codexCli')} value={stats.codexCount} accent={stats.codexCount > 0} />
           </div>
 
           {/* Activity - last 7 days */}

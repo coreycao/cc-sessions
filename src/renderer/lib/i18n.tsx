@@ -139,6 +139,8 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'stats.messages': 'messages',
     'stats.thisWeek': 'This Week',
     'stats.topProject': 'Top Project',
+    'stats.claudeCode': 'Claude Code',
+    'stats.codexCli': 'Codex',
     'stats.sessions': ({ count }) => `${count} sessions`,
 
     'settings.title': 'Settings',
@@ -339,6 +341,8 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'stats.messages': '条消息',
     'stats.thisWeek': '本周',
     'stats.topProject': '常用项目',
+    'stats.claudeCode': 'Claude Code',
+    'stats.codexCli': 'Codex',
     'stats.sessions': ({ count }) => `${count} 个会话`,
 
     'settings.title': '设置',
