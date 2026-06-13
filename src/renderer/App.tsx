@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { getVersion } from '@tauri-apps/api/app'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, RefreshCw, ArrowDownCircle } from 'lucide-react'
+import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, RefreshCw, ArrowDownCircle, Download, RotateCw } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
@@ -55,6 +55,16 @@ function ProjectSourceBadge({ provider }: { provider: 'claude' | 'codex' }) {
       {label}
     </span>
   )
+}
+
+function getHeaderUpdateActionLabel(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  state: UpdateState,
+  version: string | null,
+): string {
+  if (state === 'ready') return t('app.restartToUpdate')
+  if (state === 'downloading') return t('app.downloadingUpdate', { version: version ?? 'update' })
+  return t('app.downloadUpdate', { version: version ?? 'update' })
 }
 
 export default function App() {
@@ -308,6 +318,10 @@ export default function App() {
   const currentProjectTitle = store.selectedProject || t('app.allProjects')
   const currentProject = store.projects.find(project => project.name === store.selectedProject) || null
   const currentProjectSource = currentProject ? projectSourceLabel(currentProject.providers, t) : null
+  const headerUpdateVisible = updateState === 'available' || updateState === 'downloading' || updateState === 'ready'
+  const headerUpdateBusy = updateState === 'downloading'
+  const headerUpdateLabel = getHeaderUpdateActionLabel(t, updateState, updateVersion)
+  const onHeaderUpdateClick = updateState === 'ready' ? handleRestartUpdate : handleInstallUpdate
 
   const selectedSavedMessage = useMemo(
     () => store.savedMessages.find(m => m.id === store.selectedSavedId) || null,
@@ -464,6 +478,26 @@ export default function App() {
           </div>
         </div>
         <div className="flex-1" />
+        {headerUpdateVisible && (
+          <button
+            onClick={onHeaderUpdateClick}
+            disabled={headerUpdateBusy}
+            className="relative mr-1 inline-flex h-7 w-7 items-center justify-center rounded-lg border border-accent/25 bg-accent-subtle/80 text-accent shadow-sm transition-colors hover:bg-accent-subtle disabled:cursor-default disabled:opacity-80"
+            title={headerUpdateLabel}
+            aria-label={headerUpdateLabel}
+          >
+            {headerUpdateBusy ? (
+              <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+            ) : updateState === 'ready' ? (
+              <RotateCw className="h-3.5 w-3.5" />
+            ) : (
+              <Download className="h-3.5 w-3.5" />
+            )}
+            {updateState === 'available' && (
+              <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-accent" />
+            )}
+          </button>
+        )}
         <button
           onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light')}
           className="p-1.5 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors mr-2"
