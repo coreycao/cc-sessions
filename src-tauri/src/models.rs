@@ -92,6 +92,23 @@ pub struct AiSettings {
     pub profiles: Vec<AiProfile>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsageItem {
+    pub id: String,
+    pub label: String,
+    pub path: String,
+    pub bytes: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageUsage {
+    pub app_data_path: String,
+    pub total_bytes: u64,
+    pub items: Vec<StorageUsageItem>,
+}
+
 #[derive(Deserialize)]
 pub(crate) struct JsonlEntry {
     #[serde(rename = "type")]
