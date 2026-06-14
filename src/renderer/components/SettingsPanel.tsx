@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { createPortal } from 'react-dom'
 import {
   Activity, Archive, ArchiveRestore, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download,
-  HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Trash2,
+  Folder, HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import type { AiProfile, AiSettings, ProjectMetadata, SessionInfo, SessionProvider } from '../../shared/types'
