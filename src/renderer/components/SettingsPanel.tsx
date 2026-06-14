@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { createPortal } from 'react-dom'
 import {
-  Activity, Archive, ArchiveRestore, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download, Folder,
+  Activity, Archive, ArchiveRestore, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download,
   HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Trash2,
   type LucideIcon,
 } from 'lucide-react'
@@ -12,6 +12,7 @@ import { createEmptyAiProfile } from '../hooks/useAiSettings'
 import { getReviewCacheStats } from '../lib/aiReviewCache'
 import { useI18n, type Language } from '../lib/i18n'
 import type { UpdaterMockMode } from '../lib/updater'
+import { PROJECT_ICON_OPTIONS, ProjectIcon } from './ProjectIcon'
 import type { SettingsSection } from './SettingsList'
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -430,8 +431,10 @@ function ProjectManagementRow({
   const { t } = useI18n()
   const [editingName, setEditingName] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
+  const [iconPickerOpen, setIconPickerOpen] = useState(false)
   const [nameDraft, setNameDraft] = useState(project.metadata.displayName || '')
   const [notesDraft, setNotesDraft] = useState(project.metadata.notes || '')
+  const iconPickerRef = useRef<HTMLDivElement>(null)
   const archived = project.metadata.archived
   const displayName = project.metadata.displayName?.trim() || project.name
 
@@ -450,11 +453,66 @@ function ProjectManagementRow({
     setEditingNotes(false)
   }
 
+  useEffect(() => {
+    if (!iconPickerOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (iconPickerRef.current && !iconPickerRef.current.contains(event.target as Node)) {
+        setIconPickerOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIconPickerOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [iconPickerOpen])
+
+  const chooseIcon = async (icon: string) => {
+    await onUpdate({ icon })
+    setIconPickerOpen(false)
+  }
+
   return (
     <div className={`rounded-xl border bg-surface-2/45 p-3 transition-colors ${archived ? 'border-amber-500/25 opacity-75' : 'border-edge/80'}`}>
       <div className="flex items-start gap-3">
-        <div className={`mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${archived ? 'border-amber-500/25 bg-amber-500/10 text-amber-500' : 'border-blue-500/20 bg-blue-500/10 text-blue-500'}`}>
-          <Folder className="h-4 w-4" />
+        <div ref={iconPickerRef} className="relative mt-0.5 flex-shrink-0">
+          <button
+            type="button"
+            onClick={() => setIconPickerOpen(value => !value)}
+            disabled={disabled}
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors disabled:opacity-50 ${archived ? 'border-amber-500/25 bg-amber-500/10 text-amber-500 hover:bg-amber-500/15' : 'border-blue-500/20 bg-blue-500/10 text-blue-500 hover:bg-blue-500/15'}`}
+            title={t('projects.chooseIcon')}
+            aria-label={t('projects.chooseIcon')}
+            aria-haspopup="menu"
+            aria-expanded={iconPickerOpen}
+          >
+            <ProjectIcon iconId={project.metadata.icon} className="h-4 w-4" />
+          </button>
+          {iconPickerOpen && (
+            <div className="absolute left-0 top-[calc(100%+8px)] z-30 grid w-44 grid-cols-4 gap-1 rounded-xl border border-edge bg-surface p-2 shadow-xl" role="menu">
+              {PROJECT_ICON_OPTIONS.map(option => {
+                const active = (project.metadata.icon || 'folder') === option.id
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => chooseIcon(option.id)}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${active ? 'border-accent/30 bg-accent-subtle text-accent' : 'border-transparent text-content-4 hover:border-edge hover:bg-surface-2 hover:text-content-2'}`}
+                    title={option.label}
+                    aria-label={option.label}
+                    role="menuitemradio"
+                    aria-checked={active}
+                  >
+                    <ProjectIcon iconId={option.id} className="h-4 w-4" />
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-center gap-2">
@@ -574,6 +632,7 @@ function buildManagedProjects(
         archived: false,
         displayName: null,
         notes: null,
+        icon: null,
         updatedAt: '',
       },
     }))

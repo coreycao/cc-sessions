@@ -43,6 +43,7 @@ export function getDefaultProjectMetadata(projectPath: string): ProjectMetadata 
       archived: false,
       displayName: null,
       notes: null,
+      icon: null,
       updatedAt: '',
     }
     defaultProjectCache.set(projectPath, project)

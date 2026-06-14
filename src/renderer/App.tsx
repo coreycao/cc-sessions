@@ -16,6 +16,7 @@ import { SettingsPanel, type Theme, type UpdateState } from './components/Settin
 import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ProviderLogo } from './components/ProviderLogo'
+import { ProjectIcon } from './components/ProjectIcon'
 import { useI18n } from './lib/i18n'
 import {
   checkForUpdate, getInitialUpdaterMockMode, installUpdate, saveUpdaterMockMode,
@@ -395,6 +396,7 @@ export default function App() {
   const currentProjectTitle = currentProjectDisplayPath || t('app.allProjects')
   const currentProject = store.projects.find(project => project.path === store.selectedProject) || null
   const currentProjectSource = currentProject ? projectSourceLabel(currentProject.providers, t) : null
+  const currentProjectIcon = currentProject ? store.getProjectMetadata(currentProject.path).icon : null
   const recentProjectRank = useMemo(
     () => new Map(recentProjectPaths.map((path, index) => [path, index])),
     [recentProjectPaths]
@@ -500,7 +502,9 @@ export default function App() {
           title={currentProject ? `${currentProjectTitle} · ${currentProjectSource}` : currentProjectTitle}
           aria-label={t('app.filterByProject', { title: currentProjectTitle })}
         >
-          {currentProjectSource && currentProject?.providers.length === 1
+          {currentProjectIcon ? (
+            <ProjectIcon iconId={currentProjectIcon} className="w-3.5 h-3.5" />
+          ) : currentProjectSource && currentProject?.providers.length === 1
             ? (
               <ProviderLogo provider={currentProject.providers[0]} size="sm" />
             )
@@ -584,7 +588,7 @@ export default function App() {
                 title={p.path}
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.path ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
-              <FolderOpen className="w-3.5 h-3.5" />
+              <ProjectIcon iconId={store.getProjectMetadata(p.path).icon} className="w-3.5 h-3.5" />
                 <span className="truncate flex-1 text-left">{projectDisplayName(store.getProjectMetadata(p.path).displayName?.trim() || p.path, t('app.allProjects'))}</span>
                 <div className="flex items-center gap-1">
                   {p.providers.length > 0 && (

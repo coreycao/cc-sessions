@@ -137,6 +137,8 @@ pub struct ProjectUpdates {
     pub display_name: Option<Option<String>>,
     #[serde(default)]
     pub notes: Option<Option<String>>,
+    #[serde(default)]
+    pub icon: Option<Option<String>>,
 }
 
 fn default_gtd(session_id: &str) -> GtdMetadata {
@@ -160,6 +162,7 @@ fn default_project_metadata(project_path: &str) -> ProjectMetadata {
         archived: false,
         display_name: None,
         notes: None,
+        icon: None,
         updated_at: String::new(),
     }
 }
@@ -271,6 +274,12 @@ fn apply_project_updates(
             .as_ref()
             .map(|note| note.trim().to_string())
             .filter(|note| !note.is_empty());
+    }
+    if let Some(icon) = &updates.icon {
+        current.icon = icon
+            .as_ref()
+            .map(|icon| icon.trim().to_string())
+            .filter(|icon| !icon.is_empty());
     }
     current.updated_at = now.to_string();
     current
@@ -601,6 +610,7 @@ mod tests {
                 archived: true,
                 display_name: Some("Project Alias".to_string()),
                 notes: Some("quiet project".to_string()),
+                icon: Some("terminal".to_string()),
                 updated_at: "2026-05-18T00:02:00Z".to_string(),
             },
         );

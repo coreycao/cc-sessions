@@ -65,6 +65,8 @@ pub struct ProjectMetadata {
     pub display_name: Option<String>,
     #[serde(default)]
     pub notes: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
     pub updated_at: String,
 }
 

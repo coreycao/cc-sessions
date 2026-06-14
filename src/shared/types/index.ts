@@ -50,6 +50,7 @@ export interface ProjectMetadata {
   archived: boolean
   displayName?: string | null
   notes?: string | null
+  icon?: string | null
   updatedAt: string
 }
 

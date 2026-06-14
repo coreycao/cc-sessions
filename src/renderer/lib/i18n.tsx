@@ -220,6 +220,7 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'projects.notesPlaceholder': 'Add a local note...',
     'projects.addNote': 'Add a local note...',
     'projects.editNote': 'Edit local note',
+    'projects.chooseIcon': 'Choose project icon',
     'projects.restoreProject': 'Restore',
     'projects.archiveProject': 'Archive',
 
@@ -513,6 +514,7 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'projects.notesPlaceholder': '添加本地备注...',
     'projects.addNote': '添加本地备注...',
     'projects.editNote': '编辑本地备注',
+    'projects.chooseIcon': '选择项目图标',
     'projects.restoreProject': '恢复',
     'projects.archiveProject': '归档',
 
