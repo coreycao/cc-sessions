@@ -56,10 +56,12 @@ pub struct GtdMetadata {
     pub title_fingerprint: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectMetadata {
+    #[serde(default)]
     pub project_path: String,
+    #[serde(default)]
     pub archived: bool,
     #[serde(default)]
     pub display_name: Option<String>,
@@ -67,6 +69,7 @@ pub struct ProjectMetadata {
     pub notes: Option<String>,
     #[serde(default)]
     pub icon: Option<String>,
+    #[serde(default)]
     pub updated_at: String,
 }
 

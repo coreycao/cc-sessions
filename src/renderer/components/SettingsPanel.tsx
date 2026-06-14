@@ -12,7 +12,7 @@ import { createEmptyAiProfile } from '../hooks/useAiSettings'
 import { getReviewCacheStats } from '../lib/aiReviewCache'
 import { useI18n, type Language } from '../lib/i18n'
 import type { UpdaterMockMode } from '../lib/updater'
-import { PROJECT_ICON_OPTIONS, ProjectIcon } from './ProjectIcon'
+import { PROJECT_ICON_OPTIONS, ProjectIcon, projectIconLabelKey } from './ProjectIcon'
 import type { SettingsSection } from './SettingsList'
 
 export type Theme = 'light' | 'dark' | 'system'
@@ -502,8 +502,8 @@ function ProjectManagementRow({
                     type="button"
                     onClick={() => chooseIcon(option.id)}
                     className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${active ? 'border-accent/30 bg-accent-subtle text-accent' : 'border-transparent text-content-4 hover:border-edge hover:bg-surface-2 hover:text-content-2'}`}
-                    title={option.label}
-                    aria-label={option.label}
+                    title={t(projectIconLabelKey(option.id))}
+                    aria-label={t(projectIconLabelKey(option.id))}
                     role="menuitemradio"
                     aria-checked={active}
                   >

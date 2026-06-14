@@ -28,6 +28,13 @@ export function getProjectIconOption(iconId?: string | null): ProjectIconOption 
   return PROJECT_ICON_OPTIONS.find(option => option.id === iconId) || PROJECT_ICON_OPTIONS[0]
 }
 
+// Maps an icon id (e.g. "folder") to its translation key (e.g. "projects.iconFolder")
+// so icon labels can be localized instead of relying on the English fallback in PROJECT_ICON_OPTIONS.
+export function projectIconLabelKey(iconId?: string | null): string {
+  const id = iconId && iconId.length > 0 ? iconId : 'folder'
+  return `projects.icon${id.charAt(0).toUpperCase()}${id.slice(1)}`
+}
+
 export function ProjectIcon({ iconId, className = 'h-4 w-4' }: {
   iconId?: string | null
   className?: string
