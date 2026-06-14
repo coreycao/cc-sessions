@@ -7,7 +7,7 @@ import {
   Folder, HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Trash2,
   type LucideIcon,
 } from 'lucide-react'
-import type { AiProfile, AiSettings, ProjectMetadata, SessionInfo, SessionProvider } from '../../shared/types'
+import type { AiProfile, AiSettings, ProjectMetadata, SessionInfo, SessionProvider, SavedMessage } from '../../shared/types'
 import { createEmptyAiProfile } from '../hooks/useAiSettings'
 import { getReviewCacheStats } from '../lib/aiReviewCache'
 import { useI18n, type Language } from '../lib/i18n'
@@ -57,6 +57,7 @@ interface SettingsPanelProps {
   onUpdateProjectMetadata?: (projectPath: string, updates: Partial<ProjectMetadata>) => Promise<void>
   onSyncSessions?: () => Promise<void>
   syncSessionsBusy?: boolean
+  savedMessages?: SavedMessage[]
 }
 
 export function SettingsPanel({
@@ -64,6 +65,7 @@ export function SettingsPanel({
   updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
   aiSettings, setAiSettings, aiSettingsSaving, testingProfileId, onSaveAiSettings, onTestAiProfile,
   sessions = [], allSessions = sessions, projectData = {}, onUpdateProjectMetadata, onSyncSessions, syncSessionsBusy = false,
+  savedMessages = [],
 }: SettingsPanelProps) {
   const { t, language, setLanguage } = useI18n()
   const updateLabel = getUpdateLabel(t, updateState, updateVersion, updateProgress)
@@ -173,6 +175,7 @@ export function SettingsPanel({
             sessions={sessions}
             onSyncSessions={onSyncSessions}
             syncSessionsBusy={syncSessionsBusy}
+            savedMessages={savedMessages}
           />
         )}
       </div>
@@ -668,17 +671,19 @@ function getProjectSortName(project: ManagedProject): string {
 }
 
 function DataSettingsContent({
-  sessions, onSyncSessions, syncSessionsBusy,
+  sessions, onSyncSessions, syncSessionsBusy, savedMessages,
 }: {
   sessions: SessionInfo[]
   onSyncSessions?: () => Promise<void>
   syncSessionsBusy: boolean
+  savedMessages: SavedMessage[]
 }) {
   const { t } = useI18n()
   const [usage, setUsage] = useState<StorageUsage | null>(null)
   const [loadingUsage, setLoadingUsage] = useState(false)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [reviewCacheStats, setReviewCacheStats] = useState(() => getReviewCacheStats())
 
   const loadUsage = useCallback(async () => {
@@ -711,6 +716,39 @@ function DataSettingsContent({
     }
   }
 
+  const handleExportSaved = async () => {
+    if (savedMessages.length === 0 || exporting) return
+    setExporting(true)
+    let content: string
+    try {
+      // Yield so the spinner paints before the (potentially heavy) string build.
+      await new Promise(r => setTimeout(r, 0))
+      const sorted = [...savedMessages].sort((a, b) => b.savedAt.localeCompare(a.savedAt))
+      const parts = sorted.map(m => {
+        const role = m.role === 'user'
+          ? 'You'
+          : (m.messageCount && m.messageCount > 1 ? `${m.messageCount} messages` : 'Assistant')
+        return `## ${m.sessionTitle || 'Untitled'}\n\n**${role}** · _${m.timestamp || m.savedAt}_\n\n${m.content}`
+      })
+      content = `# Saved Messages\n\n_${sorted.length} saved · exported from CC Sessions_\n\n${parts.join('\n\n---\n\n')}\n`
+    } catch (e) {
+      console.error('Export saved messages failed:', e)
+      setExporting(false)
+      return
+    }
+    // Content is built — stop the spinner before handing off to the OS save
+    // dialog. The dialog is user interaction, not app processing, so it should
+    // not show as "loading".
+    setExporting(false)
+    await new Promise(r => setTimeout(r, 0))
+    const today = new Date().toISOString().slice(0, 10)
+    try {
+      await invoke('export_markdown', { suggestedName: `saved-messages-${today}.md`, content })
+    } catch (e) {
+      console.error('Export saved messages failed:', e)
+    }
+  }
+
   const busy = syncing || syncSessionsBusy
   const sortedItems = useMemo(
     () => [...(usage?.items ?? [])].sort((a, b) => b.bytes - a.bytes),
@@ -719,7 +757,7 @@ function DataSettingsContent({
 
   return (
     <SettingsContent title={t('settings.data')}>
-      <section className="grid gap-3 md:grid-cols-[1fr_auto]">
+      <section className="grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
           <div className="flex items-start gap-3">
             <div className="inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-blue-500/20 bg-blue-500/10 text-blue-500">
@@ -737,16 +775,29 @@ function DataSettingsContent({
           </div>
         </div>
 
-        <div className="rounded-xl border border-edge bg-surface p-4 shadow-sm md:min-w-[260px]">
+        <div className="flex flex-col rounded-xl border border-edge bg-surface p-4 shadow-sm">
           <div className="text-[12px] font-semibold text-content">{t('data.syncSessions')}</div>
           <p className="mt-1 text-[11px] leading-relaxed text-content-4">{t('data.syncSessionsDescription')}</p>
           <button
             onClick={handleSync}
             disabled={!onSyncSessions || busy}
-            className="mt-4 inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="self-end mt-auto inline-flex h-7 items-center gap-1.5 rounded-lg bg-content px-2.5 text-[11px] font-medium text-surface shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${busy ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} />
             {busy ? t('data.syncing') : t('data.syncNow')}
+          </button>
+        </div>
+
+        <div className="flex flex-col rounded-xl border border-edge bg-surface p-4 shadow-sm">
+          <div className="text-[12px] font-semibold text-content">{t('data.exportSavedMessages')}</div>
+          <p className="mt-1 text-[11px] leading-relaxed text-content-4">{t('data.exportSavedMessagesDescription')}</p>
+          <button
+            onClick={handleExportSaved}
+            disabled={savedMessages.length === 0 || exporting}
+            className="self-end mt-auto inline-flex h-7 items-center gap-1.5 rounded-lg bg-content px-2.5 text-[11px] font-medium text-surface shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {exporting ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+            {exporting ? t('data.exporting') : t('data.exportNow')}
           </button>
         </div>
       </section>

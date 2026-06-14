@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
 import { formatDate, relativeProjectName, buildGroupedRows } from '../lib/utils'
-import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square, PencilLine } from 'lucide-react'
+import { MessageSquare, GitBranch, Star, FileText, Search, PencilLine } from 'lucide-react'
+import { Checkbox } from './Checkbox'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
 
@@ -234,19 +235,15 @@ function SessionListRow({
     >
       <div className="flex items-start gap-2.5 py-2.5">
         {hasBatchSelection && (
-          <span
-            className="mt-1 flex-shrink-0"
-            onClick={(e) => {
-              e.stopPropagation()
+          <Checkbox
+            checked={isBatchSelected}
+            sizeClass="h-3.5 w-3.5"
+            className="mt-1"
+            onClick={() => {
               toggleBatchSelect(session.sessionId)
               lastClickedIndex.current = actualIndex
             }}
-          >
-            {isBatchSelected
-              ? <CheckSquare className="w-3.5 h-3.5 text-accent" />
-              : <Square className="w-3.5 h-3.5 text-content-4" />
-            }
-          </span>
+          />
         )}
         <ProviderLogo provider={session.provider} size="md" className="mt-[1px] flex-shrink-0" />
         <div className="flex-1 min-w-0">
