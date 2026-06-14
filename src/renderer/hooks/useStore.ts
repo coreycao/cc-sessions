@@ -15,8 +15,6 @@ export function useStore() {
   const { toasts, addToast, removeToast } = useToast()
   const sessions = useSessions(addToast)
   const gtd = useGTD()
-  const filters = useFilters(sessions.sessions, gtd.getGTD)
-  const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
   const saved = useSavedMessages()
   const { indexReady, refreshIndexReady } = useIndexReady()
   const ai = useAiSettings(addToast)
@@ -24,6 +22,15 @@ export function useStore() {
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
   const [hasUpdates, setHasUpdates] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const displaySessions = useMemo(
+    () => sessions.sessions.map(session => {
+      const displayTitle = gtd.getGTD(session.sessionId).displayTitle?.trim()
+      return displayTitle ? { ...session, title: displayTitle } : session
+    }),
+    [sessions.sessions, gtd.getGTD]
+  )
+  const filters = useFilters(displaySessions, gtd.getGTD)
+  const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
 
   const loadData = useCallback(async () => {
     const store = await sessions.loadData()
@@ -38,8 +45,8 @@ export function useStore() {
   }, [sessions.deleteSession])
 
   const selectedSession = useMemo(
-    () => sessions.sessions.find(s => s.sessionId === sessions.selectedSessionId) || null,
-    [sessions.sessions, sessions.selectedSessionId]
+    () => displaySessions.find(s => s.sessionId === sessions.selectedSessionId) || null,
+    [displaySessions, sessions.selectedSessionId]
   )
 
   // Show a lightweight notification when session files change on disk
@@ -78,15 +85,15 @@ export function useStore() {
     const base = filters.filteredSessions
     if (contentResults.size === 0) return base
     const seen = new Set(base.map(s => s.sessionId))
-    const extras = sessions.sessions
+    const extras = displaySessions
       .filter(s => contentResults.has(s.sessionId) && !seen.has(s.sessionId))
       .sort((a, b) => (contentResults.get(b.sessionId)?.score ?? 0) - (contentResults.get(a.sessionId)?.score ?? 0))
     return [...base, ...extras]
-  }, [filters.filteredSessions, contentResults, sessions.sessions])
+  }, [filters.filteredSessions, contentResults, displaySessions])
 
   return {
     loading: sessions.loading,
-    sessions: sessions.sessions,
+    sessions: displaySessions,
     filteredSessions,
     statusCounts: filters.statusCounts,
     selectedSession,

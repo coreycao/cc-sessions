@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import type { AiProfile, AiSettings, SessionInfo, SessionProvider } from '../../shared/types'
 import { createEmptyAiProfile } from '../hooks/useAiSettings'
+import { getReviewCacheStats } from '../lib/aiReviewCache'
 import { useI18n, type Language } from '../lib/i18n'
 import type { UpdaterMockMode } from '../lib/updater'
 import type { SettingsSection } from './SettingsList'
@@ -222,6 +223,7 @@ function DataSettingsContent({
   const [loadingUsage, setLoadingUsage] = useState(false)
   const [usageError, setUsageError] = useState<string | null>(null)
   const [syncing, setSyncing] = useState(false)
+  const [reviewCacheStats, setReviewCacheStats] = useState(() => getReviewCacheStats())
 
   const loadUsage = useCallback(async () => {
     setLoadingUsage(true)
@@ -229,6 +231,7 @@ function DataSettingsContent({
     try {
       const next = await invoke<StorageUsage>('get_storage_usage')
       setUsage(next)
+      setReviewCacheStats(getReviewCacheStats())
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       setUsageError(message)
@@ -326,10 +329,12 @@ function DataSettingsContent({
         )}
       </section>
 
-      <section className="grid gap-3 sm:grid-cols-3">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <DataMiniMetric label={t('data.indexedSessions')} value={sessions.length.toLocaleString()} />
         <DataMiniMetric label={t('data.cachedProjects')} value={new Set(sessions.map(s => s.projectPath)).size.toLocaleString()} />
         <DataMiniMetric label={t('data.cachedMessages')} value={sessions.reduce((sum, s) => sum + s.messageCount, 0).toLocaleString()} />
+        <DataMiniMetric label={t('data.aiReviewCacheEntries')} value={reviewCacheStats.entries.toLocaleString()} />
+        <DataMiniMetric label={t('data.aiReviewCacheSize')} value={formatBytes(reviewCacheStats.bytes)} />
       </section>
     </SettingsContent>
   )

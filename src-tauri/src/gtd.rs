@@ -117,6 +117,14 @@ pub struct GtdUpdates {
     pub tags: Option<Vec<String>>,
     pub notes: Option<String>,
     pub starred: Option<bool>,
+    #[serde(default)]
+    pub display_title: Option<Option<String>>,
+    #[serde(default)]
+    pub title_source: Option<Option<String>>,
+    #[serde(default)]
+    pub title_updated_at: Option<Option<String>>,
+    #[serde(default)]
+    pub title_fingerprint: Option<Option<String>>,
 }
 
 fn default_gtd(session_id: &str) -> GtdMetadata {
@@ -127,6 +135,10 @@ fn default_gtd(session_id: &str) -> GtdMetadata {
         notes: String::new(),
         starred: false,
         updated_at: String::new(),
+        display_title: None,
+        title_source: None,
+        title_updated_at: None,
+        title_fingerprint: None,
     }
 }
 
@@ -189,6 +201,30 @@ fn apply_updates(mut current: GtdMetadata, updates: &GtdUpdates, now: &str) -> G
     }
     if let Some(starred) = updates.starred {
         current.starred = starred;
+    }
+    if let Some(display_title) = &updates.display_title {
+        current.display_title = display_title
+            .as_ref()
+            .map(|title| title.trim().to_string())
+            .filter(|title| !title.is_empty());
+    }
+    if let Some(title_source) = &updates.title_source {
+        current.title_source = title_source
+            .as_ref()
+            .map(|source| source.trim().to_string())
+            .filter(|source| !source.is_empty());
+    }
+    if let Some(title_updated_at) = &updates.title_updated_at {
+        current.title_updated_at = title_updated_at
+            .as_ref()
+            .map(|updated| updated.trim().to_string())
+            .filter(|updated| !updated.is_empty());
+    }
+    if let Some(title_fingerprint) = &updates.title_fingerprint {
+        current.title_fingerprint = title_fingerprint
+            .as_ref()
+            .map(|fingerprint| fingerprint.trim().to_string())
+            .filter(|fingerprint| !fingerprint.is_empty());
     }
     current.updated_at = now.to_string();
     current
@@ -480,6 +516,10 @@ mod tests {
                 notes: "important".to_string(),
                 starred: true,
                 updated_at: "2026-05-18T00:00:00Z".to_string(),
+                display_title: Some("Renamed session".to_string()),
+                title_source: Some("manual".to_string()),
+                title_updated_at: Some("2026-05-18T00:01:00Z".to_string()),
+                title_fingerprint: Some("fingerprint".to_string()),
             },
         );
         let store = AppStore {
@@ -492,6 +532,10 @@ mod tests {
 
         assert_eq!(loaded.tags, vec!["tests".to_string()]);
         assert_eq!(loaded.gtd_data["session-1"].notes, "important");
+        assert_eq!(
+            loaded.gtd_data["session-1"].display_title.as_deref(),
+            Some("Renamed session")
+        );
 
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }

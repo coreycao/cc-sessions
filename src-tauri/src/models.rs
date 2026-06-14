@@ -46,6 +46,14 @@ pub struct GtdMetadata {
     pub notes: String,
     pub starred: bool,
     pub updated_at: String,
+    #[serde(default)]
+    pub display_title: Option<String>,
+    #[serde(default)]
+    pub title_source: Option<String>,
+    #[serde(default)]
+    pub title_updated_at: Option<String>,
+    #[serde(default)]
+    pub title_fingerprint: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

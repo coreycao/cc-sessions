@@ -92,6 +92,33 @@ pub async fn summarize_session(
     .await
 }
 
+#[tauri::command]
+pub async fn generate_session_title(
+    app: tauri::AppHandle,
+    profile_id: Option<String>,
+    current_title: String,
+    transcript: String,
+) -> Result<String, String> {
+    let settings = load_ai_settings_from_file(&ai_settings_path(&app));
+    let profile = resolve_profile(&settings, profile_id.as_deref())?;
+    validate_profile(profile)?;
+
+    let user = format!(
+        "Current title: {current_title}\n\nSession context:\n{transcript}\n\nImmediately return the new title only."
+    );
+
+    let title = call_chat_completion(
+        profile,
+        "You rename coding assistant sessions for a local session browser. Output one clear, specific display title only. Do not explain. Do not reason step by step. Requirements: 3 to 10 words when possible; preserve important project/domain terms; use the same language as the user's main request when obvious; no quotes; no Markdown; no trailing punctuation; do not mention Claude, Codex, AI, or session unless essential.",
+        &user,
+        1024,
+        DEFAULT_TIMEOUT_SECS,
+    )
+    .await?;
+
+    sanitize_generated_title(&title)
+}
+
 fn validate_settings(settings: &AiSettings) -> Result<(), String> {
     for profile in &settings.profiles {
         validate_profile(profile)?;
@@ -207,16 +234,25 @@ async fn call_chat_completion_with_options(
     let parsed: ChatCompletionResponse =
         serde_json::from_str(&body).map_err(|e| format!("Invalid AI response: {e}"))?;
     let has_choice = !parsed.choices.is_empty();
+    let finish_reasons = parsed
+        .choices
+        .iter()
+        .filter_map(|choice| choice.finish_reason.as_deref())
+        .collect::<Vec<_>>()
+        .join(", ");
     let content = parsed
         .choices
         .into_iter()
-        .filter_map(|choice| choice.message.content.and_then(|content| content.into_text()))
+        .filter_map(|choice| choice.into_text())
         .map(|content| content.trim().to_string())
         .find(|content| !content.is_empty());
 
     match (content, require_content, has_choice) {
         (Some(content), _, _) => Ok(content),
         (None, false, true) => Ok(String::new()),
+        _ if !finish_reasons.is_empty() => Err(format!(
+            "The AI response did not include message content. finish_reason: {finish_reasons}"
+        )),
         _ => Err("The AI response did not include message content".to_string()),
     }
 }
@@ -240,6 +276,36 @@ fn truncate(value: &str, max: usize) -> String {
     }
 }
 
+fn sanitize_generated_title(value: &str) -> Result<String, String> {
+    let mut title = value
+        .trim()
+        .trim_matches('"')
+        .trim_matches('“')
+        .trim_matches('”')
+        .trim_matches('`')
+        .trim()
+        .to_string();
+
+    if let Some(first_line) = title.lines().map(str::trim).find(|line| !line.is_empty()) {
+        title = first_line.to_string();
+    }
+
+    title = title
+        .trim_end_matches(['.', '。', ':', '：', ';', '；'])
+        .trim()
+        .to_string();
+
+    if title.chars().count() > 80 {
+        title = title.chars().take(80).collect::<String>().trim().to_string();
+    }
+
+    if title.is_empty() {
+        Err("The AI response did not include a usable title".to_string())
+    } else {
+        Ok(title)
+    }
+}
+
 #[derive(Deserialize)]
 struct ChatCompletionResponse {
     choices: Vec<ChatChoice>,
@@ -247,7 +313,17 @@ struct ChatCompletionResponse {
 
 #[derive(Deserialize)]
 struct ChatChoice {
-    message: ChatMessage,
+    message: Option<ChatMessage>,
+    text: Option<String>,
+    finish_reason: Option<String>,
+}
+
+impl ChatChoice {
+    fn into_text(self) -> Option<String> {
+        self.message
+            .and_then(|message| message.content.and_then(|content| content.into_text()))
+            .or(self.text)
+    }
 }
 
 #[derive(Deserialize)]
@@ -306,7 +382,7 @@ mod tests {
         let text = parsed
             .choices
             .into_iter()
-            .find_map(|choice| choice.message.content.and_then(|content| content.into_text()));
+            .find_map(|choice| choice.into_text());
         assert_eq!(text.as_deref(), Some("OK"));
     }
 
@@ -319,7 +395,15 @@ mod tests {
         let text = parsed
             .choices
             .into_iter()
-            .find_map(|choice| choice.message.content.and_then(|content| content.into_text()));
+            .find_map(|choice| choice.into_text());
+        assert_eq!(text.as_deref(), Some("OK"));
+    }
+
+    #[test]
+    fn parses_top_level_choice_text() {
+        let parsed: ChatCompletionResponse =
+            serde_json::from_str(r#"{"choices":[{"text":"OK"}]}"#).unwrap();
+        let text = parsed.choices.into_iter().find_map(|choice| choice.into_text());
         assert_eq!(text.as_deref(), Some("OK"));
     }
 }

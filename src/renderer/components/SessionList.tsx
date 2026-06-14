@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useMemo, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { SessionInfo, GTDMetadata, ContentSearchResult } from '../../shared/types'
 import { formatDate, relativeProjectName, buildGroupedRows } from '../lib/utils'
-import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square } from 'lucide-react'
+import { MessageSquare, GitBranch, Star, FileText, Search, CheckSquare, Square, PencilLine } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
 
@@ -252,6 +252,9 @@ function SessionListRow({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1">
             {gtd.starred && <Star className="w-3 h-3 text-amber-400 fill-amber-400 flex-shrink-0" />}
+            {gtd.displayTitle?.trim() && (
+              <PencilLine className="w-3 h-3 flex-shrink-0 text-accent/80" />
+            )}
             <span className={`text-[13px] font-medium truncate ${dimArchived ? 'text-content-4' : isSelected ? 'text-content' : 'text-content-2'}`}>
               {session.title}
             </span>

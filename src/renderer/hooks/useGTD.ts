@@ -17,7 +17,18 @@ const defaultGTDCache = new Map<string, GTDMetadata>()
 export function getDefaultGTD(sessionId: string): GTDMetadata {
   let gtd = defaultGTDCache.get(sessionId)
   if (!gtd) {
-    gtd = { sessionId, status: 'new', tags: EMPTY_TAGS, notes: '', starred: false, updatedAt: '' }
+    gtd = {
+      sessionId,
+      status: 'new',
+      tags: EMPTY_TAGS,
+      notes: '',
+      starred: false,
+      updatedAt: '',
+      displayTitle: null,
+      titleSource: null,
+      titleUpdatedAt: null,
+      titleFingerprint: null,
+    }
     defaultGTDCache.set(sessionId, gtd)
   }
   return gtd

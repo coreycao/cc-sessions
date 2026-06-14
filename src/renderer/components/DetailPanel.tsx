@@ -16,10 +16,11 @@ import {
 import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
-  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle,
+  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle, PencilLine, Sparkles,
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
+import { buildReviewCacheKey, readReviewCache, writeReviewCache } from '../lib/aiReviewCache'
 
 interface DetailPanelProps {
   selectedSession: SessionInfo
@@ -63,9 +64,15 @@ export const DetailPanel = memo(function DetailPanel({
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewText, setReviewText] = useState('')
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [renameSource, setRenameSource] = useState<'manual' | 'ai'>('manual')
+  const [renameLoading, setRenameLoading] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
   const overflowRef = useRef<HTMLButtonElement>(null)
   const conversationScrollRef = useRef<HTMLDivElement>(null)
   const assistantLabel = selectedSession.provider === 'codex' ? 'Codex' : 'Claude'
+  const hasCustomTitle = Boolean(gtd.displayTitle?.trim())
 
   const exportFullSession = useCallback(() => {
     const turns = parseConversation(sessionContent, selectedSession.provider)
@@ -126,18 +133,82 @@ export const DetailPanel = memo(function DetailPanel({
 
     try {
       const transcript = buildReviewTranscript(sessionContent, selectedSession.provider)
+      const cacheKey = buildReviewCacheKey(selectedSession, transcript, activeAiProfile)
+      const cached = readReviewCache(cacheKey)
+      if (cached) {
+        setReviewText(cached)
+        setReviewLoading(false)
+        return
+      }
+
       const result = await invoke<string>('summarize_session', {
         profileId: activeAiProfile?.id ?? null,
         sessionTitle: selectedSession.title,
         transcript,
       })
+      writeReviewCache(cacheKey, result)
       setReviewText(result)
     } catch (error) {
       setReviewError(error instanceof Error ? error.message : String(error))
     } finally {
       setReviewLoading(false)
     }
-  }, [activeAiProfile?.id, selectedSession.provider, selectedSession.title, sessionContent])
+  }, [activeAiProfile, selectedSession, sessionContent])
+
+  const openRenameDialog = useCallback(() => {
+    setRenameDraft(gtd.displayTitle?.trim() || selectedSession.title)
+    setRenameSource(gtd.titleSource === 'ai' ? 'ai' : 'manual')
+    setRenameError(null)
+    setRenameLoading(false)
+    setRenameOpen(true)
+  }, [gtd.displayTitle, gtd.titleSource, selectedSession.title])
+
+  const generateTitle = useCallback(async () => {
+    if (!sessionContent.trim()) {
+      setRenameError(t('detail.titleRequiresContent'))
+      return
+    }
+
+    setRenameLoading(true)
+    setRenameError(null)
+
+    try {
+      const title = await invoke<string>('generate_session_title', {
+        profileId: activeAiProfile?.id ?? null,
+        currentTitle: renameDraft || selectedSession.title,
+        transcript: buildTitleContext(selectedSession, sessionContent),
+      })
+      setRenameDraft(title)
+      setRenameSource('ai')
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setRenameLoading(false)
+    }
+  }, [activeAiProfile?.id, renameDraft, selectedSession.provider, selectedSession.title, sessionContent, t])
+
+  const saveTitle = useCallback(async () => {
+    const title = renameDraft.trim()
+    if (!title || renameLoading) return
+    await updateSessionGTD(selectedSession.sessionId, {
+      displayTitle: title,
+      titleSource: renameSource,
+      titleUpdatedAt: new Date().toISOString(),
+      titleFingerprint: buildTitleFingerprint(selectedSession, sessionContent),
+    })
+    setRenameOpen(false)
+  }, [renameDraft, renameLoading, renameSource, selectedSession, sessionContent, updateSessionGTD])
+
+  const resetTitle = useCallback(async () => {
+    if (renameLoading) return
+    await updateSessionGTD(selectedSession.sessionId, {
+      displayTitle: null,
+      titleSource: null,
+      titleUpdatedAt: null,
+      titleFingerprint: null,
+    })
+    setRenameOpen(false)
+  }, [renameLoading, selectedSession.sessionId, updateSessionGTD])
 
   return (
     <div className="relative flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
@@ -152,6 +223,20 @@ export const DetailPanel = memo(function DetailPanel({
         <div className="flex min-w-0 flex-1 items-center justify-start gap-2" data-tauri-drag-region>
           <ProviderLogo provider={selectedSession.provider} size="md" />
           <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
+          {hasCustomTitle && (
+            <span className="hidden rounded-full border border-accent/20 bg-accent-subtle px-1.5 py-px text-[9px] font-medium uppercase tracking-wide text-accent sm:inline-flex">
+              {t('detail.customTitle')}
+            </span>
+          )}
+          <ActionTip label={t('detail.renameSession')}>
+            <button
+              onClick={openRenameDialog}
+              className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+              aria-label={t('detail.renameSession')}
+            >
+              <PencilLine className="w-3.5 h-3.5" />
+            </button>
+          </ActionTip>
         </div>
         <ActionTip label={gtd.status === 'archived' ? t('detail.unarchive') : t('detail.archive')}>
           <button
@@ -357,6 +442,21 @@ export const DetailPanel = memo(function DetailPanel({
           onClose={() => setReviewOpen(false)}
         />
       )}
+      {renameOpen && (
+        <SessionRenameDialog
+          title={selectedSession.title}
+          value={renameDraft}
+          source={renameSource}
+          hasCustomTitle={hasCustomTitle}
+          loading={renameLoading}
+          error={renameError}
+          onChange={value => { setRenameDraft(value); setRenameSource('manual') }}
+          onGenerate={generateTitle}
+          onSave={saveTitle}
+          onReset={resetTitle}
+          onClose={() => setRenameOpen(false)}
+        />
+      )}
     </div>
   )
 })
@@ -384,6 +484,17 @@ function SessionReviewDialog({
   onClose: () => void
 }) {
   const { t } = useI18n()
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [onClose])
+
   return createPortal(
     <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm">
       <div className="flex max-h-[82vh] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
@@ -451,24 +562,238 @@ function SessionReviewDialog({
   )
 }
 
+function SessionRenameDialog({
+  title, value, source, hasCustomTitle, loading, error,
+  onChange, onGenerate, onSave, onReset, onClose,
+}: {
+  title: string
+  value: string
+  source: 'manual' | 'ai'
+  hasCustomTitle: boolean
+  loading: boolean
+  error: string | null
+  onChange: (value: string) => void
+  onGenerate: () => void
+  onSave: () => void
+  onReset: () => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+      }
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        event.stopPropagation()
+        onSave()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [onClose, onSave])
+
+  const canSave = value.trim().length > 0 && !loading
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm">
+      <div className="flex w-[min(520px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
+        <div className="flex h-12 items-center gap-3 border-b border-edge/70 px-4">
+          <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-subtle text-accent">
+            <PencilLine className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-content">{t('detail.renameSession')}</div>
+            <div className="truncate text-[11px] text-content-4">{title}</div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2" aria-label={t('session.closeEsc')}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-content-4" htmlFor="session-display-title">
+                {t('detail.displayTitle')}
+              </label>
+              <span className="text-[10px] text-content-5">
+                {source === 'ai' ? t('detail.aiSuggestedTitle') : t('detail.localOnlyTitle')}
+              </span>
+            </div>
+            <input
+              ref={inputRef}
+              id="session-display-title"
+              value={value}
+              onChange={event => onChange(event.target.value)}
+              placeholder={t('detail.displayTitlePlaceholder')}
+              className="h-10 w-full rounded-lg border border-edge bg-surface-2 px-3 text-[14px] font-medium text-content outline-none transition-colors placeholder:text-content-5 focus:border-accent focus:ring-2 focus:ring-accent/15"
+            />
+            <p className="mt-2 text-[11px] leading-relaxed text-content-4">
+              {t('detail.renameLocalOnlyDescription')}
+            </p>
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] leading-relaxed text-red-400">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-edge/70 px-4 py-3">
+          <button
+            onClick={onReset}
+            disabled={!hasCustomTitle || loading}
+            className="inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-medium text-content-4 transition-colors hover:bg-surface-2 hover:text-content-2 disabled:cursor-default disabled:opacity-40"
+          >
+            {t('detail.resetTitle')}
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onGenerate}
+              disabled={loading}
+              className="inline-flex h-8 items-center gap-2 rounded-lg border border-accent/25 bg-accent-subtle px-3 text-[12px] font-medium text-accent shadow-sm transition-colors hover:bg-accent-subtle/80 disabled:opacity-60"
+            >
+              {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {loading ? t('detail.generatingTitle') : t('detail.generateTitle')}
+            </button>
+            <button
+              onClick={onSave}
+              disabled={!canSave}
+              className="inline-flex h-8 items-center rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+            >
+              {t('common.save')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+const REVIEW_TRANSCRIPT_MAX_CHARS = 60_000
+const REVIEW_MESSAGE_MAX_CHARS = 8_000
+const TITLE_CONTEXT_MAX_CHARS = 6_000
+const TITLE_MESSAGE_MAX_CHARS = 520
+const TITLE_ASSISTANT_SIGNAL_MAX_CHARS = 260
+
 function buildReviewTranscript(content: string, provider: SessionInfo['provider']): string {
   const turns = parseConversation(content, provider)
   const parts: string[] = []
+  let truncatedMessages = 0
 
   for (const turn of turns) {
     if (turn.kind === 'user_turn') {
-      parts.push(`User:\n${turn.message.content}`)
+      const { text, truncated } = clampText(turn.message.content, REVIEW_MESSAGE_MAX_CHARS)
+      if (truncated) truncatedMessages += 1
+      parts.push(`User:\n${text}`)
     } else if (turn.kind === 'assistant_turn') {
-      const text = turn.messages
+      const rawText = turn.messages
         .filter(message => message.kind === 'text')
         .map(message => message.content)
         .join('\n')
+      const { text, truncated } = clampText(rawText, REVIEW_MESSAGE_MAX_CHARS)
+      if (truncated) truncatedMessages += 1
       if (text.trim()) parts.push(`Assistant:\n${text}`)
     }
   }
 
-  const transcript = parts.join('\n\n---\n\n').trim()
-  return transcript.length > 80_000
-    ? `${transcript.slice(0, 80_000)}\n\n[Transcript truncated for review.]`
+  const transcript = [
+    ...parts,
+    truncatedMessages > 0 ? `[${truncatedMessages} long messages were shortened for review.]` : '',
+  ].filter(Boolean).join('\n\n---\n\n').trim()
+
+  return transcript.length > REVIEW_TRANSCRIPT_MAX_CHARS
+    ? `${transcript.slice(0, REVIEW_TRANSCRIPT_MAX_CHARS)}\n\n[Transcript truncated for review.]`
     : transcript
+}
+
+function buildTitleContext(session: SessionInfo, content: string): string {
+  const turns = parseConversation(content, session.provider)
+  const userMessages: string[] = []
+  const assistantSignals: string[] = []
+
+  for (const turn of turns) {
+    if (turn.kind === 'user_turn') {
+      const text = compactInlineText(turn.message.content)
+      if (text) userMessages.push(clampText(text, TITLE_MESSAGE_MAX_CHARS).text)
+    } else if (assistantSignals.length < 4 && turn.kind === 'assistant_turn') {
+      const text = compactInlineText(
+        turn.messages
+          .filter(message => message.kind === 'text')
+          .map(message => message.content)
+          .join(' ')
+      )
+      if (text) assistantSignals.push(clampText(text, TITLE_ASSISTANT_SIGNAL_MAX_CHARS).text)
+    }
+  }
+
+  const firstRequests = userMessages.slice(0, 5)
+  const recentRequests = userMessages.slice(-3)
+  const sections = [
+    `Current title: ${session.title}`,
+    `Provider: ${session.providerLabel || session.provider}`,
+    `Project: ${session.projectName || session.projectPath || session.cwd || 'Unknown'}`,
+    session.gitBranch ? `Branch: ${session.gitBranch}` : '',
+    `Message count: ${session.messageCount}`,
+    formatTitleContextList('Early user requests', firstRequests),
+    formatTitleContextList('Recent user requests', recentRequests),
+    formatTitleContextList('Assistant signals', assistantSignals),
+  ].filter(Boolean)
+
+  const context = sections.join('\n\n')
+  return context.length > TITLE_CONTEXT_MAX_CHARS
+    ? `${context.slice(0, TITLE_CONTEXT_MAX_CHARS)}\n\n[Context truncated for title generation.]`
+    : context
+}
+
+function formatTitleContextList(title: string, items: string[]): string {
+  if (items.length === 0) return ''
+  return `${title}:\n${items.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
+}
+
+function compactInlineText(value: string): string {
+  return value
+    .replace(/```[\s\S]*?```/g, '[code block]')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function clampText(value: string, maxChars: number): { text: string; truncated: boolean } {
+  if (value.length <= maxChars) return { text: value, truncated: false }
+  return {
+    text: `${value.slice(0, maxChars).trim()}\n[Content shortened.]`,
+    truncated: true,
+  }
+}
+
+function buildTitleFingerprint(session: SessionInfo, content: string): string {
+  return [
+    session.sessionId,
+    session.modified,
+    session.messageCount,
+    content.length,
+    hashString(content),
+  ].join('|')
+}
+
+function hashString(value: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36)
 }
