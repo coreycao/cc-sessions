@@ -234,6 +234,7 @@ interface ManagedProject {
 }
 
 type ProjectFilter = 'all' | 'active' | 'archived'
+type ProjectSort = 'lastActive' | 'sessions' | 'name'
 
 function ProjectsSettingsContent({
   sessions, projectData, onUpdateProjectMetadata,
@@ -245,12 +246,13 @@ function ProjectsSettingsContent({
   const { t } = useI18n()
   const [query, setQuery] = useState('')
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all')
+  const [projectSort, setProjectSort] = useState<ProjectSort>('lastActive')
   const [busyProject, setBusyProject] = useState<string | null>(null)
 
   const projects = useMemo(() => buildManagedProjects(sessions, projectData), [sessions, projectData])
   const visibleProjects = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return projects.filter(project => {
+    const filtered = projects.filter(project => {
       if (projectFilter === 'active' && project.metadata.archived) return false
       if (projectFilter === 'archived' && !project.metadata.archived) return false
       if (!q) return true
@@ -258,7 +260,8 @@ function ProjectsSettingsContent({
         || project.name.toLowerCase().includes(q)
         || (project.metadata.displayName || '').toLowerCase().includes(q)
     })
-  }, [projects, query, projectFilter])
+    return sortManagedProjects(filtered, projectSort)
+  }, [projects, query, projectFilter, projectSort])
 
   const updateProject = async (projectPath: string, updates: Partial<ProjectMetadata>) => {
     if (!onUpdateProjectMetadata || busyProject) return
@@ -281,7 +284,7 @@ function ProjectsSettingsContent({
           <ProjectFilterControl value={projectFilter} onChange={setProjectFilter} />
         </div>
 
-        <div className="mt-4 flex items-center gap-2 rounded-lg border border-edge bg-surface-2 px-3 py-2">
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-edge bg-surface-2 py-1.5 pl-3 pr-1.5">
           <Search className="h-3.5 w-3.5 flex-shrink-0 text-content-4" />
           <input
             value={query}
@@ -289,6 +292,7 @@ function ProjectsSettingsContent({
             placeholder={t('projects.searchPlaceholder')}
             className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content-4"
           />
+          <ProjectSortControl value={projectSort} onChange={setProjectSort} />
         </div>
 
         <div className="mt-4 space-y-2">
@@ -309,6 +313,78 @@ function ProjectsSettingsContent({
         </div>
       </section>
     </SettingsContent>
+  )
+}
+
+function ProjectSortControl({ value, onChange }: {
+  value: ProjectSort
+  onChange: (value: ProjectSort) => void
+}) {
+  const { t } = useI18n()
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const options: Array<{ value: ProjectSort; label: string }> = [
+    { value: 'lastActive', label: t('projects.sortLastActive') },
+    { value: 'sessions', label: t('projects.sortSessions') },
+    { value: 'name', label: t('projects.sortName') },
+  ]
+  const current = options.find(option => option.value === value) ?? options[0]
+
+  useEffect(() => {
+    if (!open) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setOpen(false)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [open])
+
+  return (
+    <div ref={menuRef} className="relative flex-shrink-0">
+      <button
+        type="button"
+        onClick={() => setOpen(value => !value)}
+        className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge bg-surface px-2.5 text-[11px] font-medium text-content-3 shadow-sm transition-colors hover:bg-surface-3 hover:text-content-2"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={t('projects.sortBy')}
+      >
+        <span className="text-content-4">{t('projects.sortBy')}</span>
+        <span className="text-content">{current.label}</span>
+        <ChevronDown className={`h-3 w-3 text-content-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+6px)] z-20 w-36 overflow-hidden rounded-lg border border-edge bg-surface p-1 shadow-xl" role="menu">
+          {options.map(option => {
+            const active = value === option.value
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => {
+                  onChange(option.value)
+                  setOpen(false)
+                }}
+                className={`flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-[12px] transition-colors ${active ? 'bg-accent-subtle text-accent' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+                role="menuitemradio"
+                aria-checked={active}
+              >
+                <CheckCircle2 className={`h-3.5 w-3.5 ${active ? 'opacity-100' : 'opacity-0'}`} />
+                <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -505,6 +581,31 @@ function buildManagedProjects(
       if (a.metadata.archived !== b.metadata.archived) return a.metadata.archived ? 1 : -1
       return new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
     })
+}
+
+function sortManagedProjects(projects: ManagedProject[], sort: ProjectSort): ManagedProject[] {
+  return [...projects].sort((a, b) => {
+    if (a.metadata.archived !== b.metadata.archived) return a.metadata.archived ? 1 : -1
+
+    if (sort === 'sessions') {
+      return b.sessionCount - a.sessionCount
+        || new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+        || getProjectSortName(a).localeCompare(getProjectSortName(b))
+    }
+
+    if (sort === 'name') {
+      return getProjectSortName(a).localeCompare(getProjectSortName(b))
+        || new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+    }
+
+    return new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+      || b.sessionCount - a.sessionCount
+      || getProjectSortName(a).localeCompare(getProjectSortName(b))
+  })
+}
+
+function getProjectSortName(project: ManagedProject): string {
+  return (project.metadata.displayName?.trim() || project.name).toLocaleLowerCase()
 }
 
 function DataSettingsContent({

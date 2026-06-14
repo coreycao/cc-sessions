@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { getVersion } from '@tauri-apps/api/app'
 import { listen } from '@tauri-apps/api/event'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, Download, RotateCw } from 'lucide-react'
+import { Activity, BarChart3, Check, Clock3, LoaderCircle, Search, Sun, Moon, Monitor, PanelLeftClose, PanelLeft, FileText, FolderOpen, X, Bookmark, ChevronDown, Download, RotateCw } from 'lucide-react'
 import { useStore } from './hooks/useStore'
 import { Sidebar } from './components/Sidebar'
 import { SessionList } from './components/SessionList'
@@ -58,6 +58,19 @@ function ProjectSourceBadge({ provider }: { provider: 'claude' | 'codex' }) {
   )
 }
 
+type ProjectMenuSort = 'recent' | 'active' | 'top'
+const RECENT_PROJECTS_KEY = 'cc-sessions.recent-projects.v1'
+
+function readRecentProjects(): string[] {
+  if (typeof window === 'undefined' || !window.localStorage) return []
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(RECENT_PROJECTS_KEY) || '[]')
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : []
+  } catch {
+    return []
+  }
+}
+
 function getHeaderUpdateActionLabel(
   t: (key: string, params?: Record<string, string | number>) => string,
   state: UpdateState,
@@ -83,9 +96,13 @@ export default function App() {
   const [appVersion, setAppVersion] = useState('dev')
   const [updaterMockMode, setUpdaterMockModeState] = useState<UpdaterMockMode | null>(() => getInitialUpdaterMockMode())
   const [projectMenuPosition, setProjectMenuPosition] = useState({ top: 38, left: 105 })
+  const [projectMenuSort, setProjectMenuSort] = useState<ProjectMenuSort>('recent')
+  const [projectSortMenuOpen, setProjectSortMenuOpen] = useState(false)
+  const [recentProjectPaths, setRecentProjectPaths] = useState<string[]>(() => readRecentProjects())
   const searchRef = useRef<HTMLInputElement>(null)
   const projectBtnRef = useRef<HTMLButtonElement>(null)
   const projectMenuRef = useRef<HTMLDivElement>(null)
+  const projectSortMenuRef = useRef<HTMLDivElement>(null)
   const updateRef = useRef<AppUpdate | null>(null)
   const updateReadyShouldRelaunchRef = useRef(false)
   const updateCheckSeq = useRef(0)
@@ -259,6 +276,21 @@ export default function App() {
     setProjectMenuOpen(v => !v)
   }, [])
 
+  const recordProjectVisit = useCallback((projectPath: string | null) => {
+    if (!projectPath || store.getProjectMetadata(projectPath).archived) return
+    setRecentProjectPaths(prev => {
+      const next = [projectPath, ...prev.filter(path => path !== projectPath)].slice(0, 5)
+      localStorage.setItem(RECENT_PROJECTS_KEY, JSON.stringify(next))
+      return next
+    })
+  }, [store.getProjectMetadata])
+
+  useEffect(() => {
+    if (store.selectedSession?.projectName) {
+      recordProjectVisit(store.selectedSession.projectName)
+    }
+  }, [recordProjectVisit, store.selectedSession?.projectName])
+
   useEffect(() => {
     if (!projectMenuOpen) return
     const handler = (e: PointerEvent) => {
@@ -271,6 +303,29 @@ export default function App() {
     document.addEventListener('pointerdown', handler, true)
     return () => document.removeEventListener('pointerdown', handler, true)
   }, [projectMenuOpen])
+
+  useEffect(() => {
+    if (!projectMenuOpen) setProjectSortMenuOpen(false)
+  }, [projectMenuOpen])
+
+  useEffect(() => {
+    if (!projectSortMenuOpen) return
+    const handler = (e: PointerEvent) => {
+      const target = e.target as Node
+      if (projectSortMenuRef.current && !projectSortMenuRef.current.contains(target)) {
+        setProjectSortMenuOpen(false)
+      }
+    }
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setProjectSortMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', handler)
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('pointerdown', handler)
+      document.removeEventListener('keydown', keyHandler)
+    }
+  }, [projectSortMenuOpen])
 
   useEffect(() => {
     const root = document.documentElement
@@ -338,8 +393,41 @@ export default function App() {
   const currentProjectDisplayPath = currentProjectMeta?.displayName?.trim() || store.selectedProject
   const currentProjectName = projectDisplayName(currentProjectDisplayPath, t('app.allProjects'))
   const currentProjectTitle = currentProjectDisplayPath || t('app.allProjects')
-  const currentProject = store.projects.find(project => project.name === store.selectedProject) || null
+  const currentProject = store.projects.find(project => project.path === store.selectedProject) || null
   const currentProjectSource = currentProject ? projectSourceLabel(currentProject.providers, t) : null
+  const recentProjectRank = useMemo(
+    () => new Map(recentProjectPaths.map((path, index) => [path, index])),
+    [recentProjectPaths]
+  )
+  const projectMenuSortOptions = useMemo(
+    () => [
+      { id: 'recent' as const, label: t('app.sortRecent'), icon: Clock3 },
+      { id: 'active' as const, label: t('app.sortActive'), icon: Activity },
+      { id: 'top' as const, label: t('app.sortTop'), icon: BarChart3 },
+    ],
+    [t]
+  )
+  const currentProjectMenuSort = projectMenuSortOptions.find(option => option.id === projectMenuSort) ?? projectMenuSortOptions[0]
+  const CurrentProjectSortIcon = currentProjectMenuSort.icon
+  const sortedMenuProjects = useMemo(
+    () => [...store.projects].sort((a, b) => {
+      const aModified = new Date(a.lastModified).getTime()
+      const bModified = new Date(b.lastModified).getTime()
+
+      if (projectMenuSort === 'recent') {
+        const aRank = recentProjectRank.get(a.path) ?? Number.MAX_SAFE_INTEGER
+        const bRank = recentProjectRank.get(b.path) ?? Number.MAX_SAFE_INTEGER
+        return aRank - bRank || bModified - aModified || b.sessionCount - a.sessionCount
+      }
+
+      if (projectMenuSort === 'top') {
+        return b.sessionCount - a.sessionCount || bModified - aModified
+      }
+
+      return bModified - aModified || b.sessionCount - a.sessionCount
+    }),
+    [projectMenuSort, recentProjectRank, store.projects]
+  )
   const headerUpdateVisible = updateState === 'available' || updateState === 'downloading' || updateState === 'ready'
   const headerUpdateBusy = updateState === 'downloading'
   const headerUpdateLabel = getHeaderUpdateActionLabel(t, updateState, updateVersion)
@@ -432,22 +520,69 @@ export default function App() {
             className="fixed z-[9999] bg-surface border border-edge rounded-xl shadow-xl py-1 min-w-[280px] max-w-[340px] max-h-[320px] overflow-y-auto"
             style={projectMenuPosition}
           >
-            <button
-              onClick={() => { store.setSelectedProject(null); setProjectMenuOpen(false) }}
-              title={t('app.allProjects')}
-              className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
-            >
-              <FolderOpen className="w-3.5 h-3.5" />
-              <span className="flex-1 truncate text-left">{t('app.allProjects')}</span>
-              <span className="text-content-4 tabular-nums">{store.sessions.length}</span>
-            </button>
-            <div className="my-1 border-t border-edge/40" />
-            {store.projects.map(p => (
+            <div className={`flex items-center gap-2 px-3 py-1.5 transition-colors ${!store.selectedProject ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}>
               <button
-                key={p.name}
-                onClick={() => { store.setSelectedProject(store.selectedProject === p.name ? null : p.name); setProjectMenuOpen(false) }}
+                onClick={() => { store.setSelectedProject(null); setProjectMenuOpen(false) }}
+                title={t('app.allProjects')}
+                className="flex min-w-0 flex-1 items-center gap-2 rounded-md text-left text-[12px] transition-colors hover:text-accent"
+              >
+                <FolderOpen className="h-3.5 w-3.5 flex-shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{t('app.allProjects')}</span>
+              </button>
+              {store.projects.length > 0 && (
+                <div ref={projectSortMenuRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setProjectSortMenuOpen(value => !value)}
+                    className="inline-flex h-6 w-10 items-center justify-center gap-0.5 rounded-md border border-edge bg-surface text-content-3 shadow-sm transition-colors hover:bg-surface-3 hover:text-content-2"
+                    title={`${t('app.sortProjects')}: ${currentProjectMenuSort.label}`}
+                    aria-label={`${t('app.sortProjects')}: ${currentProjectMenuSort.label}`}
+                    aria-haspopup="menu"
+                    aria-expanded={projectSortMenuOpen}
+                  >
+                    <CurrentProjectSortIcon className="h-3.5 w-3.5 text-content-4" />
+                    <ChevronDown className={`h-2.5 w-2.5 text-content-4 transition-transform ${projectSortMenuOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  {projectSortMenuOpen && (
+                    <div className="absolute right-0 top-[calc(100%+6px)] z-10 w-36 overflow-hidden rounded-lg border border-edge bg-surface p-1 shadow-xl" role="menu">
+                      {projectMenuSortOptions.map(option => {
+                        const Icon = option.icon
+                        const active = projectMenuSort === option.id
+                        return (
+                          <button
+                            key={option.id}
+                            type="button"
+                            onClick={() => {
+                              setProjectMenuSort(option.id)
+                              setProjectSortMenuOpen(false)
+                            }}
+                            className={`flex h-7 w-full items-center gap-2 rounded-md px-2 text-left text-[12px] transition-colors ${active ? 'bg-accent-subtle text-accent' : 'text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+                            role="menuitemradio"
+                            aria-checked={active}
+                          >
+                            <Icon className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="min-w-0 flex-1 truncate">{option.label}</span>
+                            <Check className={`h-3.5 w-3.5 flex-shrink-0 ${active ? 'opacity-100' : 'opacity-0'}`} />
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {store.projects.length > 0 && <div className="my-1 border-t border-edge/40" />}
+            {sortedMenuProjects.map(p => (
+              <button
+                key={p.path}
+                onClick={() => {
+                  const nextProject = store.selectedProject === p.path ? null : p.path
+                  store.setSelectedProject(nextProject)
+                  if (nextProject) recordProjectVisit(p.path)
+                  setProjectMenuOpen(false)
+                }}
                 title={p.path}
-                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.path ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
               <FolderOpen className="w-3.5 h-3.5" />
                 <span className="truncate flex-1 text-left">{projectDisplayName(store.getProjectMetadata(p.path).displayName?.trim() || p.path, t('app.allProjects'))}</span>
