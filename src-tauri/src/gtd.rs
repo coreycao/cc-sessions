@@ -6,7 +6,7 @@ use std::sync::{atomic::AtomicBool, Mutex, RwLock};
 use serde::Deserialize;
 use tauri::Manager;
 
-use crate::models::{AppStore, GtdMetadata, SavedMessagesStore, SessionCache};
+use crate::models::{AppStore, GtdMetadata, ProjectMetadata, SavedMessagesStore, SessionCache};
 use crate::search_index::SearchIndex;
 
 pub struct AppState {
@@ -57,10 +57,12 @@ pub fn load_gtd_from_file(path: &Path) -> AppStore {
     let mut store = match fs::read_to_string(path) {
         Ok(content) => serde_json::from_str(&content).unwrap_or(AppStore {
             gtd_data: std::collections::HashMap::new(),
+            project_data: std::collections::HashMap::new(),
             tags: vec![],
         }),
         Err(_) => AppStore {
             gtd_data: std::collections::HashMap::new(),
+            project_data: std::collections::HashMap::new(),
             tags: vec![],
         },
     };
@@ -127,6 +129,16 @@ pub struct GtdUpdates {
     pub title_fingerprint: Option<Option<String>>,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectUpdates {
+    pub archived: Option<bool>,
+    #[serde(default)]
+    pub display_name: Option<Option<String>>,
+    #[serde(default)]
+    pub notes: Option<Option<String>>,
+}
+
 fn default_gtd(session_id: &str) -> GtdMetadata {
     GtdMetadata {
         session_id: session_id.to_string(),
@@ -139,6 +151,16 @@ fn default_gtd(session_id: &str) -> GtdMetadata {
         title_source: None,
         title_updated_at: None,
         title_fingerprint: None,
+    }
+}
+
+fn default_project_metadata(project_path: &str) -> ProjectMetadata {
+    ProjectMetadata {
+        project_path: project_path.to_string(),
+        archived: false,
+        display_name: None,
+        notes: None,
+        updated_at: String::new(),
     }
 }
 
@@ -230,6 +252,30 @@ fn apply_updates(mut current: GtdMetadata, updates: &GtdUpdates, now: &str) -> G
     current
 }
 
+fn apply_project_updates(
+    mut current: ProjectMetadata,
+    updates: &ProjectUpdates,
+    now: &str,
+) -> ProjectMetadata {
+    if let Some(archived) = updates.archived {
+        current.archived = archived;
+    }
+    if let Some(display_name) = &updates.display_name {
+        current.display_name = display_name
+            .as_ref()
+            .map(|name| name.trim().to_string())
+            .filter(|name| !name.is_empty());
+    }
+    if let Some(notes) = &updates.notes {
+        current.notes = notes
+            .as_ref()
+            .map(|note| note.trim().to_string())
+            .filter(|note| !note.is_empty());
+    }
+    current.updated_at = now.to_string();
+    current
+}
+
 fn save_locked_store(app: &tauri::AppHandle, store: &AppStore) -> Result<(), String> {
     save_gtd_to_file(&gtd_store_path(app), store)
 }
@@ -251,6 +297,31 @@ pub fn update_session_gtd(
     store
         .gtd_data
         .insert(session_id, apply_updates(current, &updates, &now));
+    save_locked_store(&app, &store)?;
+    Ok(store.clone())
+}
+
+#[tauri::command]
+pub fn update_project_metadata(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    project_path: String,
+    updates: ProjectUpdates,
+) -> Result<AppStore, String> {
+    let project_path = project_path.trim().to_string();
+    if project_path.is_empty() {
+        return Err("Project path is required".to_string());
+    }
+
+    let mut store = state.gtd_store.lock().map_err(|e| e.to_string())?;
+    let now = chrono::Utc::now().to_rfc3339();
+    let current = store
+        .project_data
+        .get(&project_path)
+        .cloned()
+        .unwrap_or_else(|| default_project_metadata(&project_path));
+    let updated = apply_project_updates(current, &updates, &now);
+    store.project_data.insert(project_path, updated);
     save_locked_store(&app, &store)?;
     Ok(store.clone())
 }
@@ -522,8 +593,20 @@ mod tests {
                 title_fingerprint: Some("fingerprint".to_string()),
             },
         );
+        let mut project_data = HashMap::new();
+        project_data.insert(
+            "/tmp/project".to_string(),
+            ProjectMetadata {
+                project_path: "/tmp/project".to_string(),
+                archived: true,
+                display_name: Some("Project Alias".to_string()),
+                notes: Some("quiet project".to_string()),
+                updated_at: "2026-05-18T00:02:00Z".to_string(),
+            },
+        );
         let store = AppStore {
             gtd_data,
+            project_data,
             tags: vec!["tests".to_string()],
         };
 
@@ -535,6 +618,11 @@ mod tests {
         assert_eq!(
             loaded.gtd_data["session-1"].display_title.as_deref(),
             Some("Renamed session")
+        );
+        assert!(loaded.project_data["/tmp/project"].archived);
+        assert_eq!(
+            loaded.project_data["/tmp/project"].display_name.as_deref(),
+            Some("Project Alias")
         );
 
         let _ = fs::remove_dir_all(path.parent().unwrap());

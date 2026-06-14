@@ -58,8 +58,22 @@ pub struct GtdMetadata {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
+pub struct ProjectMetadata {
+    pub project_path: String,
+    pub archived: bool,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct AppStore {
     pub gtd_data: HashMap<String, GtdMetadata>,
+    #[serde(default)]
+    pub project_data: HashMap<String, ProjectMetadata>,
     pub tags: Vec<String>,
 }
 

@@ -334,8 +334,10 @@ export default function App() {
     document.addEventListener('mouseup', onUp)
   }, [sidebarWidth])
 
-  const currentProjectName = projectDisplayName(store.selectedProject, t('app.allProjects'))
-  const currentProjectTitle = store.selectedProject || t('app.allProjects')
+  const currentProjectMeta = store.selectedProject ? store.getProjectMetadata(store.selectedProject) : null
+  const currentProjectDisplayPath = currentProjectMeta?.displayName?.trim() || store.selectedProject
+  const currentProjectName = projectDisplayName(currentProjectDisplayPath, t('app.allProjects'))
+  const currentProjectTitle = currentProjectDisplayPath || t('app.allProjects')
   const currentProject = store.projects.find(project => project.name === store.selectedProject) || null
   const currentProjectSource = currentProject ? projectSourceLabel(currentProject.providers, t) : null
   const headerUpdateVisible = updateState === 'available' || updateState === 'downloading' || updateState === 'ready'
@@ -448,7 +450,7 @@ export default function App() {
                 className={`w-full flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors ${store.selectedProject === p.name ? 'text-accent bg-accent-subtle' : 'text-content-2 hover:bg-surface-3'}`}
               >
               <FolderOpen className="w-3.5 h-3.5" />
-                <span className="truncate flex-1 text-left">{projectDisplayName(p.path, t('app.allProjects'))}</span>
+                <span className="truncate flex-1 text-left">{projectDisplayName(store.getProjectMetadata(p.path).displayName?.trim() || p.path, t('app.allProjects'))}</span>
                 <div className="flex items-center gap-1">
                   {p.providers.length > 0 && (
                     p.providers.length === 1 ? (
@@ -700,6 +702,9 @@ export default function App() {
             onSaveAiSettings={store.saveAiSettings}
             onTestAiProfile={store.testAiProfile}
             sessions={store.sessions}
+            allSessions={store.allSessions}
+            projectData={store.projectData}
+            onUpdateProjectMetadata={store.updateProjectMetadata}
             onSyncSessions={store.refreshWithUpdates}
             syncSessionsBusy={store.refreshing}
           />

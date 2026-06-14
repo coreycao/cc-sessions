@@ -3,11 +3,11 @@ import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { createPortal } from 'react-dom'
 import {
-  Activity, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download, Folder,
-  HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, Pencil, Plus, RefreshCw, Sun, Trash2,
+  Activity, Archive, ArchiveRestore, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download, Folder,
+  HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Trash2,
   type LucideIcon,
 } from 'lucide-react'
-import type { AiProfile, AiSettings, SessionInfo, SessionProvider } from '../../shared/types'
+import type { AiProfile, AiSettings, ProjectMetadata, SessionInfo, SessionProvider } from '../../shared/types'
 import { createEmptyAiProfile } from '../hooks/useAiSettings'
 import { getReviewCacheStats } from '../lib/aiReviewCache'
 import { useI18n, type Language } from '../lib/i18n'
@@ -51,6 +51,9 @@ interface SettingsPanelProps {
   onSaveAiSettings: (settings: AiSettings) => Promise<AiSettings>
   onTestAiProfile: (profile: AiProfile) => Promise<void>
   sessions?: SessionInfo[]
+  allSessions?: SessionInfo[]
+  projectData?: Record<string, ProjectMetadata>
+  onUpdateProjectMetadata?: (projectPath: string, updates: Partial<ProjectMetadata>) => Promise<void>
   onSyncSessions?: () => Promise<void>
   syncSessionsBusy?: boolean
 }
@@ -59,7 +62,7 @@ export function SettingsPanel({
   section, theme, setTheme, appVersion, updateState, updateVersion, updateProgress, updateError,
   updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
   aiSettings, setAiSettings, aiSettingsSaving, testingProfileId, onSaveAiSettings, onTestAiProfile,
-  sessions = [], onSyncSessions, syncSessionsBusy = false,
+  sessions = [], allSessions = sessions, projectData = {}, onUpdateProjectMetadata, onSyncSessions, syncSessionsBusy = false,
 }: SettingsPanelProps) {
   const { t, language, setLanguage } = useI18n()
   const updateLabel = getUpdateLabel(t, updateState, updateVersion, updateProgress)
@@ -156,6 +159,14 @@ export function SettingsPanel({
           <StatisticsSettingsContent sessions={sessions} />
         )}
 
+        {section === 'projects' && (
+          <ProjectsSettingsContent
+            sessions={allSessions}
+            projectData={projectData}
+            onUpdateProjectMetadata={onUpdateProjectMetadata}
+          />
+        )}
+
         {section === 'data' && (
           <DataSettingsContent
             sessions={sessions}
@@ -172,6 +183,7 @@ function getSectionTitle(t: (key: string) => string, section: SettingsSection) {
   const keys: Record<SettingsSection, string> = {
     app: 'settings.app',
     ai: 'settings.ai',
+    projects: 'settings.projects',
     statistics: 'settings.statistics',
     data: 'settings.data',
     appearance: 'settings.appearance',
@@ -209,6 +221,290 @@ function SettingRow({ title, description, control }: { title: string; descriptio
       {control && <div className="flex-shrink-0">{control}</div>}
     </div>
   )
+}
+
+interface ManagedProject {
+  path: string
+  name: string
+  sessionCount: number
+  messageCount: number
+  lastModified: string
+  providers: SessionProvider[]
+  metadata: ProjectMetadata
+}
+
+type ProjectFilter = 'all' | 'active' | 'archived'
+
+function ProjectsSettingsContent({
+  sessions, projectData, onUpdateProjectMetadata,
+}: {
+  sessions: SessionInfo[]
+  projectData: Record<string, ProjectMetadata>
+  onUpdateProjectMetadata?: (projectPath: string, updates: Partial<ProjectMetadata>) => Promise<void>
+}) {
+  const { t } = useI18n()
+  const [query, setQuery] = useState('')
+  const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all')
+  const [busyProject, setBusyProject] = useState<string | null>(null)
+
+  const projects = useMemo(() => buildManagedProjects(sessions, projectData), [sessions, projectData])
+  const visibleProjects = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return projects.filter(project => {
+      if (projectFilter === 'active' && project.metadata.archived) return false
+      if (projectFilter === 'archived' && !project.metadata.archived) return false
+      if (!q) return true
+      return project.path.toLowerCase().includes(q)
+        || project.name.toLowerCase().includes(q)
+        || (project.metadata.displayName || '').toLowerCase().includes(q)
+    })
+  }, [projects, query, projectFilter])
+
+  const updateProject = async (projectPath: string, updates: Partial<ProjectMetadata>) => {
+    if (!onUpdateProjectMetadata || busyProject) return
+    setBusyProject(projectPath)
+    try {
+      await onUpdateProjectMetadata(projectPath, updates)
+    } finally {
+      setBusyProject(null)
+    }
+  }
+
+  return (
+    <SettingsContent title={t('settings.projects')}>
+      <section className="rounded-xl border border-edge bg-surface p-4 shadow-sm">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3 className="text-[15px] font-semibold text-content">{t('projects.manageProjects')}</h3>
+            <p className="mt-0.5 text-[12px] text-content-4">{t('projects.manageProjectsDescription')}</p>
+          </div>
+          <ProjectFilterControl value={projectFilter} onChange={setProjectFilter} />
+        </div>
+
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-edge bg-surface-2 px-3 py-2">
+          <Search className="h-3.5 w-3.5 flex-shrink-0 text-content-4" />
+          <input
+            value={query}
+            onChange={event => setQuery(event.target.value)}
+            placeholder={t('projects.searchPlaceholder')}
+            className="min-w-0 flex-1 bg-transparent text-[12px] text-content outline-none placeholder:text-content-4"
+          />
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {visibleProjects.map(project => (
+            <ProjectManagementRow
+              key={project.path}
+              project={project}
+              busy={busyProject === project.path}
+              disabled={!onUpdateProjectMetadata || Boolean(busyProject)}
+              onUpdate={updates => updateProject(project.path, updates)}
+            />
+          ))}
+          {visibleProjects.length === 0 && (
+            <div className="flex min-h-[140px] items-center justify-center rounded-lg border border-dashed border-edge text-[12px] text-content-4">
+              {projects.length === 0 ? t('projects.noProjects') : t('projects.noMatchingProjects')}
+            </div>
+          )}
+        </div>
+      </section>
+    </SettingsContent>
+  )
+}
+
+function ProjectFilterControl({ value, onChange }: {
+  value: ProjectFilter
+  onChange: (value: ProjectFilter) => void
+}) {
+  const { t } = useI18n()
+  const options: Array<{ value: ProjectFilter; label: string }> = [
+    { value: 'all', label: t('projects.filterAll') },
+    { value: 'active', label: t('projects.filterActive') },
+    { value: 'archived', label: t('projects.filterArchived') },
+  ]
+
+  return (
+    <div className="inline-flex h-8 rounded-lg border border-edge bg-surface-2 p-0.5 shadow-sm">
+      {options.map(option => {
+        const active = value === option.value
+        return (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+            className={`rounded-md px-2.5 text-[12px] font-medium transition-colors ${active ? 'bg-surface text-content shadow-sm' : 'text-content-4 hover:text-content-2'}`}
+            aria-pressed={active}
+          >
+            {option.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function ProjectManagementRow({
+  project, busy, disabled, onUpdate,
+}: {
+  project: ManagedProject
+  busy: boolean
+  disabled: boolean
+  onUpdate: (updates: Partial<ProjectMetadata>) => Promise<void>
+}) {
+  const { t } = useI18n()
+  const [editingName, setEditingName] = useState(false)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [nameDraft, setNameDraft] = useState(project.metadata.displayName || '')
+  const [notesDraft, setNotesDraft] = useState(project.metadata.notes || '')
+  const archived = project.metadata.archived
+  const displayName = project.metadata.displayName?.trim() || project.name
+
+  useEffect(() => {
+    setNameDraft(project.metadata.displayName || '')
+    setNotesDraft(project.metadata.notes || '')
+  }, [project.metadata.displayName, project.metadata.notes])
+
+  const saveName = async () => {
+    await onUpdate({ displayName: nameDraft.trim() })
+    setEditingName(false)
+  }
+
+  const saveNotes = async () => {
+    await onUpdate({ notes: notesDraft.trim() })
+    setEditingNotes(false)
+  }
+
+  return (
+    <div className={`rounded-xl border bg-surface-2/45 p-3 transition-colors ${archived ? 'border-amber-500/25 opacity-75' : 'border-edge/80'}`}>
+      <div className="flex items-start gap-3">
+        <div className={`mt-0.5 inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg border ${archived ? 'border-amber-500/25 bg-amber-500/10 text-amber-500' : 'border-blue-500/20 bg-blue-500/10 text-blue-500'}`}>
+          <Folder className="h-4 w-4" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-center gap-2">
+            {editingName ? (
+              <input
+                value={nameDraft}
+                onChange={event => setNameDraft(event.target.value)}
+                onBlur={saveName}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') { setEditingName(false); setNameDraft(project.metadata.displayName || '') }
+                  if (event.key === 'Enter') saveName()
+                }}
+                placeholder={project.name}
+                autoFocus
+                className="h-7 min-w-0 flex-1 rounded-lg border border-edge bg-surface px-2 text-[13px] font-semibold text-content outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            ) : (
+              <button
+                onClick={() => setEditingName(true)}
+                className="min-w-0 truncate text-left text-[13px] font-semibold text-content hover:text-accent"
+                title={t('projects.editDisplayName')}
+              >
+                {displayName}
+              </button>
+            )}
+            {archived && (
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-1.5 py-px text-[9px] font-medium uppercase tracking-wide text-amber-500">
+                {t('projects.archived')}
+              </span>
+            )}
+          </div>
+          <div className="mt-0.5 truncate text-[11px] text-content-4" title={project.path}>{project.path}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-content-4">
+            <span>{t('projects.sessionCount', { count: project.sessionCount })}</span>
+            <span>{t('projects.messageCount', { count: project.messageCount })}</span>
+            <span>{new Date(project.lastModified).toLocaleDateString()}</span>
+            {project.providers.map(provider => (
+              <span key={provider} className="rounded border border-edge/70 bg-surface px-1 py-px font-medium">
+                {provider === 'codex' ? t('common.codex') : t('common.claude')}
+              </span>
+            ))}
+          </div>
+          <div className="mt-2">
+            {editingNotes ? (
+              <input
+                value={notesDraft}
+                onChange={event => setNotesDraft(event.target.value)}
+                onBlur={saveNotes}
+                onKeyDown={event => {
+                  if (event.key === 'Escape') { setEditingNotes(false); setNotesDraft(project.metadata.notes || '') }
+                  if (event.key === 'Enter') saveNotes()
+                }}
+                placeholder={t('projects.notesPlaceholder')}
+                autoFocus
+                className="h-7 w-full rounded-lg border border-edge bg-surface px-2 text-[11px] text-content-2 outline-none focus:border-accent focus:ring-2 focus:ring-accent/15"
+              />
+            ) : (
+              <button
+                onClick={() => setEditingNotes(true)}
+                className={`group inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2 py-1 text-left text-[11px] transition-colors ${project.metadata.notes ? 'border-edge bg-surface text-content-3 hover:bg-surface-2 hover:text-content-2' : 'border-dashed border-edge/80 bg-transparent text-content-4 hover:border-edge hover:bg-surface hover:text-content-2'}`}
+                title={t('projects.editNote')}
+              >
+                <NotebookPen className="h-3 w-3 flex-shrink-0 text-content-4 group-hover:text-content-3" />
+                <span className="truncate">{project.metadata.notes || t('projects.addNote')}</span>
+                <Pencil className="h-3 w-3 flex-shrink-0 text-content-5 opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-shrink-0 items-center gap-1">
+          {busy && <LoaderCircle className="h-3.5 w-3.5 animate-spin text-content-4" />}
+          <button
+            onClick={() => onUpdate({ archived: !archived })}
+            disabled={disabled}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-sm disabled:opacity-40 ${archived ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15' : 'border-edge bg-surface text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+          >
+            {archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+            {archived ? t('projects.restoreProject') : t('projects.archiveProject')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function buildManagedProjects(
+  sessions: SessionInfo[],
+  projectData: Record<string, ProjectMetadata>,
+): ManagedProject[] {
+  const map = new Map<string, Omit<ManagedProject, 'metadata'>>()
+  for (const session of sessions) {
+    const path = session.projectName || session.projectPath || session.cwd || 'Unknown'
+    const existing = map.get(path)
+    if (existing) {
+      existing.sessionCount += 1
+      existing.messageCount += session.messageCount
+      if (!existing.providers.includes(session.provider)) existing.providers.push(session.provider)
+      if (new Date(session.modified) > new Date(existing.lastModified)) existing.lastModified = session.modified
+    } else {
+      map.set(path, {
+        path,
+        name: path.split('/').filter(Boolean).at(-1) || path,
+        sessionCount: 1,
+        messageCount: session.messageCount,
+        lastModified: session.modified,
+        providers: [session.provider],
+      })
+    }
+  }
+
+  return Array.from(map.values())
+    .map(project => ({
+      ...project,
+      providers: [...project.providers].sort(),
+      metadata: projectData[project.path] || {
+        projectPath: project.path,
+        archived: false,
+        displayName: null,
+        notes: null,
+        updatedAt: '',
+      },
+    }))
+    .sort((a, b) => {
+      if (a.metadata.archived !== b.metadata.archived) return a.metadata.archived ? 1 : -1
+      return new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+    })
 }
 
 function DataSettingsContent({
