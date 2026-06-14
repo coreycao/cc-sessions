@@ -104,7 +104,7 @@ pub async fn generate_session_title(
     validate_profile(profile)?;
 
     let user = format!(
-        "Current title: {current_title}\n\nTranscript:\n{transcript}\n\nImmediately return the new title only."
+        "Current title: {current_title}\n\nSession context:\n{transcript}\n\nImmediately return the new title only."
     );
 
     let title = call_chat_completion(

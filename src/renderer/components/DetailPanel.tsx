@@ -173,11 +173,10 @@ export const DetailPanel = memo(function DetailPanel({
     setRenameError(null)
 
     try {
-      const transcript = buildReviewTranscript(sessionContent, selectedSession.provider)
       const title = await invoke<string>('generate_session_title', {
         profileId: activeAiProfile?.id ?? null,
         currentTitle: renameDraft || selectedSession.title,
-        transcript: buildTitleTranscript(transcript),
+        transcript: buildTitleContext(selectedSession, sessionContent),
       })
       setRenameDraft(title)
       setRenameSource('ai')
@@ -684,32 +683,100 @@ function SessionRenameDialog({
   )
 }
 
+const REVIEW_TRANSCRIPT_MAX_CHARS = 60_000
+const REVIEW_MESSAGE_MAX_CHARS = 8_000
+const TITLE_CONTEXT_MAX_CHARS = 6_000
+const TITLE_MESSAGE_MAX_CHARS = 520
+const TITLE_ASSISTANT_SIGNAL_MAX_CHARS = 260
+
 function buildReviewTranscript(content: string, provider: SessionInfo['provider']): string {
   const turns = parseConversation(content, provider)
   const parts: string[] = []
+  let truncatedMessages = 0
 
   for (const turn of turns) {
     if (turn.kind === 'user_turn') {
-      parts.push(`User:\n${turn.message.content}`)
+      const { text, truncated } = clampText(turn.message.content, REVIEW_MESSAGE_MAX_CHARS)
+      if (truncated) truncatedMessages += 1
+      parts.push(`User:\n${text}`)
     } else if (turn.kind === 'assistant_turn') {
-      const text = turn.messages
+      const rawText = turn.messages
         .filter(message => message.kind === 'text')
         .map(message => message.content)
         .join('\n')
+      const { text, truncated } = clampText(rawText, REVIEW_MESSAGE_MAX_CHARS)
+      if (truncated) truncatedMessages += 1
       if (text.trim()) parts.push(`Assistant:\n${text}`)
     }
   }
 
-  const transcript = parts.join('\n\n---\n\n').trim()
-  return transcript.length > 80_000
-    ? `${transcript.slice(0, 80_000)}\n\n[Transcript truncated for review.]`
+  const transcript = [
+    ...parts,
+    truncatedMessages > 0 ? `[${truncatedMessages} long messages were shortened for review.]` : '',
+  ].filter(Boolean).join('\n\n---\n\n').trim()
+
+  return transcript.length > REVIEW_TRANSCRIPT_MAX_CHARS
+    ? `${transcript.slice(0, REVIEW_TRANSCRIPT_MAX_CHARS)}\n\n[Transcript truncated for review.]`
     : transcript
 }
 
-function buildTitleTranscript(transcript: string): string {
-  return transcript.length > 18_000
-    ? `${transcript.slice(0, 18_000)}\n\n[Transcript truncated for title generation.]`
-    : transcript
+function buildTitleContext(session: SessionInfo, content: string): string {
+  const turns = parseConversation(content, session.provider)
+  const userMessages: string[] = []
+  const assistantSignals: string[] = []
+
+  for (const turn of turns) {
+    if (turn.kind === 'user_turn') {
+      const text = compactInlineText(turn.message.content)
+      if (text) userMessages.push(clampText(text, TITLE_MESSAGE_MAX_CHARS).text)
+    } else if (assistantSignals.length < 4 && turn.kind === 'assistant_turn') {
+      const text = compactInlineText(
+        turn.messages
+          .filter(message => message.kind === 'text')
+          .map(message => message.content)
+          .join(' ')
+      )
+      if (text) assistantSignals.push(clampText(text, TITLE_ASSISTANT_SIGNAL_MAX_CHARS).text)
+    }
+  }
+
+  const firstRequests = userMessages.slice(0, 5)
+  const recentRequests = userMessages.slice(-3)
+  const sections = [
+    `Current title: ${session.title}`,
+    `Provider: ${session.providerLabel || session.provider}`,
+    `Project: ${session.projectName || session.projectPath || session.cwd || 'Unknown'}`,
+    session.gitBranch ? `Branch: ${session.gitBranch}` : '',
+    `Message count: ${session.messageCount}`,
+    formatTitleContextList('Early user requests', firstRequests),
+    formatTitleContextList('Recent user requests', recentRequests),
+    formatTitleContextList('Assistant signals', assistantSignals),
+  ].filter(Boolean)
+
+  const context = sections.join('\n\n')
+  return context.length > TITLE_CONTEXT_MAX_CHARS
+    ? `${context.slice(0, TITLE_CONTEXT_MAX_CHARS)}\n\n[Context truncated for title generation.]`
+    : context
+}
+
+function formatTitleContextList(title: string, items: string[]): string {
+  if (items.length === 0) return ''
+  return `${title}:\n${items.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
+}
+
+function compactInlineText(value: string): string {
+  return value
+    .replace(/```[\s\S]*?```/g, '[code block]')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function clampText(value: string, maxChars: number): { text: string; truncated: boolean } {
+  if (value.length <= maxChars) return { text: value, truncated: false }
+  return {
+    text: `${value.slice(0, maxChars).trim()}\n[Content shortened.]`,
+    truncated: true,
+  }
 }
 
 function buildTitleFingerprint(session: SessionInfo, content: string): string {
