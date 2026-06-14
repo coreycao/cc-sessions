@@ -31,6 +31,10 @@ export interface GTDMetadata {
   notes: string
   starred: boolean
   updatedAt: string
+  displayTitle?: string | null
+  titleSource?: 'manual' | 'ai' | null
+  titleUpdatedAt?: string | null
+  titleFingerprint?: string | null
 }
 
 export interface Project {

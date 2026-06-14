@@ -16,7 +16,7 @@ import {
 import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
-  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle,
+  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle, PencilLine, Sparkles,
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
@@ -64,9 +64,15 @@ export const DetailPanel = memo(function DetailPanel({
   const [reviewLoading, setReviewLoading] = useState(false)
   const [reviewError, setReviewError] = useState<string | null>(null)
   const [reviewText, setReviewText] = useState('')
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameDraft, setRenameDraft] = useState('')
+  const [renameSource, setRenameSource] = useState<'manual' | 'ai'>('manual')
+  const [renameLoading, setRenameLoading] = useState(false)
+  const [renameError, setRenameError] = useState<string | null>(null)
   const overflowRef = useRef<HTMLButtonElement>(null)
   const conversationScrollRef = useRef<HTMLDivElement>(null)
   const assistantLabel = selectedSession.provider === 'codex' ? 'Codex' : 'Claude'
+  const hasCustomTitle = Boolean(gtd.displayTitle?.trim())
 
   const exportFullSession = useCallback(() => {
     const turns = parseConversation(sessionContent, selectedSession.provider)
@@ -149,6 +155,62 @@ export const DetailPanel = memo(function DetailPanel({
     }
   }, [activeAiProfile, selectedSession, sessionContent])
 
+  const openRenameDialog = useCallback(() => {
+    setRenameDraft(gtd.displayTitle?.trim() || selectedSession.title)
+    setRenameSource(gtd.titleSource === 'ai' ? 'ai' : 'manual')
+    setRenameError(null)
+    setRenameLoading(false)
+    setRenameOpen(true)
+  }, [gtd.displayTitle, gtd.titleSource, selectedSession.title])
+
+  const generateTitle = useCallback(async () => {
+    if (!sessionContent.trim()) {
+      setRenameError(t('detail.titleRequiresContent'))
+      return
+    }
+
+    setRenameLoading(true)
+    setRenameError(null)
+
+    try {
+      const transcript = buildReviewTranscript(sessionContent, selectedSession.provider)
+      const title = await invoke<string>('generate_session_title', {
+        profileId: activeAiProfile?.id ?? null,
+        currentTitle: renameDraft || selectedSession.title,
+        transcript: buildTitleTranscript(transcript),
+      })
+      setRenameDraft(title)
+      setRenameSource('ai')
+    } catch (error) {
+      setRenameError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setRenameLoading(false)
+    }
+  }, [activeAiProfile?.id, renameDraft, selectedSession.provider, selectedSession.title, sessionContent, t])
+
+  const saveTitle = useCallback(async () => {
+    const title = renameDraft.trim()
+    if (!title || renameLoading) return
+    await updateSessionGTD(selectedSession.sessionId, {
+      displayTitle: title,
+      titleSource: renameSource,
+      titleUpdatedAt: new Date().toISOString(),
+      titleFingerprint: buildTitleFingerprint(selectedSession, sessionContent),
+    })
+    setRenameOpen(false)
+  }, [renameDraft, renameLoading, renameSource, selectedSession, sessionContent, updateSessionGTD])
+
+  const resetTitle = useCallback(async () => {
+    if (renameLoading) return
+    await updateSessionGTD(selectedSession.sessionId, {
+      displayTitle: null,
+      titleSource: null,
+      titleUpdatedAt: null,
+      titleFingerprint: null,
+    })
+    setRenameOpen(false)
+  }, [renameLoading, selectedSession.sessionId, updateSessionGTD])
+
   return (
     <div className="relative flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
       {/* Header toolbar */}
@@ -162,6 +224,20 @@ export const DetailPanel = memo(function DetailPanel({
         <div className="flex min-w-0 flex-1 items-center justify-start gap-2" data-tauri-drag-region>
           <ProviderLogo provider={selectedSession.provider} size="md" />
           <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
+          {hasCustomTitle && (
+            <span className="hidden rounded-full border border-accent/20 bg-accent-subtle px-1.5 py-px text-[9px] font-medium uppercase tracking-wide text-accent sm:inline-flex">
+              {t('detail.customTitle')}
+            </span>
+          )}
+          <ActionTip label={t('detail.renameSession')}>
+            <button
+              onClick={openRenameDialog}
+              className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
+              aria-label={t('detail.renameSession')}
+            >
+              <PencilLine className="w-3.5 h-3.5" />
+            </button>
+          </ActionTip>
         </div>
         <ActionTip label={gtd.status === 'archived' ? t('detail.unarchive') : t('detail.archive')}>
           <button
@@ -367,6 +443,21 @@ export const DetailPanel = memo(function DetailPanel({
           onClose={() => setReviewOpen(false)}
         />
       )}
+      {renameOpen && (
+        <SessionRenameDialog
+          title={selectedSession.title}
+          value={renameDraft}
+          source={renameSource}
+          hasCustomTitle={hasCustomTitle}
+          loading={renameLoading}
+          error={renameError}
+          onChange={value => { setRenameDraft(value); setRenameSource('manual') }}
+          onGenerate={generateTitle}
+          onSave={saveTitle}
+          onReset={resetTitle}
+          onClose={() => setRenameOpen(false)}
+        />
+      )}
     </div>
   )
 })
@@ -472,6 +563,127 @@ function SessionReviewDialog({
   )
 }
 
+function SessionRenameDialog({
+  title, value, source, hasCustomTitle, loading, error,
+  onChange, onGenerate, onSave, onReset, onClose,
+}: {
+  title: string
+  value: string
+  source: 'manual' | 'ai'
+  hasCustomTitle: boolean
+  loading: boolean
+  error: string | null
+  onChange: (value: string) => void
+  onGenerate: () => void
+  onSave: () => void
+  onReset: () => void
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+    inputRef.current?.select()
+  }, [])
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        onClose()
+      }
+      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault()
+        event.stopPropagation()
+        onSave()
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown, true)
+    return () => document.removeEventListener('keydown', handleKeyDown, true)
+  }, [onClose, onSave])
+
+  const canSave = value.trim().length > 0 && !loading
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm">
+      <div className="flex w-[min(520px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
+        <div className="flex h-12 items-center gap-3 border-b border-edge/70 px-4">
+          <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-subtle text-accent">
+            <PencilLine className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-content">{t('detail.renameSession')}</div>
+            <div className="truncate text-[11px] text-content-4">{title}</div>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-1 text-content-4 hover:bg-surface-3 hover:text-content-2" aria-label={t('session.closeEsc')}>
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="space-y-4 px-5 py-5">
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <label className="text-[11px] font-semibold uppercase tracking-wide text-content-4" htmlFor="session-display-title">
+                {t('detail.displayTitle')}
+              </label>
+              <span className="text-[10px] text-content-5">
+                {source === 'ai' ? t('detail.aiSuggestedTitle') : t('detail.localOnlyTitle')}
+              </span>
+            </div>
+            <input
+              ref={inputRef}
+              id="session-display-title"
+              value={value}
+              onChange={event => onChange(event.target.value)}
+              placeholder={t('detail.displayTitlePlaceholder')}
+              className="h-10 w-full rounded-lg border border-edge bg-surface-2 px-3 text-[14px] font-medium text-content outline-none transition-colors placeholder:text-content-5 focus:border-accent focus:ring-2 focus:ring-accent/15"
+            />
+            <p className="mt-2 text-[11px] leading-relaxed text-content-4">
+              {t('detail.renameLocalOnlyDescription')}
+            </p>
+          </div>
+
+          {error && (
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-[12px] leading-relaxed text-red-400">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-edge/70 px-4 py-3">
+          <button
+            onClick={onReset}
+            disabled={!hasCustomTitle || loading}
+            className="inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-medium text-content-4 transition-colors hover:bg-surface-2 hover:text-content-2 disabled:cursor-default disabled:opacity-40"
+          >
+            {t('detail.resetTitle')}
+          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onGenerate}
+              disabled={loading}
+              className="inline-flex h-8 items-center gap-2 rounded-lg border border-accent/25 bg-accent-subtle px-3 text-[12px] font-medium text-accent shadow-sm transition-colors hover:bg-accent-subtle/80 disabled:opacity-60"
+            >
+              {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {loading ? t('detail.generatingTitle') : t('detail.generateTitle')}
+            </button>
+            <button
+              onClick={onSave}
+              disabled={!canSave}
+              className="inline-flex h-8 items-center rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+            >
+              {t('common.save')}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 function buildReviewTranscript(content: string, provider: SessionInfo['provider']): string {
   const turns = parseConversation(content, provider)
   const parts: string[] = []
@@ -492,4 +704,29 @@ function buildReviewTranscript(content: string, provider: SessionInfo['provider'
   return transcript.length > 80_000
     ? `${transcript.slice(0, 80_000)}\n\n[Transcript truncated for review.]`
     : transcript
+}
+
+function buildTitleTranscript(transcript: string): string {
+  return transcript.length > 18_000
+    ? `${transcript.slice(0, 18_000)}\n\n[Transcript truncated for title generation.]`
+    : transcript
+}
+
+function buildTitleFingerprint(session: SessionInfo, content: string): string {
+  return [
+    session.sessionId,
+    session.modified,
+    session.messageCount,
+    content.length,
+    hashString(content),
+  ].join('|')
+}
+
+function hashString(value: string): string {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i)
+    hash = Math.imul(hash, 0x01000193)
+  }
+  return (hash >>> 0).toString(36)
 }
