@@ -45,8 +45,18 @@ export interface Project {
   providers: SessionProvider[]
 }
 
+export interface ProjectMetadata {
+  projectPath: string
+  archived: boolean
+  displayName?: string | null
+  notes?: string | null
+  icon?: string | null
+  updatedAt: string
+}
+
 export interface AppStore {
   gtdData: Record<string, GTDMetadata>
+  projectData?: Record<string, ProjectMetadata>
   tags: string[]
 }
 

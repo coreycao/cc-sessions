@@ -171,6 +171,7 @@ pub fn run() {
             gtd::load_gtd_store,
             gtd::save_gtd_store,
             gtd::update_session_gtd,
+            gtd::update_project_metadata,
             gtd::add_session_tag,
             gtd::remove_session_tag,
             gtd::rename_tag,

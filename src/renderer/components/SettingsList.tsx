@@ -1,9 +1,10 @@
-import { BarChart3, Bell, Bot, Brush, Database, type LucideIcon } from 'lucide-react'
+import { BarChart3, Bell, Bot, Brush, Database, FolderKanban, type LucideIcon } from 'lucide-react'
 import { useI18n } from '../lib/i18n'
 
 export type SettingsSection =
   | 'app'
   | 'ai'
+  | 'projects'
   | 'statistics'
   | 'data'
   | 'appearance'
@@ -19,6 +20,7 @@ export function SettingsList({ selected, onSelect }: SettingsListProps) {
     { id: 'app', icon: Bell, label: t('settings.app'), description: t('settings.appDescription') },
     { id: 'appearance', icon: Brush, label: t('settings.appearance'), description: t('settings.appearanceDescription') },
     { id: 'ai', icon: Bot, label: t('settings.ai'), description: t('settings.aiDescription') },
+    { id: 'projects', icon: FolderKanban, label: t('settings.projects'), description: t('settings.projectsDescription') },
     { id: 'statistics', icon: BarChart3, label: t('settings.statistics'), description: t('settings.statisticsDescription') },
     { id: 'data', icon: Database, label: t('settings.data'), description: t('settings.dataDescription') },
   ]

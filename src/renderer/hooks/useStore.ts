@@ -29,7 +29,11 @@ export function useStore() {
     }),
     [sessions.sessions, gtd.getGTD]
   )
-  const filters = useFilters(displaySessions, gtd.getGTD)
+  const activeSessions = useMemo(
+    () => displaySessions.filter(session => !gtd.getProjectMetadata(session.projectName).archived),
+    [displaySessions, gtd.getProjectMetadata]
+  )
+  const filters = useFilters(activeSessions, gtd.getGTD)
   const { contentResults, isSearching } = useContentSearch(filters.searchQuery)
 
   const loadData = useCallback(async () => {
@@ -40,13 +44,19 @@ export function useStore() {
 
   useEffect(() => { loadData() }, [loadData])
 
+  useEffect(() => {
+    if (filters.selectedProject && gtd.getProjectMetadata(filters.selectedProject).archived) {
+      filters.setSelectedProject(null)
+    }
+  }, [filters.selectedProject, filters.setSelectedProject, gtd.getProjectMetadata])
+
   const deleteSession = useCallback(async (session: import('../../shared/types').SessionInfo) => {
     await sessions.deleteSession(session)
   }, [sessions.deleteSession])
 
   const selectedSession = useMemo(
-    () => displaySessions.find(s => s.sessionId === sessions.selectedSessionId) || null,
-    [displaySessions, sessions.selectedSessionId]
+    () => activeSessions.find(s => s.sessionId === sessions.selectedSessionId) || null,
+    [activeSessions, sessions.selectedSessionId]
   )
 
   // Show a lightweight notification when session files change on disk
@@ -85,15 +95,16 @@ export function useStore() {
     const base = filters.filteredSessions
     if (contentResults.size === 0) return base
     const seen = new Set(base.map(s => s.sessionId))
-    const extras = displaySessions
+    const extras = activeSessions
       .filter(s => contentResults.has(s.sessionId) && !seen.has(s.sessionId))
       .sort((a, b) => (contentResults.get(b.sessionId)?.score ?? 0) - (contentResults.get(a.sessionId)?.score ?? 0))
     return [...base, ...extras]
-  }, [filters.filteredSessions, contentResults, displaySessions])
+  }, [filters.filteredSessions, contentResults, activeSessions])
 
   return {
     loading: sessions.loading,
-    sessions: displaySessions,
+    sessions: activeSessions,
+    allSessions: displaySessions,
     filteredSessions,
     statusCounts: filters.statusCounts,
     selectedSession,
@@ -120,7 +131,10 @@ export function useStore() {
     newTag: gtd.newTag,
     setNewTag: gtd.setNewTag,
     getGTD: gtd.getGTD,
+    projectData: gtd.projectData,
+    getProjectMetadata: gtd.getProjectMetadata,
     updateSessionGTD: gtd.updateSessionGTD,
+    updateProjectMetadata: gtd.updateProjectMetadata,
     addTag: gtd.addTag,
     removeTag: gtd.removeTag,
     renameTag: gtd.renameTag,

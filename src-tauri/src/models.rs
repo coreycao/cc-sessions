@@ -56,10 +56,29 @@ pub struct GtdMetadata {
     pub title_fingerprint: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectMetadata {
+    #[serde(default)]
+    pub project_path: String,
+    #[serde(default)]
+    pub archived: bool,
+    #[serde(default)]
+    pub display_name: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(default)]
+    pub updated_at: String,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct AppStore {
     pub gtd_data: HashMap<String, GtdMetadata>,
+    #[serde(default)]
+    pub project_data: HashMap<String, ProjectMetadata>,
     pub tags: Vec<String>,
 }
 

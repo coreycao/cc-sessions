@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import type { GTDMetadata, AppStore, SessionStatus } from '../../shared/types'
+import type { GTDMetadata, AppStore, ProjectMetadata, SessionStatus } from '../../shared/types'
 
 const STATUS_MIGRATION: Record<string, SessionStatus> = {
   'inbox': 'new',
@@ -13,6 +13,7 @@ const STATUS_MIGRATION: Record<string, SessionStatus> = {
 
 const EMPTY_TAGS: string[] = []
 const defaultGTDCache = new Map<string, GTDMetadata>()
+const defaultProjectCache = new Map<string, ProjectMetadata>()
 
 export function getDefaultGTD(sessionId: string): GTDMetadata {
   let gtd = defaultGTDCache.get(sessionId)
@@ -34,8 +35,25 @@ export function getDefaultGTD(sessionId: string): GTDMetadata {
   return gtd
 }
 
+export function getDefaultProjectMetadata(projectPath: string): ProjectMetadata {
+  let project = defaultProjectCache.get(projectPath)
+  if (!project) {
+    project = {
+      projectPath,
+      archived: false,
+      displayName: null,
+      notes: null,
+      icon: null,
+      updatedAt: '',
+    }
+    defaultProjectCache.set(projectPath, project)
+  }
+  return project
+}
+
 export function useGTD() {
   const [gtdData, setGtdData] = useState<Record<string, GTDMetadata>>({})
+  const [projectData, setProjectData] = useState<Record<string, ProjectMetadata>>({})
   const [allTags, setAllTags] = useState<string[]>([])
   const [showTagInput, setShowTagInput] = useState(false)
   const [newTag, setNewTag] = useState('')
@@ -52,6 +70,7 @@ export function useGTD() {
         : gtd
     }
     setGtdData(migrated)
+    setProjectData(store.projectData || {})
     setAllTags(store.tags || [])
   }, [])
 
@@ -61,9 +80,18 @@ export function useGTD() {
   }, [initFromStore])
 
   const getGTD = useCallback((sessionId: string): GTDMetadata => gtdData[sessionId] || getDefaultGTD(sessionId), [gtdData])
+  const getProjectMetadata = useCallback(
+    (projectPath: string): ProjectMetadata => projectData[projectPath] || getDefaultProjectMetadata(projectPath),
+    [projectData]
+  )
 
   const updateSessionGTD = useCallback(async (sessionId: string, updates: Partial<GTDMetadata>) => {
     const store = await invoke<AppStore>('update_session_gtd', { sessionId, updates })
+    applyStore(store)
+  }, [applyStore])
+
+  const updateProjectMetadata = useCallback(async (projectPath: string, updates: Partial<ProjectMetadata>) => {
+    const store = await invoke<AppStore>('update_project_metadata', { projectPath, updates })
     applyStore(store)
   }, [applyStore])
 
@@ -119,6 +147,7 @@ export function useGTD() {
 
   return {
     gtdData,
+    projectData,
     allTags,
     showTagInput,
     setShowTagInput,
@@ -126,7 +155,9 @@ export function useGTD() {
     setNewTag,
     initFromStore,
     getGTD,
+    getProjectMetadata,
     updateSessionGTD,
+    updateProjectMetadata,
     addTag,
     removeTag,
     renameTag,
