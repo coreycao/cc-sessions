@@ -94,6 +94,9 @@ pub struct SavedMessage {
     pub content: String,
     pub timestamp: String,
     pub saved_at: String,
+    /// Present when this entry merges several selected messages into one bookmark.
+    #[serde(default)]
+    pub message_count: Option<usize>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

@@ -13,9 +13,10 @@ import type {
   SystemMessage,
   ToolResultInfo,
 } from '../../shared/types'
-import { formatDate } from '../lib/utils'
+import { formatDate, cn } from '../lib/utils'
 import { getToolInputSummary } from '../lib/parseConversation'
 import { MessageContextMenu } from './MessageContextMenu'
+import { Checkbox } from './Checkbox'
 import {
   ChevronRight, ChevronDown, Wrench, CheckCircle2, XCircle,
   Brain, Clock, Terminal, Copy, Check, X, Maximize2, Bookmark,
@@ -28,22 +29,35 @@ export interface MessageActions {
   isSaved: (messageId: string) => boolean
   onSave: (msg: TextMessage) => void
   onUnsave: (messageId: string) => void
+  onSaveMany?: (msgs: TextMessage[]) => void
+}
+
+// ---- Multi-turn selection (passed down by ConversationView when in select mode) ----
+
+export interface TurnSelection {
+  selectMode: boolean
+  selected: boolean
+  turnIndex: number
+  onToggle: (turnId: string, index: number, shiftKey: boolean, metaKey: boolean) => void
 }
 
 // ---- Turn-level renderer ----
 
-export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact, actions, assistantLabel }: {
+export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact, actions, assistantLabel, selection, turnIndex, onActivateSelect }: {
   turn: ConversationTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
   compact?: boolean
   actions?: MessageActions
   assistantLabel?: string
+  selection?: TurnSelection
+  turnIndex?: number
+  onActivateSelect?: (turnId: string, index: number, shiftKey: boolean, metaKey: boolean) => void
 }) {
   switch (turn.kind) {
     case 'user_turn':
-      return <UserMessageBubble message={turn.message} actions={actions} />
+      return <UserMessageBubble message={turn.message} actions={actions} turnId={turn.id} selection={selection} turnIndex={turnIndex} onActivateSelect={onActivateSelect} />
     case 'assistant_turn':
-      return <AssistantTurnBubble turn={turn} onExpand={onExpand} compact={compact} actions={actions} assistantLabel={assistantLabel || 'Claude'} />
+      return <AssistantTurnBubble turn={turn} onExpand={onExpand} compact={compact} actions={actions} assistantLabel={assistantLabel || 'Claude'} selection={selection} turnIndex={turnIndex} onActivateSelect={onActivateSelect} />
     case 'system':
       return compact ? null : <SystemBanner message={turn} />
     default:
@@ -53,26 +67,54 @@ export const TurnRenderer = memo(function TurnRenderer({ turn, onExpand, compact
 
 // ---- User message ----
 
-function UserMessageBubble({ message, actions }: { message: TextMessage; actions?: MessageActions }) {
+function UserMessageBubble({ message, actions, turnId, selection, turnIndex, onActivateSelect }: {
+  message: TextMessage
+  actions?: MessageActions
+  turnId: string
+  selection?: TurnSelection
+  turnIndex?: number
+  onActivateSelect?: (turnId: string, index: number, shiftKey: boolean, metaKey: boolean) => void
+}) {
   const isLong = message.content.length > 800
   const ctx = useMessageContextMenu(message, actions)
   const saved = actions?.isSaved(message.id) ?? false
+  const inSelect = selection?.selectMode ?? false
+  const selected = selection?.selected ?? false
+  const toggle = (e: React.MouseEvent) => {
+    if (!selection) return
+    selection.onToggle(turnId, selection.turnIndex, e.shiftKey, e.metaKey || e.ctrlKey)
+  }
+  const handleActivate = (e: React.MouseEvent) => {
+    if (!onActivateSelect || turnIndex == null) return
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      onActivateSelect(turnId, turnIndex, e.shiftKey, e.metaKey || e.ctrlKey)
+    }
+  }
   return (
     <div className="flex flex-col items-end">
-      <div
-        className="relative group max-w-[78%] rounded-xl px-3.5 py-2.5 bg-accent-subtle/80 border border-accent/20 shadow-sm"
-        onContextMenu={ctx.handleContextMenu}
-      >
-        <div className="flex items-center gap-2 mb-1 justify-end">
-          {saved && <Bookmark className="w-3 h-3 text-amber-400 fill-amber-400" />}
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/80">You</span>
-          {message.timestamp && (
-            <span className="text-[10px] text-content-5">{formatDate(message.timestamp)}</span>
+      <div className="flex items-start gap-2 justify-end">
+        <div
+          className={cn(
+            'relative group max-w-[78%] rounded-xl px-3.5 py-2.5 bg-accent-subtle/80 border border-accent/20 shadow-sm transition-colors',
+            inSelect && selected && 'ring-2 ring-accent/35 bg-accent-subtle',
           )}
+          onContextMenu={ctx.handleContextMenu}
+          onClick={handleActivate}
+        >
+          <div className="flex items-center gap-2 mb-1 justify-end">
+            {saved && <Bookmark className="w-3 h-3 text-amber-400 fill-amber-400" />}
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-accent/80">You</span>
+            {message.timestamp && (
+              <span className="text-[10px] text-content-5">{formatDate(message.timestamp)}</span>
+            )}
+          </div>
+          <div className="text-[13px] text-content-2 whitespace-pre-wrap leading-relaxed break-words font-mono">
+            {isLong ? message.content.slice(0, 800) + '...' : message.content}
+          </div>
         </div>
-        <div className="text-[13px] text-content-2 whitespace-pre-wrap leading-relaxed break-words font-mono">
-          {isLong ? message.content.slice(0, 800) + '...' : message.content}
-        </div>
+        {inSelect && <Checkbox checked={selected} onClick={toggle} className="mt-1" sizeClass="h-3.5 w-3.5" />}
       </div>
       {ctx.menu}
     </div>
@@ -81,12 +123,15 @@ function UserMessageBubble({ message, actions }: { message: TextMessage; actions
 
 // ---- Assistant turn ----
 
-function AssistantTurnBubble({ turn, onExpand, compact, actions, assistantLabel }: {
+function AssistantTurnBubble({ turn, onExpand, compact, actions, assistantLabel, selection, turnIndex, onActivateSelect }: {
   turn: AssistantTurn
   onExpand: (msg: { role: string; text: string; timestamp: string }) => void
   compact?: boolean
   actions?: MessageActions
   assistantLabel: string
+  selection?: TurnSelection
+  turnIndex?: number
+  onActivateSelect?: (turnId: string, index: number, shiftKey: boolean, metaKey: boolean) => void
 }) {
   const { messages, timestamp } = turn
   if (messages.length === 0) return null
@@ -98,10 +143,32 @@ function AssistantTurnBubble({ turn, onExpand, compact, actions, assistantLabel 
 
   if (visibleMessages.length === 0) return null
 
+  const inSelect = selection?.selectMode ?? false
+  const selected = selection?.selected ?? false
+  const toggle = (e: React.MouseEvent) => {
+    if (!selection) return
+    selection.onToggle(turn.id, selection.turnIndex, e.shiftKey, e.metaKey || e.ctrlKey)
+  }
+  const handleActivate = (e: React.MouseEvent) => {
+    if (!onActivateSelect || turnIndex == null) return
+    if (e.metaKey || e.ctrlKey || e.shiftKey) {
+      e.preventDefault()
+      e.stopPropagation()
+      onActivateSelect(turn.id, turnIndex, e.shiftKey, e.metaKey || e.ctrlKey)
+    }
+  }
+
   return (
     <div className="flex flex-col items-start">
-      <div className="max-w-[92%] w-full space-y-2.5">
+      <div
+        className={cn(
+          'max-w-[92%] w-full space-y-2.5 rounded-xl transition-colors',
+          inSelect && selected && 'ring-2 ring-accent/35 ring-inset bg-accent-subtle/20',
+        )}
+        onClick={handleActivate}
+      >
         <div className="flex items-center gap-2">
+          {inSelect && <Checkbox checked={selected} onClick={toggle} sizeClass="h-3.5 w-3.5" />}
           <span className="text-[10px] font-semibold uppercase tracking-wider text-content-4">{assistantLabel}</span>
           {firstTs && <span className="text-[10px] text-content-5">{formatDate(firstTs)}</span>}
         </div>

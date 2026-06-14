@@ -55,7 +55,9 @@ export function SavedMessageDetail({ message, sessions, removeSavedMessage, setS
         <div className="flex-1 min-w-0 flex items-center gap-2" data-tauri-drag-region>
           <Bookmark className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />
           <span className={`text-[10px] font-semibold uppercase tracking-wider flex-shrink-0 ${isUser ? 'text-blue-400/80' : 'text-emerald-400/80'}`}>
-            {isUser ? 'You' : assistantLabel}
+            {message.messageCount && message.messageCount > 1
+              ? t('session.savedGroup', { count: message.messageCount })
+              : (isUser ? 'You' : assistantLabel)}
           </span>
           {sourceExists ? (
             <button

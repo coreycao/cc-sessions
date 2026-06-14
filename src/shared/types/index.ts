@@ -70,6 +70,8 @@ export interface SavedMessage {
   content: string
   timestamp: string
   savedAt: string
+  /** Present when this entry merges several selected messages into one bookmark. */
+  messageCount?: number
 }
 
 export interface SavedMessagesStore {

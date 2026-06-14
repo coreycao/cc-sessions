@@ -792,6 +792,7 @@ export default function App() {
               addSavedMessage={store.addSavedMessage}
               removeSavedMessage={store.removeSavedMessage}
               activeAiProfile={store.activeAiProfile}
+              addToast={store.addToast}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
@@ -821,6 +822,7 @@ export default function App() {
           )
         ) : (
           <SettingsPanel
+            savedMessages={store.savedMessages}
             section={settingsSection}
             theme={theme}
             setTheme={setTheme}

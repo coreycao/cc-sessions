@@ -40,7 +40,16 @@ export function SavedMessagesList({ savedMessages, selectedSavedId, setSelectedS
               className={`group w-full text-left px-4 py-3 border-b border-edge-2/70 transition-colors ${isSelected ? 'bg-surface-2 shadow-[inset_3px_0_0_0_var(--color-accent)]' : 'hover:bg-surface-2/70'}`}
             >
               <div className="flex items-start gap-2">
-                <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${roleColor}`} title={msg.role} />
+                {msg.messageCount && msg.messageCount > 1 ? (
+                  <span
+                    className="mt-1 flex-shrink-0 rounded-md bg-accent-subtle px-1.5 py-0.5 text-[9px] font-bold leading-none text-accent"
+                    title={t('session.savedGroup', { count: msg.messageCount })}
+                  >
+                    {msg.messageCount}
+                  </span>
+                ) : (
+                  <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${roleColor}`} title={msg.role} />
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="text-[13px] text-content-2 line-clamp-2 leading-snug">
                     {msg.content.trim().slice(0, 240)}

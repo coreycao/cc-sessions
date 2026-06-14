@@ -16,7 +16,7 @@ import {
 import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
-  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle, PencilLine, Sparkles,
+  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle, PencilLine, Sparkles, ListChecks,
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
@@ -42,6 +42,7 @@ interface DetailPanelProps {
   addSavedMessage: (msg: Omit<SavedMessage, 'id' | 'savedAt'>) => Promise<void>
   removeSavedMessage: (id: string) => Promise<void>
   activeAiProfile: AiProfile | null
+  addToast?: (message: string, type?: 'error' | 'success') => void
 }
 
 export const DetailPanel = memo(function DetailPanel({
@@ -50,15 +51,16 @@ export const DetailPanel = memo(function DetailPanel({
   deleteSession, restoreSession, setSelectedSessionId,
   showTagInput, setShowTagInput, newTag, setNewTag,
   isSaved, addSavedMessage, removeSavedMessage,
-  activeAiProfile,
+  activeAiProfile, addToast,
 }: DetailPanelProps) {
   const { t } = useI18n()
   const gtd = getGTD(selectedSession.sessionId)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [compact, setCompact] = useState(false)
   const [metadataCollapsed, setMetadataCollapsed] = useState(false)
-  // Reset metadata collapse when switching sessions
-  useEffect(() => { setMetadataCollapsed(false) }, [selectedSession.sessionId])
+  const [selectMode, setSelectMode] = useState(false)
+  // Reset per-session UI state when switching sessions
+  useEffect(() => { setMetadataCollapsed(false); setSelectMode(false) }, [selectedSession.sessionId])
   const [showOverflow, setShowOverflow] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
@@ -108,8 +110,32 @@ export const DetailPanel = memo(function DetailPanel({
       content: msg.content,
       timestamp: msg.timestamp,
     }),
+    onSaveMany: (msgs) => {
+      if (msgs.length === 0) return
+      const sessionId = selectedSession.sessionId
+      const sessionTitle = selectedSession.title
+      const projectPath = selectedSession.projectPath
+      if (msgs.length === 1) {
+        const m = msgs[0]
+        addSavedMessage({ sessionId, sessionTitle, projectPath, messageId: m.id, role: m.role, content: m.content, timestamp: m.timestamp })
+      } else {
+        // Merge the selection into a single bookmark so it shows as one entry.
+        const merged = msgs
+          .map(m => `**${m.role === 'user' ? 'You' : assistantLabel}**\n\n${m.content}`)
+          .join('\n\n---\n\n')
+        addSavedMessage({
+          sessionId, sessionTitle, projectPath,
+          messageId: msgs.map(m => m.id).sort().join(';'),
+          role: 'assistant',
+          content: merged,
+          timestamp: msgs[0].timestamp,
+          messageCount: msgs.length,
+        })
+      }
+      addToast?.(t('detail.savedMessages', { count: msgs.length }), 'success')
+    },
     onUnsave: (messageId: string) => removeSavedMessage(`${selectedSession.sessionId}:${messageId}`),
-  }), [selectedSession.sessionId, selectedSession.title, selectedSession.projectPath, isSaved, addSavedMessage, removeSavedMessage])
+  }), [selectedSession.sessionId, selectedSession.title, selectedSession.projectPath, isSaved, addSavedMessage, removeSavedMessage, addToast, t, assistantLabel])
 
   const scrollConversation = useCallback((position: 'top' | 'bottom') => {
     const el = conversationScrollRef.current
@@ -271,6 +297,20 @@ export const DetailPanel = memo(function DetailPanel({
             <Brain className="w-4 h-4" />
           </button>
         </ActionTip>
+        <ActionTip label={t('detail.select')}>
+          <button
+            onClick={() => setSelectMode(v => !v)}
+            className={
+              selectMode
+                ? 'p-1 rounded-lg bg-accent-subtle text-accent transition-colors'
+                : 'p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors'
+            }
+            aria-label={t('detail.select')}
+            aria-pressed={selectMode}
+          >
+            <ListChecks className="w-4 h-4" />
+          </button>
+        </ActionTip>
         <div className="relative">
           <ActionTip label={t('detail.moreActions')}>
             <button
@@ -396,6 +436,9 @@ export const DetailPanel = memo(function DetailPanel({
               actions={messageActions}
               onScroll={handleConversationScroll}
               scrollContainerRef={conversationScrollRef}
+              selectMode={selectMode}
+              onEnterSelectMode={() => setSelectMode(true)}
+              onExitSelectMode={() => setSelectMode(false)}
             />
           </InlineErrorBoundary>
         )}
