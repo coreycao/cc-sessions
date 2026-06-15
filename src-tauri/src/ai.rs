@@ -119,6 +119,44 @@ pub async fn generate_session_title(
     sanitize_generated_title(&title)
 }
 
+#[tauri::command]
+pub async fn generate_session_tags(
+    app: tauri::AppHandle,
+    profile_id: Option<String>,
+    session_title: String,
+    existing_tags: Vec<String>,
+    transcript: String,
+) -> Result<Vec<String>, String> {
+    let settings = load_ai_settings_from_file(&ai_settings_path(&app));
+    let profile = resolve_profile(&settings, profile_id.as_deref())?;
+    validate_profile(profile)?;
+
+    let existing = if existing_tags.is_empty() {
+        "None".to_string()
+    } else {
+        existing_tags.join(", ")
+    };
+    let user = format!(
+        "Session title: {session_title}\nExisting tags: {existing}\n\nSession context:\n{transcript}\n\nReturn the JSON array now."
+    );
+
+    let response = call_chat_completion(
+        profile,
+        "You assign concise organization tags for coding assistant sessions. Return JSON only: an array of 1 to 5 strings. Tags must be short, reusable, concrete, and useful for filtering. Prefer an existing tag when it fits. Use lowercase for Latin text. No Markdown, no explanation.",
+        &user,
+        256,
+        DEFAULT_TIMEOUT_SECS,
+    )
+    .await?;
+
+    let tags = parse_generated_tags(&response);
+    if tags.is_empty() {
+        Err("The AI response did not include usable tags".to_string())
+    } else {
+        Ok(tags)
+    }
+}
+
 fn validate_settings(settings: &AiSettings) -> Result<(), String> {
     for profile in &settings.profiles {
         validate_profile(profile)?;
@@ -228,7 +266,10 @@ async fn call_chat_completion_with_options(
         .map_err(|e| format!("Failed to read AI response: {e}"))?;
 
     if !status.is_success() {
-        return Err(format!("AI API returned {status}: {}", truncate(&body, 500)));
+        return Err(format!(
+            "AI API returned {status}: {}",
+            truncate(&body, 500)
+        ));
     }
 
     let parsed: ChatCompletionResponse =
@@ -296,13 +337,86 @@ fn sanitize_generated_title(value: &str) -> Result<String, String> {
         .to_string();
 
     if title.chars().count() > 80 {
-        title = title.chars().take(80).collect::<String>().trim().to_string();
+        title = title
+            .chars()
+            .take(80)
+            .collect::<String>()
+            .trim()
+            .to_string();
     }
 
     if title.is_empty() {
         Err("The AI response did not include a usable title".to_string())
     } else {
         Ok(title)
+    }
+}
+
+fn parse_generated_tags(value: &str) -> Vec<String> {
+    let trimmed = value.trim();
+    let parsed = serde_json::from_str::<Vec<String>>(trimmed)
+        .ok()
+        .or_else(|| {
+            let start = trimmed.find('[')?;
+            let end = trimmed.rfind(']')?;
+            if end <= start {
+                return None;
+            }
+            serde_json::from_str::<Vec<String>>(&trimmed[start..=end]).ok()
+        })
+        .unwrap_or_else(|| {
+            trimmed
+                .lines()
+                .flat_map(|line| line.split(','))
+                .map(str::to_string)
+                .collect()
+        });
+
+    let mut tags = Vec::new();
+    for tag in parsed {
+        if let Some(normalized) = normalize_generated_tag(&tag) {
+            if !tags.iter().any(|existing| existing == &normalized) {
+                tags.push(normalized);
+            }
+        }
+        if tags.len() >= 5 {
+            break;
+        }
+    }
+
+    tags
+}
+
+fn normalize_generated_tag(value: &str) -> Option<String> {
+    let trimmed = value
+        .trim()
+        .trim_start_matches(['-', '*', '•'])
+        .trim()
+        .trim_matches('"')
+        .trim_matches('\'')
+        .trim_matches('`')
+        .trim()
+        .to_lowercase();
+    let mut normalized = String::new();
+    let mut last_dash = false;
+
+    for ch in trimmed.chars() {
+        if ch.is_alphanumeric() || matches!(ch, '+' | '#' | '.') {
+            normalized.push(ch);
+            last_dash = false;
+        } else if matches!(ch, '-' | '_' | ' ' | '/' | '\\') && !last_dash && !normalized.is_empty()
+        {
+            normalized.push('-');
+            last_dash = true;
+        }
+    }
+
+    let normalized = normalized.trim_matches('-').to_string();
+    let char_count = normalized.chars().count();
+    if char_count == 0 || char_count > 32 {
+        None
+    } else {
+        Some(normalized)
     }
 }
 
@@ -361,7 +475,7 @@ struct ChatContentPart {
 
 #[cfg(test)]
 mod tests {
-    use super::{chat_completions_url, ChatCompletionResponse};
+    use super::{chat_completions_url, parse_generated_tags, ChatCompletionResponse};
 
     #[test]
     fn builds_chat_completions_url() {
@@ -403,7 +517,34 @@ mod tests {
     fn parses_top_level_choice_text() {
         let parsed: ChatCompletionResponse =
             serde_json::from_str(r#"{"choices":[{"text":"OK"}]}"#).unwrap();
-        let text = parsed.choices.into_iter().find_map(|choice| choice.into_text());
+        let text = parsed
+            .choices
+            .into_iter()
+            .find_map(|choice| choice.into_text());
         assert_eq!(text.as_deref(), Some("OK"));
+    }
+
+    #[test]
+    fn parses_generated_tags_from_json() {
+        assert_eq!(
+            parse_generated_tags(r#"["Rust Backend", "tauri_v2", "C++"]"#),
+            vec!["rust-backend", "tauri-v2", "c++"]
+        );
+    }
+
+    #[test]
+    fn parses_generated_tags_from_wrapped_json() {
+        assert_eq!(
+            parse_generated_tags("Sure:\n```json\n[\"AI Review\", \"中文 标签\"]\n```"),
+            vec!["ai-review", "中文-标签"]
+        );
+    }
+
+    #[test]
+    fn parses_generated_tags_from_fallback_text() {
+        assert_eq!(
+            parse_generated_tags("- updater\nperformance, session list"),
+            vec!["updater", "performance", "session-list"]
+        );
     }
 }
