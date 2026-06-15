@@ -43,6 +43,7 @@ interface SettingsPanelProps {
   updateError: string | null
   updaterMockMode: UpdaterMockMode | null
   setUpdaterMockMode: (mode: UpdaterMockMode) => void
+  aiSetupRequest?: number
   onCheckUpdate: () => Promise<void>
   onInstallUpdate: () => Promise<void>
   onRestartUpdate: () => Promise<void>
@@ -66,7 +67,7 @@ export function SettingsPanel({
   updaterMockMode, setUpdaterMockMode, onCheckUpdate, onInstallUpdate, onRestartUpdate,
   aiSettings, setAiSettings, aiSettingsSaving, testingProfileId, onSaveAiSettings, onTestAiProfile,
   sessions = [], allSessions = sessions, projectData = {}, onUpdateProjectMetadata, onSyncSessions, syncSessionsBusy = false,
-  savedMessages = [],
+  savedMessages = [], aiSetupRequest = 0,
 }: SettingsPanelProps) {
   const { t, language, setLanguage } = useI18n()
   const updateLabel = getUpdateLabel(t, updateState, updateVersion, updateProgress)
@@ -137,6 +138,7 @@ export function SettingsPanel({
             setSettings={setAiSettings}
             saving={aiSettingsSaving}
             testingProfileId={testingProfileId}
+            setupRequest={aiSetupRequest}
             onSave={onSaveAiSettings}
             onTest={onTestAiProfile}
           />
@@ -1281,13 +1283,18 @@ function basename(path: string): string {
   return seg[seg.length - 1] || path
 }
 
+function isAiProfileConfigured(profile: AiProfile | null): profile is AiProfile {
+  return Boolean(profile?.baseUrl.trim() && profile.apiKey.trim() && profile.model.trim())
+}
+
 function AiSettingsContent({
-  settings, setSettings, saving, testingProfileId, onSave, onTest,
+  settings, setSettings, saving, testingProfileId, setupRequest, onSave, onTest,
 }: {
   settings: AiSettings
   setSettings: (settings: AiSettings) => void
   saving: boolean
   testingProfileId: string | null
+  setupRequest: number
   onSave: (settings: AiSettings) => Promise<AiSettings>
   onTest: (profile: AiProfile) => Promise<void>
 }) {
@@ -1300,6 +1307,7 @@ function AiSettingsContent({
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [profileMenuPosition, setProfileMenuPosition] = useState({ top: 0, left: 0 })
   const [editingProfileIds, setEditingProfileIds] = useState<Set<string>>(new Set())
+  const lastSetupRequestRef = useRef(setupRequest)
   const profileBtnRef = useRef<HTMLButtonElement>(null)
   const profileMenuRef = useRef<HTMLDivElement>(null)
 
@@ -1318,6 +1326,25 @@ function AiSettingsContent({
     })
     setEditingProfileIds(prev => new Set(prev).add(profile.id))
   }
+
+  useEffect(() => {
+    if (setupRequest === lastSetupRequestRef.current) return
+    lastSetupRequestRef.current = setupRequest
+
+    if (settings.profiles.length === 0) {
+      const profile = createEmptyAiProfile()
+      setSettings({
+        activeProfileId: profile.id,
+        profiles: [profile],
+      })
+      setEditingProfileIds(prev => new Set(prev).add(profile.id))
+      return
+    }
+
+    if (activeProfile && !isAiProfileConfigured(activeProfile)) {
+      setEditingProfileIds(prev => new Set(prev).add(activeProfile.id))
+    }
+  }, [activeProfile, setSettings, settings.profiles.length, setupRequest])
 
   const removeProfile = (id: string) => {
     const nextProfiles = settings.profiles.filter(profile => profile.id !== id)

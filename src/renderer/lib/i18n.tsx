@@ -340,6 +340,7 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'toast.aiSaveFailed': 'Failed to save AI settings',
     'toast.aiConnectionPassed': 'AI connection test passed',
     'toast.aiConnectionFailed': 'AI connection test failed',
+    'toast.aiProviderRequired': 'Add an AI provider before using AI features',
   },
   zh: {
     'common.cancel': '取消',
@@ -674,6 +675,7 @@ const DICTIONARIES: Record<Language, Record<string, TranslationValue>> = {
     'toast.aiSaveFailed': '保存 AI 设置失败',
     'toast.aiConnectionPassed': 'AI 连接测试通过',
     'toast.aiConnectionFailed': 'AI 连接测试失败',
+    'toast.aiProviderRequired': '请先添加 AI Provider，再使用 AI 功能',
   },
 }
 

@@ -91,6 +91,7 @@ export default function App() {
   const [isResizing, setIsResizing] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('app')
+  const [aiSetupRequest, setAiSetupRequest] = useState(0)
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
@@ -450,6 +451,13 @@ export default function App() {
     }
   }, [store.sessions, store.setView, store.setSelectedSavedId, store.selectSession])
 
+  const openAiSettings = useCallback(() => {
+    store.setView('settings')
+    setSettingsSection('ai')
+    setAiSetupRequest(value => value + 1)
+    store.addToast(t('toast.aiProviderRequired'))
+  }, [store.setView, store.addToast, t])
+
   if (store.loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface">
@@ -769,6 +777,7 @@ export default function App() {
               addSavedMessage={store.addSavedMessage}
               removeSavedMessage={store.removeSavedMessage}
               activeAiProfile={store.activeAiProfile}
+              onConfigureAi={openAiSettings}
               addToast={store.addToast}
             />
           ) : (
@@ -803,6 +812,7 @@ export default function App() {
             updateError={updateError}
             updaterMockMode={updaterMockMode}
             setUpdaterMockMode={setUpdaterMockMode}
+            aiSetupRequest={aiSetupRequest}
             onCheckUpdate={handleCheckUpdate}
             onInstallUpdate={handleInstallUpdate}
             onRestartUpdate={handleRestartUpdate}

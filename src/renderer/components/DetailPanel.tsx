@@ -43,6 +43,7 @@ interface DetailPanelProps {
   addSavedMessage: (msg: Omit<SavedMessage, 'id' | 'savedAt'>) => Promise<void>
   removeSavedMessage: (id: string) => Promise<void>
   activeAiProfile: AiProfile | null
+  onConfigureAi?: () => void
   addToast?: (message: string, type?: 'error' | 'success') => void
 }
 
@@ -52,7 +53,7 @@ export const DetailPanel = memo(function DetailPanel({
   deleteSession, restoreSession, setSelectedSessionId,
   showTagInput, setShowTagInput, newTag, setNewTag,
   isSaved, addSavedMessage, removeSavedMessage,
-  activeAiProfile, addToast,
+  activeAiProfile, onConfigureAi, addToast,
 }: DetailPanelProps) {
   const { t } = useI18n()
   const gtd = getGTD(selectedSession.sessionId)
@@ -162,7 +163,16 @@ export const DetailPanel = memo(function DetailPanel({
     else if (scrollTop <= 10) setMetadataCollapsed(false)
   }, [])
 
+  const requireAiProvider = useCallback(() => {
+    if (isAiProfileConfigured(activeAiProfile)) return true
+    if (onConfigureAi) onConfigureAi()
+    else addToast?.(t('toast.aiProviderRequired'))
+    return false
+  }, [activeAiProfile, addToast, onConfigureAi, t])
+
   const reviewSession = useCallback(async () => {
+    if (!requireAiProvider()) return
+
     setReviewOpen(true)
     setReviewLoading(true)
     setReviewError(null)
@@ -190,7 +200,7 @@ export const DetailPanel = memo(function DetailPanel({
     } finally {
       setReviewLoading(false)
     }
-  }, [activeAiProfile, selectedSession, sessionContent])
+  }, [activeAiProfile, requireAiProvider, selectedSession, sessionContent])
 
   const openRenameDialog = useCallback(() => {
     setRenameDraft(gtd.displayTitle?.trim() || selectedSession.title)
@@ -201,6 +211,8 @@ export const DetailPanel = memo(function DetailPanel({
   }, [gtd.displayTitle, gtd.titleSource, selectedSession.title])
 
   const generateTitle = useCallback(async () => {
+    if (!requireAiProvider()) return
+
     if (!sessionContent.trim()) {
       setRenameError(t('detail.titleRequiresContent'))
       return
@@ -222,9 +234,11 @@ export const DetailPanel = memo(function DetailPanel({
     } finally {
       setRenameLoading(false)
     }
-  }, [activeAiProfile?.id, renameDraft, selectedSession, sessionContent, t])
+  }, [activeAiProfile?.id, renameDraft, requireAiProvider, selectedSession, sessionContent, t])
 
   const generateTags = useCallback(async () => {
+    if (!requireAiProvider()) return
+
     if (!sessionContent.trim()) {
       setTagError(t('detail.tagsRequireContent'))
       return
@@ -251,7 +265,7 @@ export const DetailPanel = memo(function DetailPanel({
     } finally {
       setTagLoading(false)
     }
-  }, [activeAiProfile?.id, allTags, gtd.tags, selectedSession, sessionContent, t])
+  }, [activeAiProfile?.id, allTags, gtd.tags, requireAiProvider, selectedSession, sessionContent, t])
 
   const addSuggestedTag = useCallback(async (tag: string) => {
     await addTag(selectedSession.sessionId, tag)
@@ -886,6 +900,10 @@ function compactInlineText(value: string): string {
 
 function normalizeTagKey(value: string): string {
   return value.trim().toLowerCase()
+}
+
+function isAiProfileConfigured(profile: AiProfile | null): profile is AiProfile {
+  return Boolean(profile?.baseUrl.trim() && profile.apiKey.trim() && profile.model.trim())
 }
 
 function clampText(value: string, maxChars: number): { text: string; truncated: boolean } {
