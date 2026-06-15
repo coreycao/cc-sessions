@@ -1,17 +1,22 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import type { GTDMetadata, SessionProvider } from '../../shared/types'
+import { invoke } from '@tauri-apps/api/core'
+import type { AiProfile, GTDMetadata, SessionInfo, SessionProvider } from '../../shared/types'
 import type { ProviderFilter } from '../hooks/useFilters'
-import { Archive, Circle, Star, Tag, Trash2, X, AlertTriangle, Plus, Filter, RefreshCw } from 'lucide-react'
+import { Archive, Circle, Star, Tag, Trash2, X, AlertTriangle, Plus, Filter, RefreshCw, Sparkles, LoaderCircle, CheckCircle2 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
+import { buildTitleContext, buildTitleFingerprint, isAiProfileConfigured } from '../lib/aiSessionContext'
+import { Button, IconButton } from './ui'
 
 type FilterView = 'all' | 'new' | 'archived' | 'starred'
 
 interface BatchActionsProps {
   batchSelectedIds: Set<string>
+  sessions: SessionInfo[]
   getGTD: (sessionId: string) => GTDMetadata
   allTags: string[]
+  updateSessionGTD: (sessionId: string, updates: Partial<GTDMetadata>) => Promise<void>
   batchUpdateGTD: (ids: string[], updates: Partial<GTDMetadata>) => Promise<void>
   batchAddTag: (ids: string[], tag: string) => Promise<void>
   batchDeleteSessions: (ids: Set<string>) => Promise<void>
@@ -24,12 +29,16 @@ interface BatchActionsProps {
   providerCounts: Record<ProviderFilter, number>
   hasUpdates: boolean
   refreshWithUpdates: () => Promise<void>
+  activeAiProfile: AiProfile | null
+  onConfigureAi: () => void
 }
 
 export function BatchActions({
   batchSelectedIds,
+  sessions,
   getGTD,
   allTags,
+  updateSessionGTD,
   batchUpdateGTD,
   batchAddTag,
   batchDeleteSessions,
@@ -42,12 +51,15 @@ export function BatchActions({
   providerCounts,
   hasUpdates,
   refreshWithUpdates,
+  activeAiProfile,
+  onConfigureAi,
 }: BatchActionsProps) {
   const { t } = useI18n()
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showTagMenu, setShowTagMenu] = useState(false)
   const [showProviderMenu, setShowProviderMenu] = useState(false)
   const [showRefreshTooltip, setShowRefreshTooltip] = useState(false)
+  const [showAiRename, setShowAiRename] = useState(false)
   const tagMenuRef = useRef<HTMLDivElement>(null)
   const tagBtnRef = useRef<HTMLButtonElement>(null)
   const providerMenuRef = useRef<HTMLDivElement>(null)
@@ -59,6 +71,10 @@ export function BatchActions({
 
   const ids = Array.from(batchSelectedIds)
   const count = ids.length
+  const selectedSessions = useMemo(() => {
+    const selected = new Set(ids)
+    return sessions.filter(session => selected.has(session.sessionId))
+  }, [ids, sessions])
 
   const gtds = count > 0 ? ids.map(id => getGTD(id)) : []
   const allArchived = gtds.length > 0 && gtds.every(g => g.status === 'archived')
@@ -74,6 +90,14 @@ export function BatchActions({
 
   const handleDelete = () => {
     setShowDeleteConfirm(true)
+  }
+
+  const openAiRename = () => {
+    if (!isAiProfileConfigured(activeAiProfile)) {
+      onConfigureAi()
+      return
+    }
+    setShowAiRename(true)
   }
 
   const confirmDelete = async () => {
@@ -166,6 +190,9 @@ export function BatchActions({
             </button>
             <button ref={tagBtnRef} onClick={openTagMenu} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors" title={t('batch.addTag')}>
               <Tag className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={openAiRename} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-accent transition-colors" title={t('batch.aiRename')}>
+              <Sparkles className="w-3.5 h-3.5" />
             </button>
             <button onClick={handleDelete} className="p-1 rounded-md hover:bg-surface-3 text-content-4 hover:text-red-400 transition-colors" title={t('common.delete')}>
               <Trash2 className="w-3.5 h-3.5" />
@@ -277,8 +304,253 @@ export function BatchActions({
         />
       )}
 
+      {showAiRename && isAiProfileConfigured(activeAiProfile) && (
+        <BatchAiRenameDialog
+          sessions={selectedSessions}
+          getGTD={getGTD}
+          activeAiProfile={activeAiProfile}
+          updateSessionGTD={updateSessionGTD}
+          onClose={() => setShowAiRename(false)}
+        />
+      )}
+
     </>
   )
+}
+
+type AiRenameStatus = 'pending' | 'generating' | 'ready' | 'skipped' | 'error' | 'applied'
+
+interface AiRenameItem {
+  session: SessionInfo
+  currentTitle: string
+  suggestedTitle: string
+  status: AiRenameStatus
+  selected: boolean
+  content?: string
+  error?: string
+}
+
+const AI_RENAME_LIMIT = 20
+
+function BatchAiRenameDialog({
+  sessions,
+  getGTD,
+  activeAiProfile,
+  updateSessionGTD,
+  onClose,
+}: {
+  sessions: SessionInfo[]
+  getGTD: (sessionId: string) => GTDMetadata
+  activeAiProfile: AiProfile
+  updateSessionGTD: (sessionId: string, updates: Partial<GTDMetadata>) => Promise<void>
+  onClose: () => void
+}) {
+  const { t } = useI18n()
+  const [skipRenamed, setSkipRenamed] = useState(true)
+  const [items, setItems] = useState<AiRenameItem[]>(() => createAiRenameItems(sessions, getGTD, true))
+  const [running, setRunning] = useState(false)
+  const [applying, setApplying] = useState(false)
+  const selectedCount = items.filter(item => item.selected && item.status === 'ready').length
+  const readyCount = items.filter(item => item.status === 'ready').length
+  const limited = sessions.length > AI_RENAME_LIMIT
+
+  useEffect(() => {
+    setItems(createAiRenameItems(sessions, getGTD, skipRenamed))
+  }, [sessions, skipRenamed])
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !running && !applying) onClose()
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [applying, onClose, running])
+
+  const updateItem = (sessionId: string, updates: Partial<AiRenameItem>) => {
+    setItems(current => current.map(item => item.session.sessionId === sessionId ? { ...item, ...updates } : item))
+  }
+
+  const generateSuggestions = async () => {
+    if (running) return
+    setRunning(true)
+    const targets = items.filter(item => item.status === 'pending').slice(0, AI_RENAME_LIMIT)
+
+    for (const item of targets) {
+      updateItem(item.session.sessionId, { status: 'generating', error: undefined })
+      try {
+        const content = await invoke<string>('read_session_content', { filePath: item.session.fullPath })
+        const title = await invoke<string>('generate_session_title', {
+          profileId: activeAiProfile.id,
+          currentTitle: item.currentTitle,
+          transcript: buildTitleContext(item.session, content),
+        })
+        updateItem(item.session.sessionId, {
+          status: 'ready',
+          suggestedTitle: title,
+          selected: true,
+          content,
+        })
+      } catch (error) {
+        updateItem(item.session.sessionId, {
+          status: 'error',
+          selected: false,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+
+    setRunning(false)
+  }
+
+  const applySelected = async () => {
+    if (applying || selectedCount === 0) return
+    setApplying(true)
+    const targets = items.filter(item => item.selected && item.status === 'ready')
+    for (const item of targets) {
+      try {
+        await updateSessionGTD(item.session.sessionId, {
+          displayTitle: item.suggestedTitle,
+          titleSource: 'ai',
+          titleUpdatedAt: new Date().toISOString(),
+          titleFingerprint: buildTitleFingerprint(item.session, item.content ?? ''),
+        })
+        updateItem(item.session.sessionId, { status: 'applied', selected: false })
+      } catch (error) {
+        updateItem(item.session.sessionId, {
+          status: 'error',
+          selected: false,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      }
+    }
+    setApplying(false)
+  }
+
+  const toggleItem = (sessionId: string) => {
+    setItems(current => current.map(item => (
+      item.session.sessionId === sessionId && item.status === 'ready'
+        ? { ...item, selected: !item.selected }
+        : item
+    )))
+  }
+
+  return createPortal(
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20 backdrop-blur-sm" onClick={() => { if (!running && !applying) onClose() }}>
+      <div className="flex max-h-[82vh] w-[min(820px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl" onClick={event => event.stopPropagation()}>
+        <div className="flex h-12 items-center gap-3 border-b border-edge/70 px-4">
+          <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-subtle text-accent">
+            {running ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-[13px] font-semibold text-content">{t('batch.aiRenameTitle')}</div>
+            <div className="truncate text-[11px] text-content-4">{t('batch.aiRenameSubtitle', { count: sessions.length })}</div>
+          </div>
+          <IconButton
+            label={t('session.closeEsc')}
+            icon={<X className="h-4 w-4" />}
+            disabled={running || applying}
+            onClick={onClose}
+          />
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-b border-edge/60 bg-surface-2/35 px-4 py-2">
+          <label className="inline-flex items-center gap-2 text-[11px] font-medium text-content-3">
+            <input
+              type="checkbox"
+              checked={skipRenamed}
+              disabled={running || applying}
+              onChange={event => setSkipRenamed(event.target.checked)}
+              className="h-3.5 w-3.5 rounded border-edge accent-[var(--color-accent)]"
+            />
+            {t('batch.skipRenamed')}
+          </label>
+          <div className="text-[11px] text-content-4">
+            {limited ? t('batch.aiRenameLimit', { limit: AI_RENAME_LIMIT }) : t('batch.aiRenameReadyCount', { count: readyCount })}
+          </div>
+        </div>
+
+        <div className="min-h-[260px] flex-1 overflow-y-auto px-4 py-3">
+          <div className="space-y-2">
+            {items.map(item => (
+              <button
+                key={item.session.sessionId}
+                type="button"
+                onClick={() => toggleItem(item.session.sessionId)}
+                disabled={item.status !== 'ready' || running || applying}
+                className={`grid w-full grid-cols-[24px_minmax(0,1fr)_minmax(0,1fr)_88px] items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${item.selected ? 'border-accent/35 bg-accent-subtle/70' : 'border-edge bg-surface hover:bg-surface-2'} disabled:cursor-default disabled:opacity-80`}
+              >
+                <span className={`inline-flex h-4 w-4 items-center justify-center rounded-md border ${item.selected ? 'border-accent bg-accent text-white' : 'border-edge bg-surface-2 text-transparent'}`}>
+                  {item.selected && <CheckCircle2 className="h-3 w-3" />}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[12px] font-medium text-content">{item.currentTitle}</span>
+                  <span className="block truncate text-[10px] text-content-4">{item.session.projectName || item.session.projectPath}</span>
+                </span>
+                <span className="min-w-0">
+                  <span className={`block truncate text-[12px] font-medium ${item.suggestedTitle ? 'text-content' : 'text-content-4'}`}>
+                    {item.suggestedTitle || item.error || getAiRenameStatusLabel(t, item.status)}
+                  </span>
+                </span>
+                <span className={`justify-self-end rounded-full border px-2 py-0.5 text-[10px] font-medium ${getAiRenameStatusClass(item.status)}`}>
+                  {getAiRenameStatusLabel(t, item.status)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-3 border-t border-edge/70 px-4 py-3">
+          <div className="text-[11px] text-content-4">{t('batch.aiRenameLocalOnly')}</div>
+          <div className="flex items-center gap-2">
+            <Button onClick={onClose} variant="ghost" disabled={running || applying}>{t('common.cancel')}</Button>
+            <Button onClick={generateSuggestions} loading={running} disabled={applying || items.every(item => item.status !== 'pending')} icon={<Sparkles className="h-3.5 w-3.5" />}>
+              {t('batch.generateTitles')}
+            </Button>
+            <Button onClick={applySelected} variant="primary" loading={applying} disabled={running || selectedCount === 0}>
+              {t('batch.applySelected', { count: selectedCount })}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function createAiRenameItems(
+  sessions: SessionInfo[],
+  getGTD: (sessionId: string) => GTDMetadata,
+  skipRenamed: boolean,
+): AiRenameItem[] {
+  return sessions.map(session => {
+    const gtd = getGTD(session.sessionId)
+    const customTitle = gtd.displayTitle?.trim()
+    const skipped = Boolean(skipRenamed && customTitle)
+    return {
+      session,
+      currentTitle: customTitle || session.title,
+      suggestedTitle: '',
+      status: skipped ? 'skipped' : 'pending',
+      selected: false,
+    }
+  })
+}
+
+function getAiRenameStatusLabel(t: (key: string, params?: Record<string, string | number>) => string, status: AiRenameStatus): string {
+  if (status === 'generating') return t('batch.generating')
+  if (status === 'ready') return t('batch.ready')
+  if (status === 'skipped') return t('batch.skipped')
+  if (status === 'error') return t('batch.failed')
+  if (status === 'applied') return t('batch.applied')
+  return t('batch.pending')
+}
+
+function getAiRenameStatusClass(status: AiRenameStatus): string {
+  if (status === 'ready') return 'border-accent/25 bg-accent-subtle text-accent'
+  if (status === 'error') return 'border-red-500/25 bg-red-500/10 text-red-400'
+  if (status === 'applied') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'
+  if (status === 'skipped') return 'border-edge bg-surface-2 text-content-4'
+  return 'border-edge bg-surface-2 text-content-4'
 }
 
 function ProviderFilterItem({
