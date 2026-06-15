@@ -17,6 +17,7 @@ import { ToastContainer } from './components/Toast'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { ProviderLogo } from './components/ProviderLogo'
 import { ProjectIcon } from './components/ProjectIcon'
+import { EmptyState, IconButton, LoadingOverlay, LoadingState } from './components/ui'
 import { useI18n } from './lib/i18n'
 import {
   checkForUpdate, getInitialUpdaterMockMode, installUpdate, saveUpdaterMockMode,
@@ -90,6 +91,7 @@ export default function App() {
   const [isResizing, setIsResizing] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [settingsSection, setSettingsSection] = useState<SettingsSection>('app')
+  const [aiSetupRequest, setAiSetupRequest] = useState(0)
   const [updateState, setUpdateState] = useState<UpdateState>('idle')
   const [updateVersion, setUpdateVersion] = useState<string | null>(null)
   const [updateProgress, setUpdateProgress] = useState<number | null>(null)
@@ -449,13 +451,17 @@ export default function App() {
     }
   }, [store.sessions, store.setView, store.setSelectedSavedId, store.selectSession])
 
+  const openAiSettings = useCallback(() => {
+    store.setView('settings')
+    setSettingsSection('ai')
+    setAiSetupRequest(value => value + 1)
+    store.addToast(t('toast.aiProviderRequired'))
+  }, [store.setView, store.addToast, t])
+
   if (store.loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface">
-        <div className="text-content-2 flex flex-col items-center gap-3">
-          <LoaderCircle className="w-8 h-8 animate-spin" />
-          <span className="text-sm">{t('app.scanningSessions')}</span>
-        </div>
+        <LoadingState title={t('app.scanningSessions')} description={t('app.scanningSessionsHint')} progress />
       </div>
     )
   }
@@ -465,36 +471,17 @@ export default function App() {
     <div className="flex flex-col h-screen overflow-hidden bg-surface-2">
       {/* Global refresh lock */}
       {store.refreshing && (
-        <div
-          className="fixed inset-0 z-[10000] flex items-center justify-center bg-surface/70 backdrop-blur-sm"
-          role="status"
-          aria-live="polite"
-          aria-busy="true"
-        >
-          <div className="flex min-w-[240px] flex-col items-center gap-3 rounded-xl border border-edge bg-surface px-6 py-5 shadow-2xl">
-            <LoaderCircle className="h-6 w-6 animate-spin text-accent" />
-            <div className="text-center">
-              <div className="text-[13px] font-semibold text-content">{t('app.refreshingSessions')}</div>
-              <div className="mt-1 text-[11px] text-content-4">{t('app.refreshingSessionsHint')}</div>
-            </div>
-            <div className="h-0.5 w-full overflow-hidden rounded-full bg-surface-3">
-              <div className="h-full bg-accent animate-indeterminate-progress" />
-            </div>
-          </div>
-        </div>
+        <LoadingOverlay title={t('app.refreshingSessions')} description={t('app.refreshingSessionsHint')} />
       )}
       {/* Unified title bar */}
       <header className="h-[44px] flex items-center border-b border-edge/50 flex-shrink-0 relative bg-surface-2/95" data-tauri-drag-region>
         <div className="w-[72px] flex-shrink-0" />
-        <button
+        <IconButton
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="h-7 w-7 inline-flex items-center justify-center rounded-lg hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
-          title={t('app.toggleSidebar')}
-          aria-label={sidebarCollapsed ? t('app.showSidebar') : t('app.hideSidebar')}
+          label={sidebarCollapsed ? t('app.showSidebar') : t('app.hideSidebar')}
           aria-expanded={!sidebarCollapsed}
-        >
-          {sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
-        </button>
+          icon={sidebarCollapsed ? <PanelLeft className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+        />
         <button
           ref={projectBtnRef}
           onClick={toggleProjectMenu}
@@ -624,13 +611,12 @@ export default function App() {
               {store.isSearching ? (
                 <LoaderCircle className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-content-4 animate-spin" />
               ) : store.searchQuery ? (
-                <button
+                <IconButton
                   onClick={() => store.setSearchQuery('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-                  aria-label="Clear search"
-                >
-                  <X className="w-3 h-3" />
-                </button>
+                  className="absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-md"
+                  label={t('app.clearSearch')}
+                  icon={<X className="w-3 h-3" />}
+                />
               ) : null}
               {!store.indexReady && store.searchQuery.length >= 2 && (
                 <span className="absolute -bottom-4 left-0 text-[10px] text-content-4 animate-pulse whitespace-nowrap">{t('app.buildingIndex')}</span>
@@ -659,13 +645,12 @@ export default function App() {
             )}
           </button>
         )}
-        <button
+        <IconButton
           onClick={() => setTheme(theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light')}
-          className="p-1.5 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors mr-2"
-          title={t('app.themeTitle', { theme })}
-        >
-          {theme === 'light' ? <Sun className="w-3.5 h-3.5" /> : theme === 'dark' ? <Moon className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
-        </button>
+          className="mr-2"
+          label={t('app.themeTitle', { theme })}
+          icon={theme === 'light' ? <Sun className="w-3.5 h-3.5" /> : theme === 'dark' ? <Moon className="w-3.5 h-3.5" /> : <Monitor className="w-3.5 h-3.5" />}
+        />
       </header>
 
       {/* Index building banner */}
@@ -704,8 +689,10 @@ export default function App() {
             <>
               <BatchActions
                 batchSelectedIds={store.batchSelectedIds}
+                sessions={store.filteredSessions}
                 getGTD={store.getGTD}
                 allTags={store.allTags}
+                updateSessionGTD={store.updateSessionGTD}
                 batchUpdateGTD={store.batchUpdateGTD}
                 batchAddTag={store.batchAddTag}
                 batchDeleteSessions={store.batchDeleteSessions}
@@ -718,6 +705,8 @@ export default function App() {
                 providerCounts={store.providerCounts}
                 hasUpdates={store.hasUpdates}
                 refreshWithUpdates={store.refreshWithUpdates}
+                activeAiProfile={store.activeAiProfile}
+                onConfigureAi={openAiSettings}
               />
               {store.selectedProject && (
                 <div className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-edge/50 bg-accent-subtle/40">
@@ -792,15 +781,12 @@ export default function App() {
               addSavedMessage={store.addSavedMessage}
               removeSavedMessage={store.removeSavedMessage}
               activeAiProfile={store.activeAiProfile}
+              onConfigureAi={openAiSettings}
               addToast={store.addToast}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-content-4 text-sm flex flex-col items-center gap-3">
-                <FileText className="w-10 h-10 text-content-5" />
-                <span>{t('app.selectSession')}</span>
-                <span className="text-[11px] text-content-5">{t('app.navigationHint')}</span>
-              </div>
+              <EmptyState icon={FileText} title={t('app.selectSession')} description={t('app.navigationHint')} />
             </div>
           )
         ) : store.view === 'saved' ? (
@@ -814,10 +800,7 @@ export default function App() {
             />
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <div className="text-content-4 text-sm flex flex-col items-center gap-3">
-                <Bookmark className="w-10 h-10 text-content-5" />
-                <span>Select a saved message to view it</span>
-              </div>
+              <EmptyState icon={Bookmark} title={t('app.selectSavedMessage')} />
             </div>
           )
         ) : (
@@ -833,6 +816,7 @@ export default function App() {
             updateError={updateError}
             updaterMockMode={updaterMockMode}
             setUpdaterMockMode={setUpdaterMockMode}
+            aiSetupRequest={aiSetupRequest}
             onCheckUpdate={handleCheckUpdate}
             onInstallUpdate={handleInstallUpdate}
             onRestartUpdate={handleRestartUpdate}
