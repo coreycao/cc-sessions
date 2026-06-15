@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom'
 import { formatDate } from '../lib/utils'
 import {
   Plus, Tag, X, Trash2, RotateCcw, AlertTriangle,
-  FileText, FileCode, FileDown, MoreHorizontal,
+  FileText, FileCode, FileDown,
+  ListChecks,
 } from 'lucide-react'
 import { useI18n } from '../lib/i18n'
 
@@ -38,10 +39,15 @@ export function ActionTip({ label, children }: { label: string; children: React.
 
 // ---- Overflow menu ----
 
-export function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onExport, onDelete }: {
+export function OverflowMenu({
+  anchorRef, compact, selectMode, onClose, onResume, onToggleSelect, onToggleCompact, onExport, onDelete,
+}: {
   anchorRef: React.RefObject<HTMLButtonElement | null>
   compact: boolean
+  selectMode: boolean
   onClose: () => void
+  onResume: () => void
+  onToggleSelect: () => void
   onToggleCompact: () => void
   onExport: () => void
   onDelete: () => void
@@ -71,6 +77,15 @@ export function OverflowMenu({ anchorRef, compact, onClose, onToggleCompact, onE
       className="fixed z-[9999] bg-surface-2 border border-edge rounded-lg shadow-xl py-1 min-w-[180px]"
       style={{ top: pos.top, right: window.innerWidth - pos.left }}
     >
+      <button onClick={onResume} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
+        <span className="text-content-4"><RotateCcw className="w-3.5 h-3.5" /></span>
+        {t('detail.resumeTerminal')}
+      </button>
+      <button onClick={onToggleSelect} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
+        <span className="text-content-4"><ListChecks className="w-3.5 h-3.5" /></span>
+        {selectMode ? t('detail.exitSelect') : t('detail.select')}
+      </button>
+      <div className="my-1 h-px bg-edge/70" />
       <button onClick={onToggleCompact} className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] transition-colors text-content-2 hover:bg-surface-3 hover:text-content">
         <span className="text-content-4">{compact ? <FileCode className="w-3.5 h-3.5" /> : <FileText className="w-3.5 h-3.5" />}</span>
         {compact ? t('detail.fullView') : t('detail.compactView')}

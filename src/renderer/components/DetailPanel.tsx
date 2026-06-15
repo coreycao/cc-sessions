@@ -16,7 +16,7 @@ import {
 import {
   Archive, Circle,
   Star, MessageSquare, GitBranch, Calendar, X, Plus, Tag,
-  RotateCcw, MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle, PencilLine, Sparkles, ListChecks,
+  MoreHorizontal, ChevronUp, ChevronDown, Brain, LoaderCircle, AlertCircle, PencilLine, Sparkles,
 } from 'lucide-react'
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
@@ -59,8 +59,6 @@ export const DetailPanel = memo(function DetailPanel({
   const [compact, setCompact] = useState(false)
   const [metadataCollapsed, setMetadataCollapsed] = useState(false)
   const [selectMode, setSelectMode] = useState(false)
-  // Reset per-session UI state when switching sessions
-  useEffect(() => { setMetadataCollapsed(false); setSelectMode(false) }, [selectedSession.sessionId])
   const [showOverflow, setShowOverflow] = useState(false)
   const [reviewOpen, setReviewOpen] = useState(false)
   const [reviewLoading, setReviewLoading] = useState(false)
@@ -71,10 +69,22 @@ export const DetailPanel = memo(function DetailPanel({
   const [renameSource, setRenameSource] = useState<'manual' | 'ai'>('manual')
   const [renameLoading, setRenameLoading] = useState(false)
   const [renameError, setRenameError] = useState<string | null>(null)
+  const [tagSuggestions, setTagSuggestions] = useState<string[]>([])
+  const [tagLoading, setTagLoading] = useState(false)
+  const [tagError, setTagError] = useState<string | null>(null)
   const overflowRef = useRef<HTMLButtonElement>(null)
   const conversationScrollRef = useRef<HTMLDivElement>(null)
   const assistantLabel = selectedSession.provider === 'codex' ? 'Codex' : 'Claude'
   const hasCustomTitle = Boolean(gtd.displayTitle?.trim())
+
+  // Reset per-session UI state when switching sessions
+  useEffect(() => {
+    setMetadataCollapsed(false)
+    setSelectMode(false)
+    setTagSuggestions([])
+    setTagError(null)
+    setTagLoading(false)
+  }, [selectedSession.sessionId])
 
   const exportFullSession = useCallback(() => {
     const turns = parseConversation(sessionContent, selectedSession.provider)
@@ -211,7 +221,51 @@ export const DetailPanel = memo(function DetailPanel({
     } finally {
       setRenameLoading(false)
     }
-  }, [activeAiProfile?.id, renameDraft, selectedSession.provider, selectedSession.title, sessionContent, t])
+  }, [activeAiProfile?.id, renameDraft, selectedSession, sessionContent, t])
+
+  const generateTags = useCallback(async () => {
+    if (!sessionContent.trim()) {
+      setTagError(t('detail.tagsRequireContent'))
+      return
+    }
+
+    setTagLoading(true)
+    setTagError(null)
+
+    try {
+      const tags = await invoke<string[]>('generate_session_tags', {
+        profileId: activeAiProfile?.id ?? null,
+        sessionTitle: selectedSession.title,
+        existingTags: allTags,
+        transcript: buildTitleContext(selectedSession, sessionContent),
+      })
+      const currentTags = new Set(gtd.tags.map(normalizeTagKey))
+      const next = tags.filter(tag => !currentTags.has(normalizeTagKey(tag)))
+      setTagSuggestions(next)
+      if (next.length === 0) {
+        setTagError(t('detail.noTagSuggestions'))
+      }
+    } catch (error) {
+      setTagError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setTagLoading(false)
+    }
+  }, [activeAiProfile?.id, allTags, gtd.tags, selectedSession, sessionContent, t])
+
+  const addSuggestedTag = useCallback(async (tag: string) => {
+    await addTag(selectedSession.sessionId, tag)
+    setTagSuggestions(tags => tags.filter(item => item !== tag))
+    setTagError(null)
+  }, [addTag, selectedSession.sessionId])
+
+  const addAllSuggestedTags = useCallback(async () => {
+    const tags = [...tagSuggestions]
+    for (const tag of tags) {
+      await addTag(selectedSession.sessionId, tag)
+    }
+    setTagSuggestions([])
+    setTagError(null)
+  }, [addTag, selectedSession.sessionId, tagSuggestions])
 
   const saveTitle = useCallback(async () => {
     const title = renameDraft.trim()
@@ -246,7 +300,7 @@ export const DetailPanel = memo(function DetailPanel({
         >
           <X className="w-4 h-4" />
         </button>
-        <div className="flex min-w-0 flex-1 items-center justify-start gap-2" data-tauri-drag-region>
+        <div className="group/title flex min-w-0 flex-1 items-center justify-start gap-2" data-tauri-drag-region>
           <ProviderLogo provider={selectedSession.provider} size="md" />
           <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
           {hasCustomTitle && (
@@ -254,15 +308,6 @@ export const DetailPanel = memo(function DetailPanel({
               {t('detail.customTitle')}
             </span>
           )}
-          <ActionTip label={t('detail.renameSession')}>
-            <button
-              onClick={openRenameDialog}
-              className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-              aria-label={t('detail.renameSession')}
-            >
-              <PencilLine className="w-3.5 h-3.5" />
-            </button>
-          </ActionTip>
         </div>
         <ActionTip label={gtd.status === 'archived' ? t('detail.unarchive') : t('detail.archive')}>
           <button
@@ -270,45 +315,6 @@ export const DetailPanel = memo(function DetailPanel({
             className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
           >
             {gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-          </button>
-        </ActionTip>
-        <ActionTip label={t('detail.star')}>
-          <button
-            onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
-            className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.starred ? 'text-amber-400' : 'text-content-4 hover:text-content-2'}`}
-          >
-            <Star className={`w-4 h-4 ${gtd.starred ? 'fill-amber-400' : ''}`} />
-          </button>
-        </ActionTip>
-        <ActionTip label={t('detail.resumeTerminal')}>
-          <button
-            onClick={() => restoreSession(selectedSession)}
-            className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-          </button>
-        </ActionTip>
-        <ActionTip label={t('detail.reviewWithAi')}>
-          <button
-            onClick={reviewSession}
-            className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-            aria-label={t('detail.reviewCurrentSession')}
-          >
-            <Brain className="w-4 h-4" />
-          </button>
-        </ActionTip>
-        <ActionTip label={t('detail.select')}>
-          <button
-            onClick={() => setSelectMode(v => !v)}
-            className={
-              selectMode
-                ? 'p-1 rounded-lg bg-accent-subtle text-accent transition-colors'
-                : 'p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors'
-            }
-            aria-label={t('detail.select')}
-            aria-pressed={selectMode}
-          >
-            <ListChecks className="w-4 h-4" />
           </button>
         </ActionTip>
         <div className="relative">
@@ -325,7 +331,10 @@ export const DetailPanel = memo(function DetailPanel({
             <OverflowMenu
               anchorRef={overflowRef}
               compact={compact}
+              selectMode={selectMode}
               onClose={() => setShowOverflow(false)}
+              onResume={() => { restoreSession(selectedSession); setShowOverflow(false) }}
+              onToggleSelect={() => { setSelectMode(v => !v); setShowOverflow(false) }}
               onToggleCompact={() => { setCompact(v => !v); setShowOverflow(false) }}
               onExport={() => { exportFullSession(); setShowOverflow(false) }}
               onDelete={() => { setShowDeleteConfirm(true); setShowOverflow(false) }}
@@ -373,6 +382,41 @@ export const DetailPanel = memo(function DetailPanel({
         >
           <div className="min-h-0 overflow-hidden">
             <div className="px-5 py-3 space-y-3">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  onClick={reviewSession}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge/70 bg-surface px-2.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent"
+                  aria-label={t('detail.reviewCurrentSession')}
+                >
+                  <Brain className="h-3.5 w-3.5" />
+                  {t('detail.reviewAction')}
+                </button>
+                <button
+                  onClick={openRenameDialog}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge/70 bg-surface px-2.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent"
+                  aria-label={t('detail.renameSession')}
+                >
+                  <PencilLine className="h-3.5 w-3.5" />
+                  {t('detail.renameAction')}
+                </button>
+                <button
+                  onClick={generateTags}
+                  disabled={tagLoading || sessionContentLoading}
+                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge/70 bg-surface px-2.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent disabled:cursor-default disabled:opacity-60"
+                >
+                  {tagLoading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {tagLoading ? t('detail.generatingTags') : t('detail.generateTags')}
+                </button>
+                <button
+                  onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
+                  className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium shadow-sm transition-colors ${gtd.starred ? 'border-amber-400/30 bg-amber-400/10 text-amber-500 hover:bg-amber-400/15' : 'border-edge/70 bg-surface text-content-2 hover:border-amber-400/30 hover:bg-amber-400/10 hover:text-amber-500'}`}
+                  aria-label={gtd.starred ? t('detail.unstar') : t('detail.star')}
+                  aria-pressed={gtd.starred}
+                >
+                  <Star className={`h-3.5 w-3.5 ${gtd.starred ? 'fill-amber-400' : ''}`} />
+                  {gtd.starred ? t('detail.unstar') : t('detail.star')}
+                </button>
+              </div>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -400,6 +444,33 @@ export const DetailPanel = memo(function DetailPanel({
                     >
                       <Plus className="w-3 h-3" />{t('detail.addTag')}
                     </button>
+                  )}
+                  {tagSuggestions.length > 0 && (
+                    <>
+                      <span className="ml-1 text-[10px] uppercase tracking-wider text-content-5">{t('detail.suggestedTags')}</span>
+                      {tagSuggestions.map(tag => (
+                        <button
+                          key={tag}
+                          onClick={() => addSuggestedTag(tag)}
+                          className="inline-flex items-center gap-1 rounded-lg border border-edge/70 bg-surface px-2 py-0.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent"
+                          aria-label={t('detail.addSuggestedTag', { tag })}
+                        >
+                          <Plus className="h-3 w-3" />
+                          {tag}
+                        </button>
+                      ))}
+                      {tagSuggestions.length > 1 && (
+                        <button
+                          onClick={addAllSuggestedTags}
+                          className="rounded-lg px-2 py-0.5 text-[11px] font-medium text-content-4 transition-colors hover:bg-surface-3 hover:text-content-2"
+                        >
+                          {t('detail.addAllTags')}
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {tagError && (
+                    <span className="text-[11px] text-red-400">{tagError}</span>
                   )}
                 </div>
               </div>
@@ -812,6 +883,10 @@ function compactInlineText(value: string): string {
     .replace(/```[\s\S]*?```/g, '[code block]')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function normalizeTagKey(value: string): string {
+  return value.trim().toLowerCase()
 }
 
 function clampText(value: string, maxChars: number): { text: string; truncated: boolean } {
