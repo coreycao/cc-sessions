@@ -1,6 +1,6 @@
 {
   "name": "cc-sessions",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Claude Code Session Manager — Tauri + React",
   "type": "module",
   "scripts": {
