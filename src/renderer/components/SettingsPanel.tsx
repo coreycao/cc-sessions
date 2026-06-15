@@ -14,6 +14,7 @@ import { useI18n, type Language } from '../lib/i18n'
 import type { UpdaterMockMode } from '../lib/updater'
 import { PROJECT_ICON_OPTIONS, ProjectIcon, projectIconLabelKey } from './ProjectIcon'
 import type { SettingsSection } from './SettingsList'
+import { Button, IconButton, LoadingState } from './ui'
 
 export type Theme = 'light' | 'dark' | 'system'
 export type UpdateState = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'current' | 'error'
@@ -96,14 +97,14 @@ export function SettingsPanel({
                 title={t('settings.checkUpdates')}
                 description={updateDescription}
                 control={
-                  <button
+                  <Button
                     onClick={onUpdateAction}
                     disabled={updateBusy}
-                    className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+                    loading={updateBusy}
+                    icon={updateBusy ? undefined : getUpdateIcon(updateState)}
                   >
-                    {getUpdateIcon(updateState)}
                     {updateLabel}
-                  </button>
+                  </Button>
                 }
               />
               {updaterMockMode !== null && (
@@ -778,27 +779,32 @@ function DataSettingsContent({
         <div className="flex flex-col rounded-xl border border-edge bg-surface p-4 shadow-sm">
           <div className="text-[12px] font-semibold text-content">{t('data.syncSessions')}</div>
           <p className="mt-1 text-[11px] leading-relaxed text-content-4">{t('data.syncSessionsDescription')}</p>
-          <button
+          <Button
             onClick={handleSync}
             disabled={!onSyncSessions || busy}
-            className="self-end mt-auto inline-flex h-7 items-center gap-1.5 rounded-lg bg-content px-2.5 text-[11px] font-medium text-surface shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="self-end mt-auto"
+            size="sm"
+            variant="primary"
+            icon={<RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} />}
           >
-            <RefreshCw className={`h-3 w-3 ${busy ? 'animate-spin' : ''}`} />
             {busy ? t('data.syncing') : t('data.syncNow')}
-          </button>
+          </Button>
         </div>
 
         <div className="flex flex-col rounded-xl border border-edge bg-surface p-4 shadow-sm">
           <div className="text-[12px] font-semibold text-content">{t('data.exportSavedMessages')}</div>
           <p className="mt-1 text-[11px] leading-relaxed text-content-4">{t('data.exportSavedMessagesDescription')}</p>
-          <button
+          <Button
             onClick={handleExportSaved}
             disabled={savedMessages.length === 0 || exporting}
-            className="self-end mt-auto inline-flex h-7 items-center gap-1.5 rounded-lg bg-content px-2.5 text-[11px] font-medium text-surface shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50"
+            className="self-end mt-auto"
+            size="sm"
+            variant="primary"
+            loading={exporting}
+            icon={<Download className="h-3 w-3" />}
           >
-            {exporting ? <LoaderCircle className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
             {exporting ? t('data.exporting') : t('data.exportNow')}
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -808,14 +814,14 @@ function DataSettingsContent({
             <h3 className="text-[15px] font-semibold text-content">{t('data.storageBreakdown')}</h3>
             <p className="mt-0.5 text-[12px] text-content-4">{t('data.storageBreakdownDescription')}</p>
           </div>
-          <button
+          <Button
             onClick={loadUsage}
             disabled={loadingUsage}
-            className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+            loading={loadingUsage}
+            icon={<RefreshCw className="h-3.5 w-3.5" />}
           >
-            <RefreshCw className={`h-3.5 w-3.5 ${loadingUsage ? 'animate-spin' : ''}`} />
             {t('data.refreshUsage')}
-          </button>
+          </Button>
         </div>
 
         {usageError ? (
@@ -828,9 +834,7 @@ function DataSettingsContent({
               <StorageUsageRow key={item.id} item={localizeStorageItem(item, t)} totalBytes={usage?.totalBytes ?? 0} />
             ))}
             {sortedItems.length === 0 && (
-              <div className="flex min-h-[120px] items-center justify-center text-[12px] text-content-4">
-                {loadingUsage ? t('data.loadingUsage') : t('data.noStorageData')}
-              </div>
+              <LoadingState title={loadingUsage ? t('data.loadingUsage') : t('data.noStorageData')} icon={loadingUsage ? undefined : Database} compact={Boolean(usage)} />
             )}
           </div>
         )}
@@ -1370,13 +1374,12 @@ function AiSettingsContent({
           title={t('settings.activeApi')}
           description={activeProfile ? `${activeProfile.name} · ${activeProfile.model}` : t('settings.addApiDescription')}
           control={
-            <button
+            <Button
               onClick={addProfile}
-              className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
+              icon={<Plus className="h-3.5 w-3.5" />}
             >
-              <Plus className="h-3.5 w-3.5" />
               {t('settings.addApi')}
-            </button>
+            </Button>
           }
         />
         {settings.profiles.length > 0 && (
@@ -1454,21 +1457,20 @@ function AiSettingsContent({
                 <div className="truncate text-[11px] text-content-4">{profile.baseUrl || t('common.noBaseUrl')}</div>
               </div>
               {!editing && (
-                <button
+                <Button
                   onClick={() => editProfile(profile.id)}
-                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
+                  icon={<Pencil className="h-3.5 w-3.5" />}
                 >
-                  <Pencil className="h-3.5 w-3.5" />
                   {t('common.edit')}
-                </button>
+                </Button>
               )}
-              <button
+              <IconButton
                 onClick={() => removeProfile(profile.id)}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-content-4 hover:bg-surface-3 hover:text-red-400"
-                aria-label={t('settings.removeAiApi')}
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
+                label={t('settings.removeAiApi')}
+                size="icon-md"
+                variant="danger"
+                icon={<Trash2 className="h-3.5 w-3.5" />}
+              />
             </div>
 
             {editing ? (
@@ -1510,22 +1512,21 @@ function AiSettingsContent({
             )}
             {editing && (
               <div className="flex items-center justify-end gap-2 border-t border-edge-2 px-4 py-3">
-                <button
+                <Button
                   onClick={() => onTest(profile)}
                   disabled={testing || saving}
-                  className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2 disabled:opacity-50"
+                  loading={testing}
                 >
-                  {testing && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
                   {t('common.test')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => saveProfile(profile.id)}
                   disabled={saving || testing}
-                  className="inline-flex h-8 items-center gap-2 rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:opacity-50"
+                  variant="primary"
+                  loading={saving}
                 >
-                  {saving && <LoaderCircle className="h-3.5 w-3.5 animate-spin" />}
                   {t('common.save')}
-                </button>
+                </Button>
               </div>
             )}
           </section>

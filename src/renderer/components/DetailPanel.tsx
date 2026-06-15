@@ -21,6 +21,7 @@ import {
 import { ProviderLogo } from './ProviderLogo'
 import { useI18n } from '../lib/i18n'
 import { buildReviewCacheKey, readReviewCache, writeReviewCache } from '../lib/aiReviewCache'
+import { Button, IconButton, LoadingState } from './ui'
 
 interface DetailPanelProps {
   selectedSession: SessionInfo
@@ -294,12 +295,11 @@ export const DetailPanel = memo(function DetailPanel({
     <div className="relative flex-1 flex flex-col min-w-0 bg-surface rounded-xl border border-edge/70 shadow-sm overflow-hidden">
       {/* Header toolbar */}
       <div className="h-[42px] flex items-center px-5 gap-3 border-b border-edge/50 bg-surface" data-tauri-drag-region>
-        <button
+        <IconButton
           onClick={() => setSelectedSessionId(null)}
-          className="p-1 rounded-lg hover:bg-surface-3 text-content-3 hover:text-content-2 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
+          label={t('session.closeEsc')}
+          icon={<X className="w-4 h-4" />}
+        />
         <div className="group/title flex min-w-0 flex-1 items-center justify-start gap-2" data-tauri-drag-region>
           <ProviderLogo provider={selectedSession.provider} size="md" />
           <h2 className="truncate text-[14px] font-semibold text-content">{selectedSession.title}</h2>
@@ -310,22 +310,21 @@ export const DetailPanel = memo(function DetailPanel({
           )}
         </div>
         <ActionTip label={gtd.status === 'archived' ? t('detail.unarchive') : t('detail.archive')}>
-          <button
+          <IconButton
             onClick={() => updateSessionGTD(selectedSession.sessionId, { status: gtd.status === 'archived' ? 'new' : 'archived' })}
-            className={`p-1 rounded-lg hover:bg-surface-3 transition-colors ${gtd.status === 'archived' ? 'text-zinc-400' : 'text-content-4 hover:text-content-2'}`}
-          >
-            {gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
-          </button>
+            label={gtd.status === 'archived' ? t('detail.unarchive') : t('detail.archive')}
+            icon={gtd.status === 'archived' ? <Circle className="w-4 h-4" /> : <Archive className="w-4 h-4" />}
+            className={gtd.status === 'archived' ? 'text-zinc-400' : undefined}
+          />
         </ActionTip>
         <div className="relative">
           <ActionTip label={t('detail.moreActions')}>
-            <button
+            <IconButton
               ref={overflowRef}
               onClick={() => setShowOverflow(v => !v)}
-              className="p-1 rounded-lg hover:bg-surface-3 text-content-4 hover:text-content-2 transition-colors"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+              label={t('detail.moreActions')}
+              icon={<MoreHorizontal className="w-4 h-4" />}
+            />
           </ActionTip>
           {showOverflow && (
             <OverflowMenu
@@ -383,39 +382,42 @@ export const DetailPanel = memo(function DetailPanel({
           <div className="min-h-0 overflow-hidden">
             <div className="px-5 py-3 space-y-3">
               <div className="flex flex-wrap items-center gap-1.5">
-                <button
+                <Button
                   onClick={reviewSession}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge/70 bg-surface px-2.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent"
+                  size="sm"
                   aria-label={t('detail.reviewCurrentSession')}
+                  icon={<Brain className="h-3.5 w-3.5" />}
                 >
-                  <Brain className="h-3.5 w-3.5" />
                   {t('detail.reviewAction')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={openRenameDialog}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge/70 bg-surface px-2.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent"
+                  size="sm"
                   aria-label={t('detail.renameSession')}
+                  icon={<PencilLine className="h-3.5 w-3.5" />}
                 >
-                  <PencilLine className="h-3.5 w-3.5" />
                   {t('detail.renameAction')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={generateTags}
                   disabled={tagLoading || sessionContentLoading}
-                  className="inline-flex h-7 items-center gap-1.5 rounded-lg border border-edge/70 bg-surface px-2.5 text-[11px] font-medium text-content-2 shadow-sm transition-colors hover:border-accent/30 hover:bg-accent-subtle hover:text-accent disabled:cursor-default disabled:opacity-60"
+                  size="sm"
+                  loading={tagLoading}
+                  icon={<Sparkles className="h-3.5 w-3.5" />}
                 >
-                  {tagLoading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                   {tagLoading ? t('detail.generatingTags') : t('detail.generateTags')}
-                </button>
-                <button
+                </Button>
+                <Button
                   onClick={() => updateSessionGTD(selectedSession.sessionId, { starred: !gtd.starred })}
-                  className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-medium shadow-sm transition-colors ${gtd.starred ? 'border-amber-400/30 bg-amber-400/10 text-amber-500 hover:bg-amber-400/15' : 'border-edge/70 bg-surface text-content-2 hover:border-amber-400/30 hover:bg-amber-400/10 hover:text-amber-500'}`}
+                  size="sm"
+                  variant="secondary"
+                  className={gtd.starred ? 'border-amber-400/30 bg-amber-400/10 text-amber-500 hover:bg-amber-400/15' : 'hover:border-amber-400/30 hover:bg-amber-400/10 hover:text-amber-500'}
                   aria-label={gtd.starred ? t('detail.unstar') : t('detail.star')}
                   aria-pressed={gtd.starred}
+                  icon={<Star className={`h-3.5 w-3.5 ${gtd.starred ? 'fill-amber-400' : ''}`} />}
                 >
-                  <Star className={`h-3.5 w-3.5 ${gtd.starred ? 'fill-amber-400' : ''}`} />
                   {gtd.starred ? t('detail.unstar') : t('detail.star')}
-                </button>
+                </Button>
               </div>
               <div className="flex items-center gap-3">
                 <span className="text-[10px] uppercase tracking-wider text-content-4 font-medium w-14">{t('detail.tags')}</span>
@@ -576,12 +578,10 @@ export const DetailPanel = memo(function DetailPanel({
 })
 
 function ConversationLoadingState() {
+  const { t } = useI18n()
   return (
     <div className="flex h-full min-h-[240px] items-center justify-center">
-      <div className="flex items-center gap-2 text-[12px] text-content-4">
-        <LoaderCircle className="h-4 w-4 animate-spin" />
-        <span>Loading conversation...</span>
-      </div>
+      <LoadingState title={t('detail.loadingConversation')} compact />
     </div>
   )
 }
@@ -655,19 +655,18 @@ function SessionReviewDialog({
           <div className="text-[11px] text-content-4">{t('detail.generatedFromCurrentSession')}</div>
           <div className="flex items-center gap-2">
             {error && (
-              <button
+              <Button
                 onClick={onRetry}
-                className="inline-flex h-8 items-center gap-2 rounded-lg border border-edge bg-surface px-3 text-[12px] font-medium text-content-2 shadow-sm hover:bg-surface-2"
               >
                 {t('common.retry')}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               onClick={onClose}
-              className="inline-flex h-8 items-center rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90"
+              variant="primary"
             >
               {t('common.done')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -766,29 +765,29 @@ function SessionRenameDialog({
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-edge/70 px-4 py-3">
-          <button
+          <Button
             onClick={onReset}
             disabled={!hasCustomTitle || loading}
-            className="inline-flex h-8 items-center rounded-lg px-3 text-[12px] font-medium text-content-4 transition-colors hover:bg-surface-2 hover:text-content-2 disabled:cursor-default disabled:opacity-40"
+            variant="ghost"
           >
             {t('detail.resetTitle')}
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
-            <button
+            <Button
               onClick={onGenerate}
-              disabled={loading}
-              className="inline-flex h-8 items-center gap-2 rounded-lg border border-accent/25 bg-accent-subtle px-3 text-[12px] font-medium text-accent shadow-sm transition-colors hover:bg-accent-subtle/80 disabled:opacity-60"
+              loading={loading}
+              variant="accent"
+              icon={<Sparkles className="h-3.5 w-3.5" />}
             >
-              {loading ? <LoaderCircle className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
               {loading ? t('detail.generatingTitle') : t('detail.generateTitle')}
-            </button>
-            <button
+            </Button>
+            <Button
               onClick={onSave}
               disabled={!canSave}
-              className="inline-flex h-8 items-center rounded-lg bg-content px-3 text-[12px] font-medium text-surface shadow-sm hover:opacity-90 disabled:cursor-default disabled:opacity-50"
+              variant="primary"
             >
               {t('common.save')}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
