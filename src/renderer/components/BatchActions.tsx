@@ -487,7 +487,7 @@ function BatchAiRenameDialog({
                   <span className="block truncate text-[10px] text-content-4">{item.session.projectName || item.session.projectPath}</span>
                 </span>
                 <span className="min-w-0">
-                  <span className={`block truncate text-[12px] font-medium ${item.suggestedTitle ? 'text-content' : 'text-content-4'}`}>
+                  <span className={`block truncate text-[12px] font-medium ${getAiRenameInlineStatusClass(item)}`}>
                     {item.suggestedTitle || item.error || getAiRenameStatusLabel(t, item.status)}
                   </span>
                 </span>
@@ -545,7 +545,16 @@ function getAiRenameStatusLabel(t: (key: string, params?: Record<string, string 
   return t('batch.pending')
 }
 
+function getAiRenameInlineStatusClass(item: AiRenameItem): string {
+  if (item.suggestedTitle) return 'text-content'
+  if (item.status === 'generating') return 'text-blue-500 dark:text-blue-400'
+  if (item.status === 'error') return 'text-red-400'
+  if (item.status === 'applied') return 'text-emerald-500'
+  return 'text-content-4'
+}
+
 function getAiRenameStatusClass(status: AiRenameStatus): string {
+  if (status === 'generating') return 'border-blue-500/25 bg-blue-500/10 text-blue-500 dark:text-blue-400'
   if (status === 'ready') return 'border-accent/25 bg-accent-subtle text-accent'
   if (status === 'error') return 'border-red-500/25 bg-red-500/10 text-red-400'
   if (status === 'applied') return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500'

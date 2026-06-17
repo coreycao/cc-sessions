@@ -629,7 +629,7 @@ function SessionReviewDialog({
       <div className="flex max-h-[82vh] w-[min(760px,calc(100vw-48px))] flex-col overflow-hidden rounded-xl border border-edge bg-surface shadow-2xl">
         <div className="flex h-12 items-center gap-3 border-b border-edge/70 px-4">
           <div className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-accent-subtle text-accent">
-            {loading ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Brain className="h-4 w-4" />}
+            <Brain className="h-4 w-4" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold text-content">{t('detail.sessionReview')}</div>
