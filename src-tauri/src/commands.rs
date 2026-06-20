@@ -6,7 +6,7 @@ use tauri::Manager;
 use tauri_plugin_dialog::DialogExt;
 
 use crate::ai::ai_settings_path;
-use crate::gtd::{gtd_store_path, search_index_dir, session_cache_path};
+use crate::gtd::{gtd_store_path, search_index_dir, session_cache_path, AppState};
 use crate::helpers::session_roots;
 use crate::models::{StorageUsage, StorageUsageItem};
 use crate::saved::saved_messages_path;
@@ -76,6 +76,80 @@ pub fn restore_session(
         .arg(&script)
         .spawn()
         .map_err(|e| e.to_string())?;
+    Ok("success".into())
+}
+
+fn shell_single_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
+fn validate_project_path(
+    project_path: &str,
+    state: tauri::State<'_, AppState>,
+) -> Result<PathBuf, String> {
+    let canonical =
+        fs::canonicalize(project_path).map_err(|e| format!("Invalid project path: {e}"))?;
+    let cache = state
+        .cache
+        .lock()
+        .map_err(|e| format!("Session cache lock poisoned: {e}"))?;
+
+    for entry in cache.entries.values() {
+        for candidate in [&entry.session.cwd, &entry.session.project_path] {
+            if candidate.trim().is_empty() {
+                continue;
+            }
+            let Ok(candidate_canonical) = fs::canonicalize(candidate) else {
+                continue;
+            };
+            if canonical == candidate_canonical {
+                return Ok(canonical);
+            }
+        }
+    }
+
+    Err("Project path is not part of the indexed sessions".to_string())
+}
+
+#[tauri::command]
+pub fn open_project(
+    project_path: String,
+    target: String,
+    state: tauri::State<'_, AppState>,
+) -> Result<String, String> {
+    let path = validate_project_path(&project_path, state)?;
+    match target.as_str() {
+        "vscode" => Command::new("open")
+            .arg("-a")
+            .arg("Visual Studio Code")
+            .arg(&path)
+            .spawn()
+            .or_else(|_| Command::new("code").arg(&path).spawn())
+            .map_err(|e| format!("Failed to open VS Code: {e}"))?,
+        "terminal" => {
+            let cd_command = format!("cd {}", shell_single_quote(&path.to_string_lossy()));
+            let script = format!(
+                "tell application \"Terminal\"\n\tdo script \"{}\"\n\tactivate\nend tell",
+                escape_applescript(&cd_command)
+            );
+            Command::new("osascript")
+                .arg("-e")
+                .arg(&script)
+                .spawn()
+                .map_err(|e| format!("Failed to open Terminal: {e}"))?
+        }
+        "xcode" => Command::new("xed")
+            .arg(&path)
+            .spawn()
+            .or_else(|_| Command::new("open").arg("-a").arg("Xcode").arg(&path).spawn())
+            .map_err(|e| format!("Failed to open Xcode: {e}"))?,
+        "finder" => Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open Finder: {e}"))?,
+        _ => return Err("Unsupported project open target".to_string()),
+    };
+
     Ok("success".into())
 }
 

@@ -187,6 +187,7 @@ pub fn run() {
             commands::read_session_content,
             commands::delete_session,
             commands::restore_session,
+            commands::open_project,
             commands::export_markdown,
             commands::get_storage_usage,
             ai::load_ai_settings,

@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { invoke } from '@tauri-apps/api/core'
 import { createPortal } from 'react-dom'
 import {
-  Activity, Archive, ArchiveRestore, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Database, Download,
-  Folder, HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Trash2,
+  Activity, Archive, ArchiveRestore, BarChart3, CalendarDays, CheckCircle2, ChevronDown, Code2, Database, Download,
+  Folder, FolderOpen, Hammer, HardDrive, KeyRound, LoaderCircle, MessageSquare, Monitor, Moon, NotebookPen, Pencil, Plus, RefreshCw, Search, Sun, Terminal, Trash2,
   type LucideIcon,
 } from 'lucide-react'
 import type { AiProfile, AiSettings, ProjectMetadata, SessionInfo, SessionProvider, SavedMessage } from '../../shared/types'
@@ -232,6 +232,7 @@ function SettingRow({ title, description, control }: { title: string; descriptio
 
 interface ManagedProject {
   path: string
+  openPath: string
   name: string
   sessionCount: number
   messageCount: number
@@ -242,6 +243,7 @@ interface ManagedProject {
 
 type ProjectFilter = 'all' | 'active' | 'archived'
 type ProjectSort = 'lastActive' | 'sessions' | 'name'
+type ProjectOpenTarget = 'vscode' | 'finder' | 'terminal' | 'xcode'
 
 function ProjectsSettingsContent({
   sessions, projectData, onUpdateProjectMetadata,
@@ -438,9 +440,13 @@ function ProjectManagementRow({
   const [editingName, setEditingName] = useState(false)
   const [editingNotes, setEditingNotes] = useState(false)
   const [iconPickerOpen, setIconPickerOpen] = useState(false)
+  const [openMenuOpen, setOpenMenuOpen] = useState(false)
+  const [openingTarget, setOpeningTarget] = useState<ProjectOpenTarget | null>(null)
+  const [openError, setOpenError] = useState<string | null>(null)
   const [nameDraft, setNameDraft] = useState(project.metadata.displayName || '')
   const [notesDraft, setNotesDraft] = useState(project.metadata.notes || '')
   const iconPickerRef = useRef<HTMLDivElement>(null)
+  const openMenuRef = useRef<HTMLDivElement>(null)
   const archived = project.metadata.archived
   const displayName = project.metadata.displayName?.trim() || project.name
 
@@ -477,9 +483,42 @@ function ProjectManagementRow({
     }
   }, [iconPickerOpen])
 
+  useEffect(() => {
+    if (!openMenuOpen) return
+    const onPointerDown = (event: PointerEvent) => {
+      if (openMenuRef.current && !openMenuRef.current.contains(event.target as Node)) {
+        setOpenMenuOpen(false)
+      }
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpenMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [openMenuOpen])
+
   const chooseIcon = async (icon: string) => {
     await onUpdate({ icon })
     setIconPickerOpen(false)
+  }
+
+  const openProject = async (target: ProjectOpenTarget) => {
+    if (!project.openPath || openingTarget) return
+    setOpeningTarget(target)
+    setOpenError(null)
+    try {
+      await invoke('open_project', { projectPath: project.openPath, target })
+      setOpenMenuOpen(false)
+    } catch (error) {
+      console.error('Failed to open project:', error)
+      setOpenError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setOpeningTarget(null)
+    }
   }
 
   return (
@@ -586,23 +625,112 @@ function ProjectManagementRow({
                 <Pencil className="h-3 w-3 flex-shrink-0 text-content-5 opacity-0 transition-opacity group-hover:opacity-100" />
               </button>
             )}
+            {openError && <div className="mt-1 text-[10px] text-red-400">{openError}</div>}
           </div>
         </div>
         <div className="flex flex-shrink-0 items-center gap-1">
           {busy && <LoaderCircle className="h-3.5 w-3.5 animate-spin text-content-4" />}
+          <ProjectOpenMenu
+            ref={openMenuRef}
+            open={openMenuOpen}
+            openingTarget={openingTarget}
+            disabled={disabled || !project.openPath}
+            onToggle={() => setOpenMenuOpen(value => !value)}
+            onOpen={openProject}
+          />
           <button
             onClick={() => onUpdate({ archived: !archived })}
             disabled={disabled}
-            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12px] font-medium shadow-sm disabled:opacity-40 ${archived ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15' : 'border-edge bg-surface text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+            className={`inline-flex h-8 w-8 items-center justify-center rounded-lg border text-[12px] font-medium shadow-sm disabled:opacity-40 ${archived ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/15' : 'border-edge bg-surface text-content-3 hover:bg-surface-2 hover:text-content-2'}`}
+            title={archived ? t('projects.restoreProject') : t('projects.archiveProject')}
+            aria-label={archived ? t('projects.restoreProject') : t('projects.archiveProject')}
           >
             {archived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
-            {archived ? t('projects.restoreProject') : t('projects.archiveProject')}
           </button>
         </div>
       </div>
     </div>
   )
 }
+
+const PROJECT_OPEN_TARGETS: Array<{
+  target: ProjectOpenTarget
+  labelKey: string
+  icon: LucideIcon
+  iconClass: string
+}> = [
+  { target: 'vscode', labelKey: 'projects.openVsCode', icon: Code2, iconClass: 'bg-blue-500/10 text-blue-500' },
+  { target: 'finder', labelKey: 'projects.openFinder', icon: FolderOpen, iconClass: 'bg-sky-500/10 text-sky-500' },
+  { target: 'terminal', labelKey: 'projects.openTerminal', icon: Terminal, iconClass: 'bg-zinc-900 text-zinc-100 dark:bg-zinc-100 dark:text-zinc-900' },
+  { target: 'xcode', labelKey: 'projects.openXcode', icon: Hammer, iconClass: 'bg-cyan-500/10 text-cyan-500' },
+]
+
+const ProjectOpenMenu = forwardRef<HTMLDivElement, {
+  open: boolean
+  openingTarget: ProjectOpenTarget | null
+  disabled: boolean
+  onToggle: () => void
+  onOpen: (target: ProjectOpenTarget) => void
+}>(function ProjectOpenMenu({
+  open, openingTarget, disabled, onToggle, onOpen,
+}, ref) {
+  const { t } = useI18n()
+  const defaultTarget = PROJECT_OPEN_TARGETS[1]
+  const DefaultIcon = defaultTarget.icon
+
+  return (
+    <div ref={ref} className="relative flex h-8 overflow-visible rounded-lg border border-edge bg-surface shadow-sm">
+      <button
+        type="button"
+        onClick={() => onOpen(defaultTarget.target)}
+        disabled={disabled || Boolean(openingTarget)}
+        className="inline-flex h-8 w-8 items-center justify-center rounded-l-lg text-content-3 transition-colors hover:bg-surface-2 hover:text-content disabled:cursor-default disabled:opacity-40"
+        title={t('projects.openProject')}
+        aria-label={t('projects.openProject')}
+      >
+        {openingTarget ? (
+          <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+        ) : (
+          <DefaultIcon className="h-3.5 w-3.5" />
+        )}
+      </button>
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={disabled || Boolean(openingTarget)}
+        className="inline-flex h-8 w-7 items-center justify-center rounded-r-lg border-l border-edge/70 text-content-4 transition-colors hover:bg-surface-2 hover:text-content-2 disabled:cursor-default disabled:opacity-40"
+        aria-label={t('projects.openWith')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        title={t('projects.openWith')}
+      >
+        <ChevronDown className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-[calc(100%+8px)] z-30 w-44 overflow-hidden rounded-xl border border-edge bg-surface p-1.5 shadow-xl" role="menu">
+          {PROJECT_OPEN_TARGETS.map(option => {
+            const Icon = option.icon
+            return (
+              <button
+                key={option.target}
+                type="button"
+                onClick={() => onOpen(option.target)}
+                className="flex h-9 w-full items-center gap-2 rounded-lg px-2 text-left text-[13px] font-medium text-content-2 transition-colors hover:bg-surface-2 hover:text-content"
+                role="menuitem"
+              >
+                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-md ${option.iconClass}`}>
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <span>{t(option.labelKey)}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+})
 
 function buildManagedProjects(
   sessions: SessionInfo[],
@@ -611,15 +739,18 @@ function buildManagedProjects(
   const map = new Map<string, Omit<ManagedProject, 'metadata'>>()
   for (const session of sessions) {
     const path = session.projectName || session.projectPath || session.cwd || 'Unknown'
+    const openPath = session.cwd || session.projectPath || ''
     const existing = map.get(path)
     if (existing) {
       existing.sessionCount += 1
       existing.messageCount += session.messageCount
+      if (!existing.openPath && openPath) existing.openPath = openPath
       if (!existing.providers.includes(session.provider)) existing.providers.push(session.provider)
       if (new Date(session.modified) > new Date(existing.lastModified)) existing.lastModified = session.modified
     } else {
       map.set(path, {
         path,
+        openPath,
         name: path.split('/').filter(Boolean).at(-1) || path,
         sessionCount: 1,
         messageCount: session.messageCount,

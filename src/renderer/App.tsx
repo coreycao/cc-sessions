@@ -678,7 +678,6 @@ export default function App() {
           sidebarCollapsed={sidebarCollapsed}
           isResizing={isResizing}
           startResize={startResize}
-          sessions={store.sessions}
           view={store.view}
           setView={store.setView}
           savedCount={store.savedMessages.length}

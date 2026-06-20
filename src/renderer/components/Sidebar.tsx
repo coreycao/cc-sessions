@@ -2,12 +2,10 @@ import { useState, useCallback, useRef, useEffect, memo } from 'react'
 import { createPortal } from 'react-dom'
 import type { FilterView } from '../hooks/useFilters'
 import type { View } from '../hooks/useStore'
-import type { SessionInfo } from '../../shared/types'
 import {
   LayoutList, Circle, Star, Archive,
   Tag, Pencil, Trash, Plus, Settings, Bookmark, ChevronDown,
 } from 'lucide-react'
-import { StatsPanel } from './StatsPanel'
 import { useI18n } from '../lib/i18n'
 
 interface SidebarProps {
@@ -25,7 +23,6 @@ interface SidebarProps {
   sidebarCollapsed: boolean
   isResizing: boolean
   startResize: (e: React.MouseEvent) => void
-  sessions: SessionInfo[]
   view: View
   setView: (v: View) => void
   savedCount: number
@@ -37,7 +34,6 @@ export const Sidebar = memo(function Sidebar({
   allTags, tagCounts, renameTag, deleteTag, createTag,
   statusCounts,
   sidebarWidth, sidebarCollapsed, isResizing, startResize,
-  sessions,
   view, setView, savedCount,
 }: SidebarProps) {
   const { t } = useI18n()
@@ -227,7 +223,6 @@ export const Sidebar = memo(function Sidebar({
         </div>
 
         <div className="flex-1" />
-        <StatsPanel sessions={sessions} />
         <div className="px-2.5 py-2 border-t border-edge/50">
           <button
             onClick={() => setView('settings')}
