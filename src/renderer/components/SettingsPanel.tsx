@@ -1729,7 +1729,7 @@ function LabeledInput({
         value={value}
         onChange={event => onChange(event.target.value)}
         placeholder={placeholder}
-        className="h-9 w-full rounded-lg border border-edge bg-surface-2 px-3 text-[12px] text-content outline-none placeholder:text-content-5 focus:border-accent focus:ring-2 focus:ring-accent/15"
+        className="h-9 w-full rounded-lg border border-edge bg-surface-2 px-3 text-[12px] text-content caret-accent shadow-inner outline-none transition-[background-color,border-color,box-shadow] placeholder:text-content-5 focus:border-accent focus:bg-surface focus:shadow-[inset_0_0_0_1px_var(--color-accent)] focus:ring-2 focus:ring-accent/15"
       />
     </label>
   )
