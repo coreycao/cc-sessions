@@ -319,6 +319,7 @@ export function BatchActions({
 }
 
 type AiRenameStatus = 'pending' | 'generating' | 'ready' | 'skipped' | 'error' | 'applied'
+type AiRenameFilter = 'active' | 'all' | AiRenameStatus
 
 interface AiRenameItem {
   session: SessionInfo
@@ -346,25 +347,41 @@ function BatchAiRenameDialog({
   onClose: () => void
 }) {
   const { t } = useI18n()
-  const [skipRenamed, setSkipRenamed] = useState(true)
-  const [items, setItems] = useState<AiRenameItem[]>(() => createAiRenameItems(sessions, getGTD, true))
+  const [initialSessions] = useState(() => sessions)
+  const [items, setItems] = useState<AiRenameItem[]>(() => createAiRenameItems(sessions, getGTD))
+  const [filter, setFilter] = useState<AiRenameFilter>('active')
+  const [filterOpen, setFilterOpen] = useState(false)
   const [running, setRunning] = useState(false)
   const [applying, setApplying] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   const selectedCount = items.filter(item => item.selected && item.status === 'ready').length
   const readyCount = items.filter(item => item.status === 'ready').length
-  const limited = sessions.length > AI_RENAME_LIMIT
-
-  useEffect(() => {
-    setItems(createAiRenameItems(sessions, getGTD, skipRenamed))
-  }, [sessions, skipRenamed])
+  const limited = initialSessions.length > AI_RENAME_LIMIT
+  const visibleItems = useMemo(() => filterAiRenameItems(items, filter), [filter, items])
+  const filterOptions = useMemo(() => getAiRenameFilterOptions(t, items), [items, t])
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !running && !applying) onClose()
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      event.stopPropagation()
+      event.stopImmediatePropagation()
+      if (!running && !applying) onClose()
     }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
+    document.addEventListener('keydown', handler, true)
+    return () => document.removeEventListener('keydown', handler, true)
   }, [applying, onClose, running])
+
+  useEffect(() => {
+    if (!filterOpen) return
+    const handlePointerDown = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setFilterOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [filterOpen])
 
   const updateItem = (sessionId: string, updates: Partial<AiRenameItem>) => {
     setItems(current => current.map(item => item.session.sessionId === sessionId ? { ...item, ...updates } : item))
@@ -443,7 +460,45 @@ function BatchAiRenameDialog({
           </div>
           <div className="min-w-0 flex-1">
             <div className="truncate text-[13px] font-semibold text-content">{t('batch.aiRenameTitle')}</div>
-            <div className="truncate text-[11px] text-content-4">{t('batch.aiRenameSubtitle', { count: sessions.length })}</div>
+            <div className="truncate text-[11px] text-content-4">{t('batch.aiRenameSubtitle', { count: initialSessions.length })}</div>
+          </div>
+          <div className="hidden max-w-[280px] truncate text-[11px] text-content-4 md:block">
+            {limited ? t('batch.aiRenameLimit', { limit: AI_RENAME_LIMIT }) : t('batch.aiRenameReadyCount', { count: readyCount })}
+          </div>
+          <div ref={filterRef} className="relative">
+            <Button
+              size="sm"
+              variant={filter === 'active' ? 'secondary' : 'accent'}
+              icon={<Filter className="h-3.5 w-3.5" />}
+              onClick={() => setFilterOpen(open => !open)}
+              aria-haspopup="menu"
+              aria-expanded={filterOpen}
+            >
+              {getAiRenameFilterLabel(t, filter)}
+            </Button>
+            {filterOpen && (
+              <div className="absolute right-0 top-[calc(100%+6px)] z-10 w-44 overflow-hidden rounded-xl border border-edge bg-surface py-1 shadow-xl">
+                {filterOptions.map(option => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => {
+                      setFilter(option.value)
+                      setFilterOpen(false)
+                    }}
+                    className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[12px] transition-colors ${filter === option.value ? 'bg-accent-subtle text-accent' : 'text-content-3 hover:bg-surface-2 hover:text-content'}`}
+                    role="menuitemradio"
+                    aria-checked={filter === option.value}
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className={`h-1.5 w-1.5 rounded-full ${filter === option.value ? 'bg-accent' : 'bg-content-4/50'}`} />
+                      {option.label}
+                    </span>
+                    <span className="text-[11px] text-content-4">{option.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <IconButton
             label={t('session.closeEsc')}
@@ -453,25 +508,10 @@ function BatchAiRenameDialog({
           />
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-b border-edge/60 bg-surface-2/35 px-4 py-2">
-          <label className="inline-flex items-center gap-2 text-[11px] font-medium text-content-3">
-            <input
-              type="checkbox"
-              checked={skipRenamed}
-              disabled={running || applying}
-              onChange={event => setSkipRenamed(event.target.checked)}
-              className="h-3.5 w-3.5 rounded border-edge accent-[var(--color-accent)]"
-            />
-            {t('batch.skipRenamed')}
-          </label>
-          <div className="text-[11px] text-content-4">
-            {limited ? t('batch.aiRenameLimit', { limit: AI_RENAME_LIMIT }) : t('batch.aiRenameReadyCount', { count: readyCount })}
-          </div>
-        </div>
-
         <div className="min-h-[260px] flex-1 overflow-y-auto px-4 py-3">
-          <div className="space-y-2">
-            {items.map(item => (
+          {visibleItems.length > 0 ? (
+            <div className="space-y-2">
+              {visibleItems.map(item => (
               <button
                 key={item.session.sessionId}
                 type="button"
@@ -495,8 +535,13 @@ function BatchAiRenameDialog({
                   {getAiRenameStatusLabel(t, item.status)}
                 </span>
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-52 items-center justify-center rounded-xl border border-dashed border-edge bg-surface-2/35 text-[12px] text-content-4">
+              {t('batch.noSessionsForFilter')}
+            </div>
+          )}
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t border-edge/70 px-4 py-3">
@@ -520,12 +565,11 @@ function BatchAiRenameDialog({
 function createAiRenameItems(
   sessions: SessionInfo[],
   getGTD: (sessionId: string) => GTDMetadata,
-  skipRenamed: boolean,
 ): AiRenameItem[] {
   return sessions.map(session => {
     const gtd = getGTD(session.sessionId)
     const customTitle = gtd.displayTitle?.trim()
-    const skipped = Boolean(skipRenamed && customTitle)
+    const skipped = Boolean(customTitle)
     return {
       session,
       currentTitle: customTitle || session.title,
@@ -534,6 +578,37 @@ function createAiRenameItems(
       selected: false,
     }
   })
+}
+
+function filterAiRenameItems(items: AiRenameItem[], filter: AiRenameFilter): AiRenameItem[] {
+  if (filter === 'all') return items
+  if (filter === 'active') return items.filter(item => item.status !== 'skipped')
+  return items.filter(item => item.status === filter)
+}
+
+function getAiRenameFilterOptions(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  items: AiRenameItem[],
+): Array<{ value: AiRenameFilter; label: string; count: number }> {
+  const countStatus = (status: AiRenameStatus) => items.filter(item => item.status === status).length
+  return [
+    { value: 'active', label: t('batch.filterActive'), count: items.filter(item => item.status !== 'skipped').length },
+    { value: 'all', label: t('batch.filterAll'), count: items.length },
+    { value: 'pending', label: t('batch.pending'), count: countStatus('pending') },
+    { value: 'ready', label: t('batch.ready'), count: countStatus('ready') },
+    { value: 'skipped', label: t('batch.skipped'), count: countStatus('skipped') },
+    { value: 'error', label: t('batch.failed'), count: countStatus('error') },
+    { value: 'applied', label: t('batch.applied'), count: countStatus('applied') },
+  ]
+}
+
+function getAiRenameFilterLabel(
+  t: (key: string, params?: Record<string, string | number>) => string,
+  filter: AiRenameFilter,
+): string {
+  if (filter === 'active') return t('batch.filterActive')
+  if (filter === 'all') return t('batch.filterAll')
+  return getAiRenameStatusLabel(t, filter)
 }
 
 function getAiRenameStatusLabel(t: (key: string, params?: Record<string, string | number>) => string, status: AiRenameStatus): string {
