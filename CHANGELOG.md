@@ -2,6 +2,19 @@
 
 All notable changes to CC Sessions are documented here.
 
+## [1.0.11] - 2026-06-20
+
+### Added
+
+- Add project open actions in Settings → Projects for Finder, Terminal, VS Code, and Xcode.
+- Add status filtering to the batch AI rename dialog, with skipped sessions hidden by default.
+
+### Changed
+
+- Remove the left sidebar Stats panel while keeping the full Statistics settings page.
+- Refresh README documentation for AI workflows, project management, updater testing, local data, and current prerequisites.
+- Polish AI rename and review loading/status indicators.
+
 ## [1.0.0] - 2026-06-08
 
 ### Added
