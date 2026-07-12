@@ -92,6 +92,7 @@ interface LoadingStateProps {
   className?: string
   compact?: boolean
   progress?: boolean
+  progressOnly?: boolean
 }
 
 export function LoadingState({
@@ -101,30 +102,36 @@ export function LoadingState({
   className,
   compact = false,
   progress = false,
+  progressOnly = false,
 }: LoadingStateProps) {
   return (
     <div
       className={cn(
         'flex flex-col items-center justify-center text-center',
-        compact ? 'gap-2 py-8' : 'gap-3 py-12',
+        compact ? 'gap-2 py-8' : progressOnly ? 'gap-4 py-12' : 'gap-3 py-12',
         className,
       )}
       role="status"
       aria-live="polite"
       aria-busy="true"
     >
-      <div className={cn(
-        'inline-flex items-center justify-center rounded-xl border border-accent/20 bg-accent-subtle text-accent shadow-sm',
-        compact ? 'h-8 w-8' : 'h-10 w-10',
-      )}>
-        {Icon ? <Icon className={cn(compact ? 'h-4 w-4' : 'h-5 w-5')} /> : <LoaderCircle className={cn('animate-spin', compact ? 'h-4 w-4' : 'h-5 w-5')} />}
-      </div>
-      <div>
+      {!progressOnly && (
+        <div className={cn(
+          'inline-flex items-center justify-center rounded-xl border border-accent/20 bg-accent-subtle text-accent shadow-sm',
+          compact ? 'h-8 w-8' : 'h-10 w-10',
+        )}>
+          {Icon ? <Icon className={cn(compact ? 'h-4 w-4' : 'h-5 w-5')} /> : <LoaderCircle className={cn('animate-spin', compact ? 'h-4 w-4' : 'h-5 w-5')} />}
+        </div>
+      )}
+      <div className={cn(progressOnly && 'space-y-1.5')}>
         <div className={cn('font-semibold text-content', compact ? 'text-[12px]' : 'text-[13px]')}>{title}</div>
         {description && <div className="mt-1 max-w-[320px] text-[11px] leading-relaxed text-content-4">{description}</div>}
       </div>
       {progress && (
-        <div className="h-0.5 w-40 overflow-hidden rounded-full bg-surface-3">
+        <div className={cn(
+          'overflow-hidden rounded-full bg-surface-3',
+          progressOnly ? 'h-1 w-48 shadow-inner' : 'h-0.5 w-40',
+        )}>
           <div className="h-full bg-accent animate-indeterminate-progress" />
         </div>
       )}

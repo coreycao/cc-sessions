@@ -461,7 +461,7 @@ export default function App() {
   if (store.loading) {
     return (
       <div className="flex items-center justify-center h-screen bg-surface">
-        <LoadingState title={t('app.scanningSessions')} description={t('app.scanningSessionsHint')} progress />
+        <LoadingState title={t('app.scanningSessions')} description={t('app.scanningSessionsHint')} progress progressOnly />
       </div>
     )
   }
