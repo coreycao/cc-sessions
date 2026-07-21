@@ -15,6 +15,13 @@ All notable changes to CC Sessions are documented here.
 - Refresh README documentation for AI workflows, project management, updater testing, local data, and current prerequisites.
 - Polish AI rename and review loading/status indicators.
 
+## [1.0.12] - 2026-07-21
+
+### Changed
+
+- Refine session scanning loading state for smoother UI feedback.
+- Polish settings input focus styles.
+
 ## [1.0.0] - 2026-06-08
 
 ### Added
